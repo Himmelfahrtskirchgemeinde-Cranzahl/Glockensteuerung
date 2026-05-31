@@ -26,17 +26,22 @@ PORT     STATE    SERVICE
 
 ## Portscan #2 – Vollständiger Scan (nmap `-p-`), 2026-05-31
 
-```
-Not shown: 65534 closed tcp ports (reset)
-PORT       STATE     SERVICE
-25423/tcp  filtered  unknown
-```
+⚠️ **Portscans sind bei diesem Gerät NICHT verlässlich** (Messrauschen):
 
-**Deutung:**
-- Von allen 65535 TCP-Ports ist **nur `25423/tcp` „filtered"** (alle übrigen `closed`).
-  → Sehr wahrscheinlich der **Steuer-Port** der ST5; per Firewall gegen Scans
-  abgeschirmt, nimmt aber die App an.
-- Port 80 ist auch im **Browser vom PC nicht erreichbar** → kein offenes Web-Interface.
+- **Lauf A:** meldet nur `25423/tcp filtered`.
+- **Lauf B (Wiederholung):** meldet `Warning: giving up on port because
+  retransmission cap hit (6)` und **18 völlig andere** „filtered" Ports
+  (4513, 7391, 10269, 11268, 13236, 15819, 17899, 18509, 19083, 22562,
+  25297, 27744, 32368, 34667, 39832, 45018, 46884, 60084) – **25423 ist nicht dabei**.
+
+**Deutung:** Das Gerät bzw. die Fritz!Box **drosselt/verwirft** Scan-Pakete
+(Rate-Limiting). Dadurch markiert nmap bei jedem Lauf **zufällig andere** Ports
+als „filtered". Die Ergebnisse sind **Artefakte, kein echter Portzustand**.
+→ Der Steuer-Port lässt sich **per Scan nicht** zuverlässig bestimmen
+(auch die frühere Annahme „25423" ist damit **nicht belegt**).
+
+➡️ **Konsequenz:** Portscanning als Methode verworfen. Der echte Port und das
+Protokoll müssen aus einem **Mitschnitt des App-Verkehrs** ermittelt werden.
 
 ## Mitschnitt-Versuch #1 (Fritz!Box, WLAN), 2026-05-31
 
@@ -61,16 +66,18 @@ TCP-Verbindung Handy↔VOCO **tatsächlich enthält**.
 ## Offene Punkte / nächste Schritte
 
 1. **Mitschnitt mit echtem VOCO-Verkehr** erzeugen (Anleitung:
-   [`Mitschnitt-Klartext.md`](Mitschnitt-Klartext.md)). Wichtig: vor dem Hochladen
-   prüfen, dass `192.168.178.151:25423` enthalten ist (Wireshark-Filter
-   `tcp.port == 25423`).
-2. Diese Verbindung analysieren → Befehl zum Auslösen eines Programms.
+   [`Mitschnitt-Klartext.md`](Mitschnitt-Klartext.md)). Filter im Mitschnitt nicht
+   auf einen Port festlegen, sondern auf die **Geräte-IP**: `ip.addr == 192.168.178.151`.
+2. Daraus den **echten Port** und das **Protokoll** ablesen, dann den Befehl zum
+   Auslösen eines Programms.
 3. Erst danach: Referenz-Client + Mapping ChurchTools-Veranstaltung → Programm.
 
 ## Verifizierte Fakten (Stand jetzt)
 
 - Steuerung erreichbar unter `192.168.178.151`, Hostname `HEW-VOCO.fritz.box`.
-- Einziger auffälliger Port: **TCP 25423** (Steuer-Port, firewall-abgeschirmt).
-- Noch **unbekannt**: das Anwendungsprotokoll auf 25423 sowie lokal/Cloud.
-  (Frühere Aussagen zu einem konkreten Protokoll waren nicht belegt und wurden
-  verworfen.)
+- Kommunikation lokal im LAN (Gerät hängt an der Fritz!Box).
+- **Unbekannt:** der Steuer-Port und das Anwendungsprotokoll.
+  Portscans sind wegen Rate-Limiting **unbrauchbar** (s. o.). Frühere Aussagen zu
+  Port `25423` und zu einem konkreten Protokoll waren **nicht belegt** und sind
+  verworfen.
+- Klärung nur über einen **Verkehrsmitschnitt der App** möglich.
