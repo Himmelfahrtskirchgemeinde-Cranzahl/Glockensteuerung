@@ -1,14 +1,18 @@
-# Lesbaren Mitschnitt erzeugen (Klartext statt verschlüsseltem WLAN)
+# Brauchbaren Mitschnitt des App-Verkehrs erzeugen
 
 **Warum:** Die bisherigen Fritz!Box-WLAN-Mitschnitte (`wlan-133…`, `wlan-135…`)
 sind zwar lesbar, enthalten aber **keinen einzigen Datenpunkt der Steuerung
 `192.168.178.151`** – nur unbeteiligtes Hintergrundrauschen (mDNS, IPv6, ARP,
-Broadcasts) anderer Geräte. Die eigentliche TCP-Verbindung Handy↔VOCO auf
-Port 25423 wurde nicht erfasst. Wir brauchen einen Mitschnitt, der **genau diese
-Verbindung enthält** (vor dem Hochladen mit Wireshark-Filter `tcp.port == 25423`
-prüfen!).
+Broadcasts) anderer Geräte. Auch **Portscans sind unbrauchbar** (das Gerät
+drosselt sie, Ergebnisse schwanken bei jedem Lauf). Wir brauchen daher einen
+Mitschnitt, der die **echte Verbindung Handy↔VOCO** enthält.
 
-Ziel ist immer: die TCP-Verbindung **Handy/App → `192.168.178.151:25423`** im Klartext.
+> **Filter immer auf die Geräte-IP, nicht auf einen Port:** `ip.addr == 192.168.178.151`
+> – den richtigen Port kennen wir noch nicht; er ergibt sich aus dem Mitschnitt.
+
+Ziel ist immer: die Verbindung **Handy/App ↔ `192.168.178.151`** im Klartext –
+**oder** der Nachweis, dass die App stattdessen ins Internet (HEW-Cloud
+`app.hew-voco.de`) telefoniert.
 
 ---
 
@@ -27,7 +31,7 @@ terminiert, sieht Wireshark den **entschlüsselten** Verkehr.
    - **Ja →** weiter mit Schritt 5.
    - **Nein →** Methode B verwenden (App braucht offenbar das gleiche Netz).
 5. In **Wireshark** den Adapter **„LAN-Verbindung* (Mobiler Hotspot)"** als Aufnahme
-   starten. Filter: `tcp.port == 25423`
+   starten. Filter: `ip.addr == 192.168.178.151`
 6. In der App die Aktionen ausführen: verbinden, Status abrufen, und – **nur wenn
    unkritisch** – **ein bestimmtes Programm auslösen** (merken: *welches*!).
 7. Aufnahme stoppen → **Datei → Speichern unter** → `.pcapng`.
@@ -46,7 +50,7 @@ VOCO-Verkehr verfehlt – diesmal sicherstellen, dass er enthalten ist:
      mitschneiden.
 2. **Parallel** in der App die ST5 ansteuern (verbinden, Status, ggf. ein
    Programm – welches gemerkt). Erst **danach** die Aufnahme stoppen.
-3. `.eth` in **Wireshark** öffnen, Filter `tcp.port == 25423`.
+3. `.eth` in **Wireshark** öffnen, Filter `ip.addr == 192.168.178.151`.
    - **Pakete sichtbar?** → Rechtsklick → **Follow → TCP Stream** → Screenshot
      (Hex/Roh-Ansicht) teilen **oder** Datei hochladen.
    - **Keine Pakete?** → der Mitschnitt hat den Verkehr wieder verfehlt →
@@ -58,9 +62,16 @@ VOCO-Verkehr verfehlt – diesmal sicherstellen, dass er enthalten ist:
 
 ---
 
-## Was wir aus dem lesbaren Mitschnitt brauchen
+## Was wir aus dem Mitschnitt brauchen
 
-- Bestätigung **lokal** (App spricht direkt mit `192.168.178.151`, nicht Cloud).
-- Den **exakten Bytestrom** der Verbindung auf Port 25423 – insbesondere die
-  Nachricht, die beim **Auslösen eines Programms** gesendet wird.
+- **Lokal oder Cloud?** Spricht die App direkt mit `192.168.178.151` – oder mit
+  einer Internet-Adresse (HEW-Cloud `app.hew-voco.de`)? Das ist die zentrale Frage.
+- Den **echten Port** und den **exakten Bytestrom** der relevanten Verbindung –
+  insbesondere die Nachricht, die beim **Auslösen eines Programms** gesendet wird.
 - Dazu: **welches Programm** in der App gedrückt wurde (zum Abgleich).
+
+> **Wichtiger Hinweis (neu):** `app.hew-voco.de` ist ein **Web-Portal mit Login**
+> (HEW-Cloud). Es ist daher gut möglich, dass die App **nicht lokal**, sondern
+> über diese Cloud steuert. Dann zeigt der Mitschnitt Verkehr zu einer
+> öffentlichen IP statt zu `192.168.178.151` – und eine saubere Anbindung liefe
+> über die Cloud (API von HEW nötig), nicht über das LAN.
