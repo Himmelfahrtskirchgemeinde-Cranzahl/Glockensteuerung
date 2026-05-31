@@ -58,6 +58,12 @@ HEW-Schnittstellen-Doku wäre die bevorzugte, dauerhaft wartbare Lösung.
 
 ## Fragen (Detailliste, falls technischer Ansprechpartner)
 
+0. **Funktion der Eingänge (wichtigste Frage):** Die ST5 hat 5 frei belegbare
+   Kanäle (auch als Eingang, 230 V). **Was genau löst ein aktivierter Eingang
+   aus** — einen bestimmten **Programmschritt/eine Melodie**, oder nur einen
+   **einzelnen Läutekreis/eine Glocke**? Wie wird das im Service-Mode zugeordnet?
+   Und: Wozu dienen **P1/P2** (Automatikschalter/Gruppensteuerung) genau?
+
 1. **Externe Steuereingänge:** Besitzt die VOCO-futura ST5 potentialfreie
    Eingänge, über die sich einzelne **Läuteprogramme** (oder einzelne Läutekreise)
    per Kontaktschluss von außen **auslösen** lassen?

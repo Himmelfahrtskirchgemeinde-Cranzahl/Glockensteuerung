@@ -4,17 +4,21 @@ Anbindung der Glockenläutesteuerung **HEW VOCO-futura ST5** an **ChurchTools**,
 damit das passende Läuteprogramm automatisch anhand der Termine im
 ChurchTools-**Veranstaltungsmodul** ausgelöst wird – ohne manuelle Programmwahl.
 
-> **Status:** Klärungsphase. Die Hauptfrage ist weiterhin, **wie sich die ST5 von
-> außen ansteuern lässt** (lokal im LAN vs. über die HEW-Cloud `app.hew-voco.de`).
-> Aktueller Schritt: **Auswertung der Bedienungsanleitung**.
+> **Status:** Handbuch ausgewertet. Gewählter Hauptweg: **Variante A** (Gateway +
+> Koppelrelais an die ST5-Eingänge). Plan: [`docs/Variante-A-Plan.md`](docs/Variante-A-Plan.md).
 
-## Bisher gesicherte Fakten
+## Bisher gesicherte Fakten (aus Handbuch)
 
+- ST5 hat **5 frei belegbare Stromkreise** (Läuten/Schlag/**Eingang**/Ausgang),
+  **5 Eingangskanäle 230 V~, nicht potentialfrei** → externe Auslösung via
+  **Koppelrelais** möglich (= Variante A).
+- **Offen:** Was genau ein Eingang auslöst (Programm vs. Einzelglocke) — bei HEW
+  zu klären, bevor verkabelt wird.
+- Fernsteuerung läuft offiziell über das **Web-Portal `www.hew-voco.de`**
+  (Benutzerkonto, voller Umfang nur mit kostenpflichtigem Freischaltcode); das
+  erklärt, warum lokal kein Steuer-Port auffindbar war. Eine offene API ist
+  **nicht** dokumentiert.
 - Steuerung im LAN: `192.168.178.151` = `HEW-VOCO.fritz.box`.
-- **Kein** lokal ansteuerbarer Port gefunden; Portscans sind wegen Rate-Limiting
-  unbrauchbar (schwankende Ergebnisse).
-- `app.hew-voco.de` ist ein **Login-Webportal** → **Verdacht** auf Cloud-Steuerung
-  (nicht bewiesen).
 
 ## Dokumente
 
