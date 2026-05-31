@@ -32,13 +32,39 @@ PORT     STATE    SERVICE
 - **Noch offen:** vollständiger Portscan (`-p-`, alle 65535) steht aus –
   der Steuer-Port könnte ein hoher Port sein.
 
+## Portscan #2 – Vollständiger Scan (nmap `-p-`), 2026-05-31
+
+```
+Not shown: 65534 closed tcp ports (reset)
+PORT       STATE     SERVICE
+25423/tcp  filtered  unknown
+```
+
+**Deutung:**
+- Von allen 65535 TCP-Ports ist **nur `25423/tcp` „filtered"** (alle übrigen `closed`).
+  → Sehr wahrscheinlich der **Steuer-Port** der ST5; per Firewall gegen Scans
+  abgeschirmt, nimmt aber die App an.
+- Port 80 ist auch im **Browser vom PC nicht erreichbar** → kein offenes Web-Interface.
+
+## Mitschnitt-Versuch #1 (Fritz!Box, WLAN), 2026-05-31
+
+- Zwei Dateien `wlan-133…`, `wlan-135…` (pcap, linktype **105 = IEEE 802.11**).
+- **Ergebnis: alle Daten-Frames sind WPA2-verschlüsselt** → IP/TCP-Nutzdaten
+  **nicht lesbar**. Aus diesen Mitschnitten lässt sich das Protokoll nicht ableiten.
+
 ## Offene Punkte / nächste Schritte
 
-1. Vollständiger Portscan `nmap -p- -T4 192.168.178.151`.
-2. Port 80 gezielt prüfen (Browser `http://192.168.178.151`, `nmap -p80 -sV -Pn`).
-3. **Entscheidend:** Datenverkehr **während der App-Nutzung** mitschneiden, um
-   Port, Protokoll, Richtung (lokal vs. Cloud) und ggf. Authentifizierung zu sehen.
-   - Option: **Fritz!Box-Paketmitschnitt** unter `http://fritz.box/html/capture.html`
-     (eingebaut, kein Zusatztool) – während App-Aktionen aufnehmen.
-   - Option: Windows-PC als **Mobiler Hotspot**, Handy darüber, Wireshark mitlaufen.
-4. Lokal/Cloud-Test mit der App (Internet aus, WLAN an).
+1. **Lesbaren** Mitschnitt erzeugen (Klartext-IP statt verschlüsseltem 802.11):
+   - **Variante A (empfohlen):** Windows-PC als *Mobiler Hotspot*, Handy darüber,
+     mit **Wireshark** auf dem Hotspot-Adapter aufnehmen → entschlüsselte
+     Ethernet/IP-Frames. Danach `.pcapng` hochladen.
+   - **Variante B:** Fritz!Box-WLAN-Mitschnitt wiederholen, dabei das Handy-WLAN
+     **trennen und neu verbinden** (4-Wege-Handshake aufzeichnen), dann in
+     Wireshark mit dem **WLAN-Passwort** entschlüsseln (IEEE-802.11-Einstellungen).
+2. Im lesbaren Mitschnitt: Verbindung zu `192.168.178.151:25423` analysieren
+   (Protokoll, Befehl zum Auslösen eines Programms).
+3. Erst danach: Referenz-Client + Mapping ChurchTools-Veranstaltung → Programm.
+
+> **Hinweis zur Sorgfalt:** Frühere, nicht abgeschlossene Analyseläufe hatten zu
+> verfrühten Protokoll-Aussagen geführt; diese wurden verworfen. Dieses Dokument
+> enthält nur tatsächlich verifizierte Messergebnisse.
