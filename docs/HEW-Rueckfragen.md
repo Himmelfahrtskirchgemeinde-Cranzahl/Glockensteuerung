@@ -7,9 +7,56 @@ entscheidende Punkt für die geplante ChurchTools-Anbindung.
 **Kontakt:** HEW Kirchturmtechnik, https://www.hew-hf.de/kirchturmtechnik/
 (Anlagen-/Seriennummer der eigenen ST5 bereithalten.)
 
+**Stand:** Wird **parallel** zur eigenen Datenverkehrs-Analyse
+([`Protokoll-Analyse.md`](Protokoll-Analyse.md)) verfolgt. Eine offizielle
+HEW-Schnittstellen-Doku wäre die bevorzugte, dauerhaft wartbare Lösung.
+
 ---
 
-## Fragen
+## Sendebereites Anschreiben (E-Mail / Kontaktformular)
+
+> Platzhalter in `[…]` vor dem Senden ausfüllen.
+
+**Betreff:** Anfrage Netzwerk-Schnittstelle / Protokoll VOCO-futura ST5 – Anbindung an Kalendersystem
+
+> Sehr geehrte Damen und Herren,
+>
+> wir betreiben in unserer Gemeinde [Name der Kirchengemeinde / Ort] eine
+> Läutesteuerung **VOCO-futura ST5** (Anlagen-/Seriennummer: [SN]). Die Anlage
+> ist über das mitgelieferte **LAN-Modul** mit unserem Netzwerk verbunden und
+> wird mit der **VOCO-futura App** bedient.
+>
+> Wir möchten die **Auswahl des Läuteprogramms automatisieren**: Unsere Termine
+> (Gottesdienste, Veranstaltungen) sind in der Gemeindesoftware **ChurchTools**
+> hinterlegt. Ein Rechner vor Ort soll künftig anhand dieser Termine
+> **automatisch das passende Läuteprogramm zur richtigen Zeit auslösen**, damit
+> die manuelle Programmwahl entfällt.
+>
+> Dazu bitten wir um Auskunft/Unterstützung:
+>
+> 1. Gibt es für das **LAN-/WLAN-Modul** der VOCO-futura eine **dokumentierte
+>    Schnittstelle/API** (z. B. REST/HTTP, MQTT, Modbus-TCP), über die ein
+>    eigenes System ein **bestimmtes Läuteprogramm auslösen** kann?
+> 2. Falls ja: Können Sie uns die **Schnittstellen-Dokumentation** bereitstellen
+>    (Endpunkte/Befehle, Ports, Authentifizierung)?
+> 3. Erfolgt die Steuerung der App **lokal im Netzwerk** oder über einen
+>    **HEW-Cloud-Dienst**? Ist eine Anbindung durch Drittsysteme vorgesehen?
+> 4. Alternativ: Besitzt die ST5 **potentialfreie Steuereingänge**, über die sich
+>    Programme per Kontaktschluss auslösen lassen (inkl. Klemmenplan)? Falls nicht
+>    vorhanden – gibt es ein **Nachrüstmodul**?
+> 5. Gibt es seitens HEW **Vorgaben oder Bedenken** (Gewährleistung, Sicherheit)
+>    zur automatisierten Ansteuerung, die wir beachten sollten?
+>
+> Über eine kurze Rückmeldung – idealerweise mit Hinweis auf die passende
+> technische Dokumentation – freuen wir uns sehr.
+>
+> Mit freundlichen Grüßen
+> [Name], [Funktion], [Kirchengemeinde]
+> [Telefon / E-Mail]
+
+---
+
+## Fragen (Detailliste, falls technischer Ansprechpartner)
 
 1. **Externe Steuereingänge:** Besitzt die VOCO-futura ST5 potentialfreie
    Eingänge, über die sich einzelne **Läuteprogramme** (oder einzelne Läutekreise)
