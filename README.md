@@ -11,8 +11,10 @@ ChurchTools-**Veranstaltungsmodul** ausgelöst wird – ohne manuelle Programmwa
 
 - [`docs/Konzept.md`](docs/Konzept.md) – Gesamtkonzept, Architektur, Varianten,
   Sicherheitsüberlegungen und nächste Schritte.
+- [`docs/Protokoll-Analyse.md`](docs/Protokoll-Analyse.md) – **Aktueller Schritt:**
+  Anleitung zur Analyse des App↔ST5-Datenverkehrs (Variante B / LAN).
 - [`docs/HEW-Rueckfragen.md`](docs/HEW-Rueckfragen.md) – Konkrete Fragen an HEW
-  zur externen Ansteuerbarkeit der ST5 (kritischer Klärungspunkt).
+  zur externen Ansteuerbarkeit der ST5 (optionale Rückfallebene).
 - [`docs/ChurchTools-API.md`](docs/ChurchTools-API.md) – Notizen zur
   ChurchTools-REST-API und zum Auslesen des Veranstaltungsmoduls.
 

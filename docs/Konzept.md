@@ -36,11 +36,16 @@ Bekannt (Herstellerangaben / Datenblatt):
 - Die *futura*-Serie verfügt über ein **LAN-Anschlussmodul** (WLAN optional)
   und eine **VOCO-futura App** zur Fern-Programmierung/-Steuerung.
 
-⚠️ **Kritische, noch offene Frage (blockierend):**
-Es ist **nicht öffentlich dokumentiert**, ob bzw. wie sich ein konkretes
-Läuteprogramm **von außen auslösen** lässt. Die App nutzt ein **proprietäres,
-nicht offengelegtes Protokoll**. Hiervon hängt die gesamte Umsetzung ab –
-siehe Abschnitt 4 und [`HEW-Rueckfragen.md`](HEW-Rueckfragen.md).
+⚠️ **Kritische, noch offene Frage (in Klärung):**
+Es ist **nicht öffentlich dokumentiert**, wie sich ein konkretes Läuteprogramm
+**von außen auslösen** lässt. Die App nutzt ein **proprietäres, nicht
+offengelegtes Protokoll**.
+
+> **Entscheidung:** Es wird **Variante B (LAN-/WLAN-Anbindung)** verfolgt, und das
+> Protokoll wird per **eigener Datenverkehrs-Analyse** (App ↔ ST5) ermittelt.
+> Vorgehen Schritt für Schritt in [`Protokoll-Analyse.md`](Protokoll-Analyse.md).
+> Offen ist noch, ob die App **lokal** oder **über die HEW-Cloud** steuert
+> (Test in der Analyse-Anleitung, Schritt 0).
 
 ### 2.2 ChurchTools (Terminquelle)
 
@@ -203,8 +208,8 @@ damit sicherheitsrelevant. Leitlinien:
 
 ## 9. Nächste Schritte
 
-1. **ST5-Ansteuerbarkeit klären** (Handbuch lesen / Fragen an HEW senden) →
-   bestimmt Variante A/B/C.
+1. **ST5-Protokoll ermitteln** (Variante B): Datenverkehr App↔ST5 analysieren
+   gemäß [`Protokoll-Analyse.md`](Protokoll-Analyse.md) – inkl. Test lokal/Cloud.
 2. ChurchTools-API-Zugang einrichten (technischer Benutzer + Token) und
    `GET /api/events` an der eigenen Instanz testen.
 3. Bestehende Läuteprogramme + Veranstaltungsarten erfassen und die
