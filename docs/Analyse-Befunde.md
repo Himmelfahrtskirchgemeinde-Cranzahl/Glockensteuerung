@@ -24,14 +24,6 @@ PORT     STATE    SERVICE
 3389/tcp filtered ms-wbt-server
 ```
 
-**Deutung:**
-- 97 Ports `closed` (RST) → Gerät reagiert aktiv.
-- Port **80 `filtered`** (kein RST, Paket verworfen) → Hinweis auf ein
-  **per Firewall abgeschirmtes Web-Interface** (anders als die 97 RST-Ports).
-- 139/3389 `filtered` → typisches Droppen gängiger Angriffsports.
-- **Noch offen:** vollständiger Portscan (`-p-`, alle 65535) steht aus –
-  der Steuer-Port könnte ein hoher Port sein.
-
 ## Portscan #2 – Vollständiger Scan (nmap `-p-`), 2026-05-31
 
 ```
@@ -48,23 +40,37 @@ PORT       STATE     SERVICE
 
 ## Mitschnitt-Versuch #1 (Fritz!Box, WLAN), 2026-05-31
 
-- Zwei Dateien `wlan-133…`, `wlan-135…` (pcap, linktype **105 = IEEE 802.11**).
-- **Ergebnis: alle Daten-Frames sind WPA2-verschlüsselt** → IP/TCP-Nutzdaten
-  **nicht lesbar**. Aus diesen Mitschnitten lässt sich das Protokoll nicht ableiten.
+Zwei Dateien `wlan-133…`, `wlan-135…` (Format: *modified pcap*, Magic `a1b2cd34`,
+24-Byte-Record-Header, linktype **105 = IEEE 802.11**).
+
+Sauber ausgewertet (288 bzw. 310 Pakete):
+- Frames sind **unverschlüsselt/lesbar** (kein WPA-Problem).
+- **Aber: kein einziges Paket zu/von `192.168.178.151`** enthalten.
+- Inhalt = nur **unbeteiligter Hintergrundverkehr** anderer Geräte:
+  mDNS (`224.0.0.251:5353`), IPv6, ARP, IGMP, Broadcasts.
+
+➡️ **Fazit:** Die App↔Steuerung-Verbindung (Port 25423) wurde **nicht erfasst**.
+Der Mitschnitt traf nicht den richtigen Pfad/Zeitpunkt. Es ist **kein**
+Verschlüsselungsproblem – wir brauchen einen Mitschnitt, der die unicast-
+TCP-Verbindung Handy↔VOCO **tatsächlich enthält**.
+
+> Hinweis: Eine frühere Notiz hatte diese Dateien fälschlich als
+> „WPA2-verschlüsselt" eingestuft. Das war ein Auswertungsfehler und ist
+> hiermit korrigiert.
 
 ## Offene Punkte / nächste Schritte
 
-1. **Lesbaren** Mitschnitt erzeugen (Klartext-IP statt verschlüsseltem 802.11):
-   - **Variante A (empfohlen):** Windows-PC als *Mobiler Hotspot*, Handy darüber,
-     mit **Wireshark** auf dem Hotspot-Adapter aufnehmen → entschlüsselte
-     Ethernet/IP-Frames. Danach `.pcapng` hochladen.
-   - **Variante B:** Fritz!Box-WLAN-Mitschnitt wiederholen, dabei das Handy-WLAN
-     **trennen und neu verbinden** (4-Wege-Handshake aufzeichnen), dann in
-     Wireshark mit dem **WLAN-Passwort** entschlüsseln (IEEE-802.11-Einstellungen).
-2. Im lesbaren Mitschnitt: Verbindung zu `192.168.178.151:25423` analysieren
-   (Protokoll, Befehl zum Auslösen eines Programms).
+1. **Mitschnitt mit echtem VOCO-Verkehr** erzeugen (Anleitung:
+   [`Mitschnitt-Klartext.md`](Mitschnitt-Klartext.md)). Wichtig: vor dem Hochladen
+   prüfen, dass `192.168.178.151:25423` enthalten ist (Wireshark-Filter
+   `tcp.port == 25423`).
+2. Diese Verbindung analysieren → Befehl zum Auslösen eines Programms.
 3. Erst danach: Referenz-Client + Mapping ChurchTools-Veranstaltung → Programm.
 
-> **Hinweis zur Sorgfalt:** Frühere, nicht abgeschlossene Analyseläufe hatten zu
-> verfrühten Protokoll-Aussagen geführt; diese wurden verworfen. Dieses Dokument
-> enthält nur tatsächlich verifizierte Messergebnisse.
+## Verifizierte Fakten (Stand jetzt)
+
+- Steuerung erreichbar unter `192.168.178.151`, Hostname `HEW-VOCO.fritz.box`.
+- Einziger auffälliger Port: **TCP 25423** (Steuer-Port, firewall-abgeschirmt).
+- Noch **unbekannt**: das Anwendungsprotokoll auf 25423 sowie lokal/Cloud.
+  (Frühere Aussagen zu einem konkreten Protokoll waren nicht belegt und wurden
+  verworfen.)
