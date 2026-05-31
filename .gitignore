@@ -1,0 +1,16 @@
+# Geheimnisse / lokale Konfiguration - NIEMALS committen
+.env
+.env.*
+!.env.example
+*.key
+secrets/
+
+# Mitschnitte koennen sensible Daten enthalten
+*.pcap
+*.pcapng
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
