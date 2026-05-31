@@ -1,30 +1,42 @@
-# HEW VOCO Cloud-Portal (app.hew-voco.de) — HYPOTHESE, zu prüfen
+# HEW VOCO Web-Portal (www.hew-voco.de) — belegte Fakten
 
-> ⚠️ **Status: unbestätigt.** Belegt ist nur, dass **`hew-voco.de/login` /
-> `app.hew-voco.de`** ein **Web-Portal mit Anmeldung** ist (aus Websuche).
-> **Nicht** belegt ist, ob es dort eine API/API-Keys gibt. (Eine frühere Notiz
-> hatte das fälschlich als gesichert dargestellt — hiermit korrigiert.)
-> Aus der Cloud-Umgebung ist das Portal nicht erreichbar (403).
+## Was das Handbuch sagt (Kap. 4.7 „Netzwerk", Kap. „Speicherkarte/Backup")
 
-## Warum diese Spur wichtig ist
+- Die VOCO-futura ST5 kann per **LAN (RJ45)** oder **WLAN (optional)** ins Netz.
+  Internet dient für **Zeit-Sync** *und* **Fernsteuerung\* per Browser**.
+- **Fernsteuerung/Konfiguration läuft über `www.hew-voco.de`** (Benutzerkonto,
+  „hier registrieren"). Kostenloses Testen möglich.
+- **\* Voller Funktionsumfang nur mit kostenpflichtigem Freischaltcode**
+  (Vertriebspartner / `0 52 21 / 59 04-21`, `kirchentechnik@hew-hf.de`).
+  Ohne Freischaltcode u. a. **kein Download** von Konfigurationen.
+- **Backups** lassen sich auf `hew-voco.de` **hochladen und bearbeiten**
+  (ebenfalls Freischaltcode nötig).
+- „**Fernzugriff erlauben**" (Einstellungen→Sicherheit) = Fernwartung, braucht
+  Internet.
 
-HEW bewirbt die VOCO-futura mit Fernsteuerung *„von zu Hause, unterwegs oder aus
-dem Büro"* und einem **LAN-Modul**. Zusammen mit dem Login-Portal spricht das
-dafür, dass die App **möglicherweise über die HEW-Cloud** steuert (statt rein
-lokal). Das würde auch erklären, warum lokal **kein** ansteuerbarer Port
-gefunden wurde. **Bewiesen ist das aber nicht.**
+## Bewertung
 
-## Was zu klären ist (sobald du im Portal bist)
+- Es gibt also ein **offizielles Web-Portal mit Fernsteuerung** – das ist die
+  dokumentierte Cloud-Steuerung. Das erklärt, warum **lokal kein offener
+  Steuer-Port** zu finden war.
+- ⚠️ **Eine offene/dokumentierte Programmier-API ist im Handbuch NICHT erwähnt.**
+  „Fernsteuerung per Browser" heißt nicht zwangsläufig „nutzbare API für
+  Drittsysteme". Ob es eine API/Webhooks gibt, ist **offen** und am besten
+  **direkt bei HEW** zu erfragen (siehe [`HEW-Rueckfragen.md`](HEW-Rueckfragen.md)).
 
-1. Gibt es im eingeloggten Portal einen Bereich **„API", „Integrationen",
-   „Entwickler", „Webhooks", „Token/Schlüssel"**? → Screenshot.
-2. Falls ja: Basis-URL, Auth-Verfahren, Endpunkte zum **Programme auflisten** und
-   **Programm starten**. (Dann ist das der sauberste Weg, ganz ohne Reverse-Eng.)
-3. Falls nein: Steuerung läuft evtl. nur über App/Cloud ohne offene API →
-   dann ist die **HEW-Anfrage** ([`HEW-Rueckfragen.md`](HEW-Rueckfragen.md)) der Weg.
+## Falls eine API existiert (zu prüfen, optionaler Weg)
 
-## Sicherheit (falls doch API-Keys existieren)
+> Nur relevant, wenn HEW eine API bestätigt **oder** du im eingeloggten Portal
+> API-Aufrufe siehst. **Aktuell nicht der gewählte Hauptweg** (das ist Variante A).
 
-- API-Key/Token ist ein **Geheimnis** → **nie** ins Repo/Chat, in Screenshots
-  unkenntlich machen. Lokal in `.env` (per `.gitignore` ausgeschlossen),
-  Vorlage: [`../.env.example`](../.env.example).
+1. Im Portal einloggen, **F12 → Network → Fetch/XHR**, lesende Aktion ausführen,
+   einen Aufruf inspizieren: **URL-Muster, Methode, Auth-Header-Name** (nicht den
+   Wert!), Antwort-JSON.
+2. Erkenntnisse hier eintragen.
+
+### 🔐 Sicherheit
+- Zugangsdaten / Tokens / API-Keys sind **Geheimnisse**: **nie** in Repo, Chat,
+  Screenshots oder Shell-History. Lokal nur in **`.env`** (per `.gitignore`
+  ausgeschlossen), Vorlage [`../.env.example`](../.env.example).
+- Aus dieser Auswertungsumgebung werden **keine** Zugangsdaten an externe Hosts
+  gesendet; API-Tests laufen lokal beim Nutzer.
