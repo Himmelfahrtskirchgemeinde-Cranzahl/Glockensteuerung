@@ -1,9 +1,12 @@
 # Lesbaren Mitschnitt erzeugen (Klartext statt verschlüsseltem WLAN)
 
 **Warum:** Die bisherigen Fritz!Box-WLAN-Mitschnitte (`wlan-133…`, `wlan-135…`)
-enthalten nur **WPA2-verschlüsselte 802.11-Frames** (alle Daten-Frames protected,
-kein EAPOL-Handshake). Sie sind inhaltlich **nicht lesbar** und auch nachträglich
-**nicht entschlüsselbar**. Wir brauchen einen Mitschnitt mit **Klartext-IP**.
+sind zwar lesbar, enthalten aber **keinen einzigen Datenpunkt der Steuerung
+`192.168.178.151`** – nur unbeteiligtes Hintergrundrauschen (mDNS, IPv6, ARP,
+Broadcasts) anderer Geräte. Die eigentliche TCP-Verbindung Handy↔VOCO auf
+Port 25423 wurde nicht erfasst. Wir brauchen einen Mitschnitt, der **genau diese
+Verbindung enthält** (vor dem Hochladen mit Wireshark-Filter `tcp.port == 25423`
+prüfen!).
 
 Ziel ist immer: die TCP-Verbindung **Handy/App → `192.168.178.151:25423`** im Klartext.
 
@@ -32,23 +35,26 @@ terminiert, sieht Wireshark den **entschlüsselten** Verkehr.
 
 ---
 
-## Methode B (Alternative): WLAN-Mitschnitt MIT Handshake + Wireshark entschlüsseln
+## Methode B (Alternative): Fritz!Box-Mitschnitt – aber richtig
 
-Falls die App nur im gewohnten Netz funktioniert:
+Falls die App nur im gewohnten Netz funktioniert. Der vorige Versuch hat den
+VOCO-Verkehr verfehlt – diesmal sicherstellen, dass er enthalten ist:
 
-1. Fritz!Box-Mitschnitt starten (`http://fritz.box/html/capture.html`, WLAN-Interface).
-2. **Während** der Aufnahme: Handy-**WLAN aus- und wieder einschalten**
-   → so wird der **4-Wege-Handshake** mit aufgezeichnet (Pflicht zum Entschlüsseln).
-3. App öffnen, Aktionen ausführen (s. o., welches Programm gemerkt).
-4. Aufnahme stoppen → `.eth`.
-5. In **Wireshark** entschlüsseln:
-   **Bearbeiten → Einstellungen → Protocols → IEEE 802.11**
-   → „Enable decryption" + Schlüssel **`wpa-pwd`** = `WLAN-PASSWORT:SSID`.
-6. Filter `tcp.port == 25423` → Rechtsklick → **Follow → TCP Stream**
-   → den Inhalt als **Screenshot** teilen (Hex/Roh-Ansicht).
+1. Fritz!Box-Mitschnitt `http://fritz.box/html/capture.html` starten.
+   - **Richtige Schnittstelle wählen:** die, über die das **Handy** läuft
+     (WLAN). Hängt die ST5 am LAN-Kabel, ggf. zusätzlich die LAN-Schnittstelle
+     mitschneiden.
+2. **Parallel** in der App die ST5 ansteuern (verbinden, Status, ggf. ein
+   Programm – welches gemerkt). Erst **danach** die Aufnahme stoppen.
+3. `.eth` in **Wireshark** öffnen, Filter `tcp.port == 25423`.
+   - **Pakete sichtbar?** → Rechtsklick → **Follow → TCP Stream** → Screenshot
+     (Hex/Roh-Ansicht) teilen **oder** Datei hochladen.
+   - **Keine Pakete?** → der Mitschnitt hat den Verkehr wieder verfehlt →
+     Methode A (PC-Hotspot) verwenden, die garantiert den Handy-Verkehr sieht.
 
-> WLAN-Passwort **nicht** ins Repo/Chat schreiben – die Entschlüsselung passiert
-> lokal in Wireshark.
+> Sollten WLAN-Frames ausnahmsweise doch verschlüsselt sein (protected), in
+> Wireshark unter *IEEE 802.11* mit `wpa-pwd = WLAN-PASSWORT:SSID` entschlüsseln
+> (Passwort nur lokal eingeben, nicht ins Repo/Chat).
 
 ---
 
