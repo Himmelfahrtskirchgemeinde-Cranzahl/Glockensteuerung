@@ -1,16 +1,21 @@
-# Geheimnisse / lokale Konfiguration - NIEMALS committen
+# Geheimnisse / lokale Konfiguration — NIEMALS committen
 .env
 .env.*
 !.env.example
-*.key
+*.secret
 secrets/
 
-# Mitschnitte koennen sensible Daten enthalten
+# Mitschnitte / Rohdaten (können sensibel sein, groß)
 *.pcap
 *.pcapng
+*.eth
 
 # Python
 __pycache__/
 *.pyc
 .venv/
 venv/
+
+# OS/Editor
+.DS_Store
+*.swp

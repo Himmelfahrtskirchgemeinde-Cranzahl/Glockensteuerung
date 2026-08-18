@@ -4,21 +4,25 @@ Anbindung der Glockenläutesteuerung **HEW VOCO-futura ST5** an **ChurchTools**,
 damit das passende Läuteprogramm automatisch anhand der Termine im
 ChurchTools-**Veranstaltungsmodul** ausgelöst wird – ohne manuelle Programmwahl.
 
-> **Status:** Handbuch ausgewertet. Gewählter Hauptweg: **Variante A** (Gateway +
-> Koppelrelais an die ST5-Eingänge). Plan: [`docs/Variante-A-Plan.md`](docs/Variante-A-Plan.md).
+> **Status: Durchbruch.** Die Steuerung erfolgt über **MQTT (WebSocket) am
+> HEW-Broker `hew-voco.de:8084`** — belegt aus dem Web-App-Quelltext. Damit ist
+> ein **verkabelungsfreier** Weg möglich (kein Relais nötig).
+> → Protokoll: [`docs/VOCO-MQTT-Protokoll.md`](docs/VOCO-MQTT-Protokoll.md),
+> Client: [`src/voco_mqtt.py`](src/voco_mqtt.py).
 
-## Bisher gesicherte Fakten (aus Handbuch)
+## Bisher gesicherte Fakten
 
-- ST5 hat **5 frei belegbare Stromkreise** (Läuten/Schlag/**Eingang**/Ausgang),
-  **5 Eingangskanäle 230 V~, nicht potentialfrei** → externe Auslösung via
-  **Koppelrelais** möglich (= Variante A).
-- **Offen:** Was genau ein Eingang auslöst (Programm vs. Einzelglocke) — bei HEW
-  zu klären, bevor verkabelt wird.
-- Fernsteuerung läuft offiziell über das **Web-Portal `www.hew-voco.de`**
-  (Benutzerkonto, voller Umfang nur mit kostenpflichtigem Freischaltcode); das
-  erklärt, warum lokal kein Steuer-Port auffindbar war. Eine offene API ist
-  **nicht** dokumentiert.
-- Steuerung im LAN: `192.168.178.151` = `HEW-VOCO.fritz.box`.
+- **MQTT-Steuerung (empfohlener Weg):** Programm auslösen =
+  `START:<PGS-Name>:INSTANT` an Topic `hew/voco/<Serial><GerätePW>/playpgsD`
+  (Broker `hew-voco.de:8084`, WSS, Login `hewWeb`/`vocoWeb`).
+- 🔐 Seriennummer + **Geräte-Passwort** = Zugang zum Läuten → **geheim** halten,
+  nur in `.env` (siehe [`.env.example`](.env.example)), nie committen.
+- Läuft über die **HEW-Cloud** (Broker), also internetabhängig; ggf.
+  Freischaltcode-Relevanz beim Test prüfen.
+- **Alternative (Rückfall):** Variante A (Eingänge + Koppelrelais),
+  [`docs/Variante-A-Plan.md`](docs/Variante-A-Plan.md) — nur falls der MQTT-Weg
+  ausfällt.
+- Gerät im LAN: `192.168.178.151` = `HEW-VOCO.fritz.box`, Serie ST5, FW 1.27.
 
 ## Dokumente
 
