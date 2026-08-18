@@ -19,3 +19,12 @@ venv/
 # OS/Editor
 .DS_Store
 *.swp
+
+# Node / Extension-Build
+node_modules/
+dist/
+releases/
+
+# Gateway-Laufzeitstatus
+state.json
+gateway/state.json
