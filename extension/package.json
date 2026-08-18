@@ -1,0 +1,21 @@
+{
+    "name": "glockensteuerung",
+    "private": true,
+    "version": "0.1.0",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc && vite build",
+        "preview": "vite preview",
+        "deploy": "npm run build && node scripts/package.js"
+    },
+    "dependencies": {
+        "mqtt": "^5.10.0"
+    },
+    "devDependencies": {
+        "@churchtools/churchtools-client": "^1.4.0",
+        "@types/node": "^24.3.0",
+        "typescript": "^5.9.2",
+        "vite": "^7.1.2"
+    }
+}

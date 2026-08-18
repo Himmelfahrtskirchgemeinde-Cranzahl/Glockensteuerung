@@ -51,14 +51,22 @@ def decode_name(raw: str) -> str:
 
 
 class Voco:
-    def __init__(self):
-        self.serial = _req("VOCO_SERIAL")
-        self.devpw = _req("VOCO_DEVICE_PW")
-        self.host = os.environ.get("VOCO_BROKER_HOST", "hew-voco.de")
-        self.port = int(os.environ.get("VOCO_BROKER_PORT", "8084"))
-        user = os.environ.get("VOCO_BROKER_USER", "hewWeb")
-        pw = os.environ.get("VOCO_BROKER_PASS", "vocoWeb")
-        ws_path = os.environ.get("VOCO_WS_PATH", "/mqtt")
+    def __init__(self, serial=None, device_pw=None, broker_url=None,
+                 host=None, port=None, ws_path=None, user=None, password=None):
+        self.serial = serial or _req("VOCO_SERIAL")
+        self.devpw = device_pw or _req("VOCO_DEVICE_PW")
+        # Broker-URL (wss://host:port/pfad) hat Vorrang, sonst Einzelwerte/ENV
+        if broker_url:
+            from urllib.parse import urlparse
+            u = urlparse(broker_url)
+            host = host or u.hostname
+            port = port or u.port
+            ws_path = ws_path or (u.path or "/mqtt")
+        self.host = host or os.environ.get("VOCO_BROKER_HOST", "hew-voco.de")
+        self.port = int(port or os.environ.get("VOCO_BROKER_PORT", "8084"))
+        user = user or os.environ.get("VOCO_BROKER_USER", "hewWeb")
+        pw = password or os.environ.get("VOCO_BROKER_PASS", "vocoWeb")
+        ws_path = ws_path or os.environ.get("VOCO_WS_PATH", "/mqtt")
         self.base = f"hew/voco/{self.serial}{self.devpw}"
 
         self.online = None

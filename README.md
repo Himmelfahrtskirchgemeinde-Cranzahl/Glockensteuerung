@@ -24,9 +24,32 @@ ChurchTools-**Veranstaltungsmodul** ausgelöst wird – ohne manuelle Programmwa
   ausfällt.
 - Gerät im LAN: `192.168.178.151` = `HEW-VOCO.fritz.box`, Serie ST5, FW 1.27.
 
+## Komponenten (Umsetzung)
+
+```
+   ┌────────────────────────────┐        ┌──────────────────────────┐
+   │  ChurchTools-Extension     │        │  Gateway-Dienst (Python) │
+   │  (Browser-Modul)           │        │  auf dem Dauer-PC        │
+   │  • Status + manuell läuten │        │  • liest CT-Termine      │
+   │  • Regeln: Termin→PGS      │──KV──▶ │  • + Regeln (aus CT)     │
+   └──────────┬─────────────────┘ Config │  • löst automatisch aus  │
+              │ MQTT/WSS                  └───────────┬──────────────┘
+              ▼                                       │ MQTT/WSS
+        ┌───────────────────────  hew-voco.de:8084 ───▼───────────┐
+        │              HEW-Broker  →  VOCO-futura ST5              │
+        └──────────────────────────────────────────────────────────┘
+```
+
+- **[`extension/`](extension/)** – ChurchTools Custom-Module (TypeScript/Vite):
+  Bedien-Panel + Konfiguration der Automatik-Regeln. Bauen: `npm run deploy`.
+- **[`gateway/`](gateway/)** – Python-Dienst: löst zur Termin-Zeit automatisch
+  aus (`python scheduler.py`). Liest Gerät + Regeln aus ChurchTools.
+- Beide sprechen den HEW-Broker per MQTT (Protokoll: `docs/VOCO-MQTT-Protokoll.md`).
+
 ## Dokumente
 
 - [`docs/Konzept.md`](docs/Konzept.md) – Gesamtkonzept, Architektur, Varianten.
+- [`docs/VOCO-MQTT-Protokoll.md`](docs/VOCO-MQTT-Protokoll.md) – **Steuerprotokoll** (belegt).
 - [`docs/Handbuch-Auswertung.md`](docs/Handbuch-Auswertung.md) – **Aktueller Schritt:**
   was aus der Bedienungsanleitung zu klären ist (PDF bitte ins Repo laden).
 - [`docs/HEW-Cloud-API.md`](docs/HEW-Cloud-API.md) – Hypothese Cloud-Portal/-API (zu prüfen).
