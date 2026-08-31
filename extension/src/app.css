@@ -52,6 +52,8 @@ html, body { margin: 0; padding: 0; height: 100%; }
 .gs-mhead .mi { width: 36px; height: 36px; border-radius: 9px; flex: none; background: var(--gs-blue-tint); color: var(--gs-blue); display: grid; place-items: center; }
 .gs-mhead h1 { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; color: var(--gs-head); margin: 0; }
 .gs-mhead .sp { flex: 1; }
+.gs-vdiv { width: 1px; height: 24px; flex: none; align-self: center; background: var(--gs-border-strong); margin: 0 6px; }
+.gs-badge { background: var(--gs-danger); color: #fff; border-radius: 999px; font-size: 11px; min-width: 17px; height: 17px; padding: 0 5px; display: inline-grid; place-items: center; margin-left: 2px; }
 
 /* ---- Hauptbereich: Seitenleiste + Inhalt, volle Höhe ---- */
 .gs-main { flex: 1; display: flex; align-items: stretch; min-height: 0; }
@@ -63,7 +65,7 @@ html, body { margin: 0; padding: 0; height: 100%; }
 .gs-compat b { color: var(--gs-head); }
 
 /* ---- Seitenleiste (durchgehend, links bündig) ---- */
-.gs-subnav { display: flex; flex-direction: column; gap: 2px; width: 240px; flex: none; background: var(--gs-surface); border-right: 1px solid var(--gs-border); padding: 12px 12px 24px; position: sticky; top: 58px; align-self: flex-start; height: calc(100vh - 58px); overflow-y: auto; }
+.gs-subnav { display: flex; flex-direction: column; gap: 2px; width: 240px; flex: none; background: var(--gs-surface); border-right: 1px solid var(--gs-border); padding: 12px 12px 24px; overflow-y: auto; min-height: 0; }
 .gs-subnav .lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gs-faint); padding: 14px 12px 6px; }
 .gs-subnav button { display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: var(--gs-radius-sm); color: var(--gs-text); font: inherit; font-weight: 500; font-size: 14px; background: none; border: none; cursor: pointer; text-align: left; width: 100%; }
 .gs-subnav button svg { width: 18px; height: 18px; color: var(--gs-dim); flex: none; }
@@ -73,7 +75,7 @@ html, body { margin: 0; padding: 0; height: 100%; }
 .gs-subnav .cnt { margin-left: auto; font-size: 12px; font-weight: 700; background: var(--gs-surface-2); color: var(--gs-dim); border: 1px solid var(--gs-border); border-radius: 999px; padding: 0 7px; }
 .gs-subfoot { margin-top: auto; padding: 14px 12px 2px; font-size: 11.5px; line-height: 1.7; color: var(--gs-faint); border-top: 1px solid var(--gs-border); }
 .gs-subfoot .ver { font-weight: 700; color: var(--gs-dim); }
-.gs-subfoot .heart { color: var(--gs-danger); }
+.gs-subfoot .heart { color: var(--gs-faint); }
 
 /* ---- Karten ---- */
 .gs-card { background: var(--gs-surface); border: 1px solid var(--gs-border); border-radius: var(--gs-radius); margin-bottom: 16px; }
