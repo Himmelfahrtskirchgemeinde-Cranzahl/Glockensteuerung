@@ -26,6 +26,7 @@ Basiert auf dem offiziellen
   Bei einem Versions-Tag (`v*`) hängt sie zusätzlich am **Release**. Details:
   [`../ANLEITUNG.md`](../ANLEITUNG.md), Teil 1.
 - **Lokal:** siehe „Bauen & Installieren" unten.
+- [Bauen & Installieren]
 
 ## Entwicklung
 
