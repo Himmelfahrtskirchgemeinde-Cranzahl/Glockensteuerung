@@ -2,7 +2,15 @@
 
 Liest die ChurchTools-Termine + die in der Extension konfigurierten Regeln und
 löst zur richtigen Zeit das passende VOCO-Läuteprogramm per MQTT aus.
-Läuft dauerhaft auf dem **Dauer-PC vor Ort** (braucht Internet).
+
+Läuft auf **irgendeinem dauerhaft laufenden Rechner mit Internet** – das muss
+**nicht** in der Kirche stehen: Raspberry Pi, kleiner Server/VPS oder ein
+vorhandener Dauer-PC. (Steuerung und ChurchTools laufen über das Internet.)
+
+> **📖 Komplette Einrichtung Schritt für Schritt: [`../ANLEITUNG.md`](../ANLEITUNG.md)**
+
+> **🛡️ Simulation:** `python scheduler.py --dry-run` plant und protokolliert,
+> löst aber **nicht** aus. Dauerhaft: `VOCO_SIMULATION=1` in der `.env`.
 
 ## Einrichtung
 
