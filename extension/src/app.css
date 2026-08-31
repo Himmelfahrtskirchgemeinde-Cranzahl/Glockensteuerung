@@ -79,7 +79,8 @@ html, body { margin: 0; padding: 0; height: 100%; }
 .gs-count { font-size: 12.5px; color: var(--gs-dim); background: var(--gs-surface-2); border: 1px solid var(--gs-border); padding: 3px 10px; border-radius: 999px; font-weight: 600; }
 
 /* ---- Pills ---- */
-.gs-pill { display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+.gs-pill { display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: 999px; font-size: 13px; font-weight: 600; white-space: nowrap; flex: none; }
+.gs-pill .dot { flex: none; }
 .gs-pill .dot { width: 8px; height: 8px; border-radius: 50%; }
 .gs-pill.ok { background: var(--gs-success-bg); color: var(--gs-success-fg); }
 .gs-pill.ok .dot { background: var(--gs-green); }
@@ -186,6 +187,7 @@ html, body { margin: 0; padding: 0; height: 100%; }
 
 @media (prefers-reduced-motion: reduce) { .gs *, .gs-toggle::after { transition: none !important; } }
 @media (max-width: 820px) {
+  .gs-mhead { height: auto; min-height: 58px; flex-wrap: wrap; padding: 8px 14px; }
   .gs-main { flex-direction: column; }
   .gs-subnav { width: auto; height: auto; position: static; border-right: none; border-bottom: 1px solid var(--gs-border); flex-direction: row; flex-wrap: wrap; align-items: center; }
   .gs-subnav .lbl { width: 100%; }
