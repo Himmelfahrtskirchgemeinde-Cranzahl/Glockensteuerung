@@ -95,10 +95,10 @@ export class VocoMqtt {
     public onUpdate?: () => void;
     /** Simulationsmodus: sendet KEINE auslösenden Befehle, protokolliert sie nur. */
     public simulate = true;
-    public onLog?: (line: string, dir: 'in' | 'out' | 'sim') => void;
+    public onLog?: (line: string, dir: 'in' | 'out' | 'sim' | 'info') => void;
     private syncdataLogged = false;
 
-    private log(line: string, dir: 'in' | 'out' | 'sim') { this.onLog?.(line, dir); }
+    private log(line: string, dir: 'in' | 'out' | 'sim' | 'info') { this.onLog?.(line, dir); }
 
     constructor(cfg: VocoConfig) {
         this.cfg = {
@@ -128,7 +128,7 @@ export class VocoMqtt {
                 settled = true;
                 c.subscribe(`${this.base}/#`);
                 this.requestSync();
-                if (reconnected) this.log('wieder verbunden', 'in');
+                this.log(reconnected ? 'wieder mit Broker verbunden' : 'mit Broker verbunden', 'info');
                 resolve();
             });
             // Nur der ERSTE Verbindungsfehler ist fatal. Spaetere sind vom
@@ -136,9 +136,9 @@ export class VocoMqtt {
             // gemeldeter Fehler).
             c.on('error', (e) => {
                 if (!settled) { settled = true; reject(e); }
-                else this.log('Verbindung unterbrochen – verbinde neu …', 'in');
+                else this.log('Verbindung unterbrochen – verbinde neu …', 'info');
             });
-            c.on('offline', () => { if (settled) this.log('Verbindung unterbrochen – verbinde neu …', 'in'); });
+            c.on('offline', () => { if (settled) this.log('Verbindung unterbrochen – verbinde neu …', 'info'); });
             c.on('message', (topic, payload) => this.onMessage(topic, payload.toString('latin1')));
         });
     }
@@ -167,7 +167,7 @@ export class VocoMqtt {
         this.pub('/fetchinfo', 'EN');
         this.pub('/playpgsD', 'list');
         this.pub('/fetchdata', '1'); // Katalog (sPGS, Programmschritte, Melodien …) anfordern
-        this.log('Status/Programme angefragt (lesend)', 'out');
+        this.log('Status/Programme angefragt (lesend)', 'info');
     }
 
     /** Programm sofort starten. name = ROHER Name (wie empfangen). */
@@ -186,35 +186,41 @@ export class VocoMqtt {
 
     private onMessage(topic: string, payload: string) {
         const sub = topic.substring(this.base.length);
+        // Hinweis zur Kennzeichnung: Gerätestatus, Listen, Katalog und Echos sind
+        // laufende INFOS (ℹ). Als „Antwort" (◀) gilt nur echtes Läuten – das wird
+        // in App.vue aus der Änderung der laufenden Programme abgeleitet.
+        const short = payload.length > 80 ? payload.slice(0, 80) + '…' : payload;
         if (sub === '/connection') {
             this.status.online = payload === '1';
-            this.log(`Gerät meldet: ${payload === '1' ? 'online' : 'offline'}`, 'in');
+            this.log(`Gerät meldet: ${payload === '1' ? 'online' : 'offline'}`, 'info');
         } else if (sub === '/sendpgsD') {
             const i = payload.indexOf(':');
             if (i >= 0) {
                 this.status.playable = parseLenPrefixed(payload.substring(0, i));
                 this.status.stoppable = parseLenPrefixed(payload.substring(i + 1));
             }
-            this.log(`Programmliste empfangen (${this.status.playable.length} startbar)`, 'in');
+            this.log(`Programmliste empfangen (${this.status.playable.length} startbar, ${this.status.stoppable.length} laufend)`, 'info');
         } else if (sub === '/sw') {
-            this.log(`Schlagwerk: ${payload}`, 'in');
+            this.log(`Schlagwerk: ${payload}`, 'info');
         } else if (sub === '/auto') {
-            this.log(`Automatik: ${payload}`, 'in');
+            this.log(`Automatik: ${payload}`, 'info');
         } else if (sub === '/syncinfo') {
-            this.log('Statusinfo empfangen', 'in');
+            this.log(`Statusinfo empfangen: ${short}`, 'info');
         } else if (sub === '/syncdata') {
             // Katalog parsen: Sofort-PGS, Programmschritte, Melodien.
             this.catalog = parseCatalog(payload);
+            const c = this.catalog;
             if (!this.syncdataLogged) {
                 this.syncdataLogged = true;
-                const c = this.catalog;
-                this.log(`Katalog empfangen: ${c.sPGS.length} Sofort-PGS, ${c.melodies.length} Melodien, ${c.programsteps.length} Programmschritte`, 'in');
+                this.log(`Katalog empfangen: ${c.sPGS.length} Sofort-PGS, ${c.melodies.length} Melodien, ${c.programsteps.length} Programmschritte`, 'info');
+            } else {
+                this.log('Katalog aktualisiert', 'info');
             }
         } else if (sub === '/fetchinfo' || sub === '/fetchdata' || sub === '/playpgsD') {
-            // Echo der eigenen Anfragen (retained) – nicht loggen.
+            // Echo der eigenen (retained) Anfragen – als Info protokollieren.
+            this.log(`Echo ${sub}: ${short}`, 'info');
         } else {
-            const short = payload.length > 80 ? payload.slice(0, 80) + '…' : payload;
-            this.log(`${sub}: ${short}`, 'in');
+            this.log(`${sub}: ${short}`, 'info');
         }
         this.onUpdate?.();
     }
