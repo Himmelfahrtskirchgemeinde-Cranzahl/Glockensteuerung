@@ -34,7 +34,9 @@ const canEdit = (cat: CatKey): boolean => {
     return id != null && rights.value.editCats.includes(id);
 };
 const showLaeuten = computed(() => canView('steuerung') || canView('log'));
-const showEinstellungen = computed(() => canView('regeln') || canView('geraet'));
+const showEinstellungen = computed(() => canView('regeln') || rights.value.manageExt);
+/** Sichtbarkeit einer Ansicht: „geraet" nur für „Erweiterung verwalten". */
+const canSeeView = (v: View): boolean => (v === 'geraet' ? rights.value.manageExt : canView(v));
 const allCatalogNames = computed(() => [...catalog.value.sPGS, ...catalog.value.melodies, ...catalog.value.programsteps]);
 const simulate = ref(true);
 const online = ref<boolean | null>(null);
@@ -154,8 +156,8 @@ async function boot() {
 
 function pickDefaultView() {
     const order: View[] = ['steuerung', 'log', 'regeln', 'geraet'];
-    if (!canView(view.value)) {
-        const first = order.find((v) => canView(v));
+    if (!canSeeView(view.value)) {
+        const first = order.find((v) => canSeeView(v));
         if (first) view.value = first;
     }
 }
@@ -326,7 +328,7 @@ const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶'
           <div v-if="showEinstellungen" class="lbl">Einstellungen</div>
           <button v-if="canView('regeln')" :class="{ active: view === 'regeln' }" @click="view = 'regeln'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>Automatik-Regeln<span v-if="rules.length" class="cnt">{{ rules.length }}</span></button>
-          <button v-if="canView('geraet')" :class="{ active: view === 'geraet' }" @click="view = 'geraet'">
+          <button v-if="rights.manageExt" :class="{ active: view === 'geraet' }" @click="view = 'geraet'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 5V3m8 2V3M4 10h16"/></svg>Gerät</button>
           <div class="lbl">Hilfe</div>
           <button @click="showFeedback = true">
@@ -455,17 +457,17 @@ const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶'
           </section>
 
           <!-- ▸ Gerät -->
-          <section v-else-if="view === 'geraet' && canView('geraet')" class="gs-card">
-            <div class="gs-head"><h2>Gerät</h2><span class="gs-spacer"></span><span v-if="!canEdit('geraet')" class="gs-pill muted">nur lesen</span></div>
+          <section v-else-if="view === 'geraet' && rights.manageExt" class="gs-card">
+            <div class="gs-head"><h2>Gerät</h2></div>
             <div class="gs-body">
-              <p v-if="!canEdit('geraet')" class="gs-readonly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Zum Ändern brauchst du das Recht „Daten in Kategorie bearbeiten" für „Gerät". Ein Admin vergibt es in der Rechteverwaltung unter „Glockensteuerung".</p>
+              <p class="gs-readonly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Die Zugangsdaten gelten <b>global</b>: Sie liegen in der Kategorie „Steuerung", damit jede berechtigte Person (die Steuerung sehen darf) Status sehen und läuten kann. Konfigurieren darf nur, wer „Erweiterung verwalten" hat.</p>
               <div class="gs-fields">
-                <label>Seriennummer</label><input type="text" v-model="device.serial" placeholder="VH-XXXXXX" :disabled="!canEdit('geraet')">
-                <label>Geräte-Passwort</label><input type="password" v-model="device.devicePw" placeholder="geheim" :disabled="!canEdit('geraet')">
-                <label>Broker-URL</label><input type="text" v-model="device.brokerUrl" :disabled="!canEdit('geraet')">
+                <label>Seriennummer</label><input type="text" v-model="device.serial" placeholder="VH-XXXXXX">
+                <label>Geräte-Passwort</label><input type="password" v-model="device.devicePw" placeholder="geheim">
+                <label>Broker-URL</label><input type="text" v-model="device.brokerUrl">
               </div>
               <p class="gs-note"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Seriennummer + Passwort erlauben das Läuten – Modulzugriff einschränken. Verbinden &amp; Status lesen ist ungefährlich.</p>
-              <div v-if="canEdit('geraet')" class="gs-foot" style="justify-content:flex-start"><button class="gs-btn gs-primary" @click="saveDevice">Gerät speichern &amp; verbinden</button></div>
+              <div class="gs-foot" style="justify-content:flex-start"><button class="gs-btn gs-primary" @click="saveDevice">Gerät speichern &amp; verbinden</button></div>
             </div>
           </section>
 
