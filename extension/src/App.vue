@@ -396,7 +396,10 @@ async function loadNextRingings() {
             const catName: string = (typeof cat === 'object' ? cat?.name : cat) ?? '';
             const title: string = ev?.name ?? ev?.title ?? '';
             for (const r of evtRules) {
-                if (r.calendarId && calId != null && r.calendarId !== calId) continue;
+                // Exakt wie im Gateway: ist ein Kalender gesetzt, MUSS die
+                // Veranstaltung ihn haben. Kein „fehlt = egal" – sonst zeigt die
+                // Vorschau wieder Läutungen, die real nie ausgelöst würden.
+                if (r.calendarId && r.calendarId !== calId) continue;
                 if (catName.trim().toLowerCase() !== (r.category || '').trim().toLowerCase()) continue;
                 add(r, start, `Veranstaltung „${catName}" · ${fmtTime(start)} ${title}`.trim());
             }
