@@ -125,6 +125,11 @@ async function boot() {
                 password: import.meta.env.VITE_PASSWORD,
             });
         }
+        // Tab-Titel im ChurchTools-Stil: „‹Instanz› - Glockensteuerung".
+        try {
+            const info = await churchtoolsClient.get<{ siteName?: string }>('/info');
+            if (info?.siteName) document.title = `${info.siteName} - Glockensteuerung`;
+        } catch { /* Titel bleibt beim Fallback „Glockensteuerung" */ }
         await store.init();
         catIds.value = { ...store.catIds };
         rights.value = await loadRights();
