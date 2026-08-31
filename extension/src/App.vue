@@ -387,7 +387,7 @@ async function loadNextRingings() {
 
           <div class="gs-subfoot">
             <div class="ver">v{{ APP_VERSION }}</div>
-            <div>Entwickelt mit <span class="heart">♥</span> von JosuaDev</div>
+            <div>Entwickelt mit <span class="heart">❤️</span> von JosuaDev</div>
           </div>
         </nav>
 
