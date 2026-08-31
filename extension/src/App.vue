@@ -35,10 +35,12 @@ const canEdit = (cat: CatKey): boolean => {
 };
 const showLaeuten = computed(() => canView('steuerung') || canView('log'));
 const showEinstellungen = computed(() => canView('regeln') || canView('geraet'));
+const allCatalogNames = computed(() => [...catalog.value.sPGS, ...catalog.value.melodies, ...catalog.value.programsteps]);
 const simulate = ref(true);
 const online = ref<boolean | null>(null);
 const playable = ref<string[]>([]);
 const stoppable = ref<string[]>([]);          // laufende (= stoppbare) Programme
+const catalog = ref<{ sPGS: string[]; programsteps: string[]; melodies: string[] }>({ sPGS: [], programsteps: [], melodies: [] });
 const runningSince = ref<Record<string, number>>({}); // roher Name -> Startzeit (ms)
 const durations = ref<Record<string, number>>({});    // Anzeigename -> Minuten
 const now = ref<number>(Date.now());
@@ -167,6 +169,11 @@ function connectVoco() {
         online.value = voco!.status.online;
         playable.value = [...voco!.status.playable];
         updateRunning([...voco!.status.stoppable]);
+        catalog.value = {
+            sPGS: [...voco!.catalog.sPGS],
+            programsteps: [...voco!.catalog.programsteps],
+            melodies: [...voco!.catalog.melodies],
+        };
     };
     pushLog('Verbinde mit Broker …', 'out');
     voco.connect().catch((e) => handleError('mqtt.connect', e));
@@ -426,8 +433,19 @@ const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶'
                 </select>
                 <label>Veranstaltungsart</label><input type="text" v-model="rule.category" placeholder="(egal) z. B. Gottesdienst" :disabled="!canEdit('regeln')">
                 <label>Läuteprogramm</label>
-                <input type="text" v-model="rule.pgsName" :list="'pgs-' + i" placeholder="Name des Sofort-PGS" :disabled="!canEdit('regeln')">
-                <datalist :id="'pgs-' + i"><option v-for="raw in playable" :key="raw" :value="decodeName(raw)"></option></datalist>
+                <select v-model="rule.pgsName" :disabled="!canEdit('regeln')">
+                  <option value="">(bitte wählen)</option>
+                  <optgroup v-if="catalog.sPGS.length" label="Sofort-PGS">
+                    <option v-for="n in catalog.sPGS" :key="'s' + n" :value="n">{{ n }}</option>
+                  </optgroup>
+                  <optgroup v-if="catalog.melodies.length" label="Melodien">
+                    <option v-for="n in catalog.melodies" :key="'m' + n" :value="n">{{ n }}</option>
+                  </optgroup>
+                  <optgroup v-if="catalog.programsteps.length" label="Programmschritte (Vorlagen)">
+                    <option v-for="n in catalog.programsteps" :key="'p' + n" :value="n">{{ n }}</option>
+                  </optgroup>
+                  <option v-if="rule.pgsName && !allCatalogNames.includes(rule.pgsName)" :value="rule.pgsName">{{ rule.pgsName }} (aktuell)</option>
+                </select>
                 <label>Vorlauf (Min.)</label><input type="number" min="0" v-model.number="rule.leadMinutes" :disabled="!canEdit('regeln')">
                 <label>Aktiv</label><label class="gs-switch"><input type="checkbox" v-model="rule.active" :disabled="!canEdit('regeln')"></label>
                 <template v-if="canEdit('regeln')"><div></div><button class="gs-btn gs-stop sm" style="justify-self:start" @click="delRule(i)">Löschen</button></template>
