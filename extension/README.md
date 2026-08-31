@@ -57,12 +57,26 @@ der Gateway erwartet (`VOCO_EXT_KEY`).
 - **Automatik-Regeln:** je Regel Kalender und/oder Veranstaltungsart → PGS +
   Vorlaufzeit. Gespeichert im ChurchTools-KV-Store (`custommodules`).
 
-## 🔐 Sicherheit
+## 🔐 Sicherheit & Berechtigungen
 
 Seriennummer + Geräte-Passwort erlauben das Läuten. Sie liegen im ChurchTools-
 KV-Store; der Zugriff auf dieses Modul sollte auf Berechtigte beschränkt werden.
 Die Verbindung zum HEW-Broker läuft direkt aus dem Browser per MQTT-over-WSS
 (wie die offizielle HEW-Web-App).
+
+Die Extension nutzt die **vorhandenen ChurchTools-Rechte** des Custom-Modules
+(Rechteverwaltung → „Glockensteuerung") und trennt zwei Stufen:
+
+| Aktion | benötigtes Recht |
+|---|---|
+| Modul öffnen, Status sehen, **Läuten/Testen** | „*Glockensteuerung* sehen" (`view`) |
+| **Einstellungen** (Gerät, Automatik-Regeln) ändern, **Scharfschalten** | „Daten in Kategorie **bearbeiten/erstellen**" (`edit`/`create custom data`) – oder Admin mit „administer custom modules" |
+
+Wer nur „sehen" hat, bekommt die Einstellungen **schreibgeschützt** angezeigt und
+kann die Simulation nicht ausschalten. Die Prüfung blendet die Bedienelemente
+nur passend aus – **erzwungen wird sie serverseitig** von ChurchTools auf den
+KV-Endpunkten. Ein Admin vergibt das Bearbeiten-Recht in der Rechteverwaltung
+gezielt an die Personen, die konfigurieren dürfen.
 
 ## Technik
 
