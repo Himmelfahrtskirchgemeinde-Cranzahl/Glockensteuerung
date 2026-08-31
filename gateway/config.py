@@ -2,8 +2,13 @@
 Laedt die Gateway-Konfiguration.
 
 Geraet + Regeln kommen aus DEMSELBEN ChurchTools-Custom-Module wie die
-Extension (Modul-Shorty 'glockensteuerung', Kategorie 'settings'). So ist die
-Konfiguration eine einzige Quelle der Wahrheit. Fallback: Geraet aus .env.
+Extension (Modul-Shorty 'glockensteuerung'). So ist die Konfiguration eine
+einzige Quelle der Wahrheit. Fallback: Geraet aus .env.
+
+Die Extension legt pro Untermenue eine eigene Kategorie an ('steuerung' fuer das
+Geraet, 'regeln' fuer die Regeln), damit sich Rechte je Untermenue vergeben
+lassen. Deshalb werden hier ALLE Kategorien des Moduls nach den Schluesseln
+'device' und 'rules' durchsucht – nicht mehr nur die alte Kategorie 'settings'.
 """
 from __future__ import annotations
 import json
@@ -44,37 +49,81 @@ def _find_module(ct) -> dict | None:
     return None
 
 
+# Vorrang der Kategorien beim Suchen. Die Extension legt heute 'steuerung'
+# (Geraet) und 'regeln' (Regeln) an; 'settings' und 'geraet' sind Altbestand und
+# werden weiter gelesen, damit alte Installationen nicht brechen.
+_DEVICE_CAT_ORDER = ("steuerung", "settings", "geraet")
+_RULES_CAT_ORDER = ("regeln", "settings")
+
+
+def _to_rule(r: dict) -> Rule:
+    return Rule(
+        id=str(r.get("id", "")),
+        name=r.get("name", "Regel"),
+        calendar_id=r.get("calendarId"),
+        category=r.get("category"),
+        pgs_name=r.get("pgsName", ""),
+        lead_minutes=int(r.get("leadMinutes", 0) or 0),
+        active=bool(r.get("active", True)),
+    )
+
+
 def load_from_churchtools(ct) -> GatewayConfig:
-    """Liest Geraet + Regeln aus dem Custom-Module (von der Extension gepflegt)."""
+    """Liest Geraet + Regeln aus dem Custom-Module (von der Extension gepflegt).
+
+    Durchsucht ALLE Kategorien des Moduls nach den Schluesseln 'device' und
+    'rules'. Frueher wurde nur die Kategorie 'settings' gelesen – die legt die
+    Extension seit der Rechte-Umstellung aber nicht mehr an, wodurch der Gateway
+    dauerhaft 0 Regeln sah und nie automatisch ausgeloest hat.
+    """
     device = None
     rules: list[Rule] = []
+    devices_by_cat: dict[str, DeviceConfig] = {}
+    rules_by_cat: dict[str, list[Rule]] = {}
+
     mod = _find_module(ct)
     if mod:
         mid = mod["id"]
-        cats = ct.get(f"/custommodules/{mid}/customdatacategories")
-        cat = next((c for c in cats if c.get("shorty") == "settings"), None)
-        if cat:
-            values = ct.get(f"/custommodules/{mid}/customdatacategories/{cat['id']}/customdatavalues")
-            for v in values:
+        try:
+            cats = ct.get(f"/custommodules/{mid}/customdatacategories")
+        except Exception:
+            cats = []
+        for cat in cats or []:
+            shorty = cat.get("shorty") or ""
+            try:
+                values = ct.get(
+                    f"/custommodules/{mid}/customdatacategories/{cat['id']}/customdatavalues"
+                )
+            except Exception:
+                continue  # keine Leseberechtigung o. Ae. -> naechste Kategorie
+            for v in values or []:
                 data = _parse_value(v.get("value"))
                 if not isinstance(data, dict):
                     continue
-                if data.get("key") == "device" and isinstance(data.get("data"), dict):
-                    d = data["data"]
-                    if d.get("serial") and d.get("devicePw"):
-                        device = DeviceConfig(d["serial"], d["devicePw"],
-                                              d.get("brokerUrl") or "wss://hew-voco.de:8084/mqtt")
-                elif data.get("key") == "rules" and isinstance(data.get("data"), list):
-                    for r in data["data"]:
-                        rules.append(Rule(
-                            id=str(r.get("id", "")),
-                            name=r.get("name", "Regel"),
-                            calendar_id=r.get("calendarId"),
-                            category=r.get("category"),
-                            pgs_name=r.get("pgsName", ""),
-                            lead_minutes=int(r.get("leadMinutes", 0) or 0),
-                            active=bool(r.get("active", True)),
-                        ))
+                key, payload = data.get("key"), data.get("data")
+                if key == "device" and isinstance(payload, dict):
+                    if payload.get("serial") and payload.get("devicePw"):
+                        devices_by_cat[shorty] = DeviceConfig(
+                            payload["serial"], payload["devicePw"],
+                            payload.get("brokerUrl") or "wss://hew-voco.de:8084/mqtt")
+                elif key == "rules" and isinstance(payload, list):
+                    rules_by_cat[shorty] = [_to_rule(r) for r in payload if isinstance(r, dict)]
+
+    # Aktuelle Kategorie gewinnt, sonst irgendeine gefundene.
+    for shorty in _DEVICE_CAT_ORDER:
+        if shorty in devices_by_cat:
+            device = devices_by_cat[shorty]
+            break
+    else:
+        device = next(iter(devices_by_cat.values()), None)
+
+    for shorty in _RULES_CAT_ORDER:
+        if shorty in rules_by_cat:
+            rules = rules_by_cat[shorty]
+            break
+    else:
+        rules = next(iter(rules_by_cat.values()), [])
+
     # Fallback Geraet aus .env
     if device is None and os.environ.get("VOCO_SERIAL") and os.environ.get("VOCO_DEVICE_PW"):
         device = DeviceConfig(os.environ["VOCO_SERIAL"], os.environ["VOCO_DEVICE_PW"],
