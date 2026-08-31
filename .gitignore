@@ -20,6 +20,9 @@ venv/
 .DS_Store
 *.swp
 
+# Claude Code – persönliche, lokale Einstellungen (nicht teilen)
+.claude/settings.local.json
+
 # Node / Extension-Build
 node_modules/
 dist/
