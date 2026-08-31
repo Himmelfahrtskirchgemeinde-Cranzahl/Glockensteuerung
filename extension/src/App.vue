@@ -478,7 +478,8 @@ async function loadNextRingings() {
             <!-- Ereignis-Log (abgespeckt) – voller Log unter „Ereignis-Log" -->
             <section v-if="logLines.length" class="gs-card">
               <div class="gs-head"><h2>Letzte Ereignisse</h2><span class="gs-spacer"></span>
-                <button v-if="canView('log')" class="gs-btn gs-ghost sm" @click="view = 'log'">Ganzes Log</button></div>
+                <span class="gs-count">◀ Antwort · ▶ gesendet · ⚙ Simulation</span>
+                <button v-if="canView('log')" class="gs-btn gs-ghost sm" style="margin-left:10px" @click="view = 'log'">Ganzes Log</button></div>
               <div class="gs-body">
                 <div class="gs-log" style="max-height:160px">
                   <div v-for="(e, i) in logLines.slice(0, 6)" :key="i"><span class="ts">{{ e.ts.toLocaleTimeString('de-DE') }}</span> <span :class="e.dir">{{ logIcon(e.dir) }}</span> {{ e.line }}</div>
@@ -549,7 +550,7 @@ async function loadNextRingings() {
           <section v-else-if="view === 'geraet' && rights.manageExt" class="gs-card">
             <div class="gs-head"><h2>Gerät</h2></div>
             <div class="gs-body">
-              <p class="gs-readonly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Die Zugangsdaten gelten <b>global</b>: Sie liegen in der Kategorie „Steuerung", damit jede berechtigte Person (die Steuerung sehen darf) Status sehen und läuten kann. Konfigurieren darf nur, wer „Erweiterung verwalten" hat.</p>
+              <p class="gs-readonly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><span>Die Zugangsdaten gelten <b>global</b>: Sie liegen in der Kategorie „Steuerung", damit jede berechtigte Person (die Steuerung sehen darf) Status sehen und läuten kann. Konfigurieren darf nur, wer „Erweiterung verwalten" hat.</span></p>
               <div class="gs-fields">
                 <label>Seriennummer</label><input type="text" v-model="device.serial" placeholder="VH-XXXXXX">
                 <label>Geräte-Passwort</label><input type="password" v-model="device.devicePw" placeholder="geheim">
