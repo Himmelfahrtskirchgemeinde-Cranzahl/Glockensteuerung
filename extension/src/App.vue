@@ -6,6 +6,8 @@ import type { DeviceConfig, MappingRule } from './config';
 import { VocoMqtt, decodeName } from './voco/mqtt';
 import { reportError, submitFeedback, maskSerial, APP_VERSION, FEEDBACK_URL } from './feedback';
 import type { ReportContext, FeedbackFields } from './feedback';
+import { loadRights } from './perms';
+import type { Rights } from './perms';
 
 const isDev = import.meta.env.MODE === 'development';
 declare const window: Window & typeof globalThis & { settings?: { base_url?: string } };
@@ -17,6 +19,7 @@ let voco: VocoMqtt | undefined;
 type View = 'steuerung' | 'log' | 'regeln' | 'geraet';
 const view = ref<View>('steuerung');
 
+const rights = ref<Rights>({ canView: true, canEdit: false });
 const simulate = ref(true);
 const online = ref<boolean | null>(null);
 const playable = ref<string[]>([]);
@@ -79,6 +82,7 @@ async function boot() {
                 password: import.meta.env.VITE_PASSWORD,
             });
         }
+        rights.value = await loadRights();
         await store.init();
         const cfg = await store.load();
         if (cfg.device) device.value = { brokerUrl: 'wss://hew-voco.de:8084/mqtt', ...cfg.device };
@@ -115,6 +119,7 @@ function fire(raw: string) {
 }
 
 function setSimulate(on: boolean) {
+    if (!on && !rights.value.canEdit) { toast('Kein Recht zum Scharfschalten (Einstellungen ändern).'); return; }
     if (!on && !confirm('Simulation ausschalten?\n\nDanach lösen Knöpfe und Automatik ECHTES Läuten aus.')) return;
     simulate.value = on;
     if (voco) voco.simulate = on;
@@ -223,7 +228,7 @@ const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶'
                 <b>{{ simulate ? 'Simulationsmodus aktiv' : 'SCHARF – echtes Läuten möglich' }}</b><br>
                 <small>{{ simulate ? 'Es wird nichts an die Anlage gesendet. Du siehst nur, was passieren würde – und im Ereignis-Log die echten Antworten der Anlage.' : 'Knöpfe und Automatik lösen jetzt wirklich Läuten aus.' }}</small>
               </div>
-              <label class="gs-switch"><button class="gs-toggle" :class="{ off: !simulate }" role="switch" :aria-checked="simulate" @click="setSimulate(!simulate)"></button> Simulation</label>
+              <label class="gs-switch"><button class="gs-toggle" :class="{ off: !simulate }" role="switch" :aria-checked="simulate" :disabled="simulate && !rights.canEdit" :title="simulate && !rights.canEdit ? 'Scharfschalten braucht das Recht „Daten bearbeiten“' : ''" @click="setSimulate(!simulate)"></button> Simulation</label>
             </div>
 
             <section class="gs-card">
@@ -264,40 +269,43 @@ const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶'
           <!-- ▸ Automatik-Regeln -->
           <section v-else-if="view === 'regeln'" class="gs-card">
             <div class="gs-head"><h2>Automatik-Regeln</h2><span class="gs-spacer"></span>
-              <button class="gs-btn gs-ghost sm" @click="addRule"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Regel hinzufügen</button></div>
+              <span v-if="!rights.canEdit" class="gs-pill muted">nur lesen</span>
+              <button v-else class="gs-btn gs-ghost sm" @click="addRule"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Regel hinzufügen</button></div>
             <div class="gs-body">
               <p style="color:var(--gs-dim);font-size:13.5px;margin:0 0 14px">Vom Gateway-Dienst für automatisches Läuten genutzt (Termin → Programm).</p>
+              <p v-if="!rights.canEdit" class="gs-readonly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Zum Ändern brauchst du das Recht „Daten in Kategorie bearbeiten". Ein Admin vergibt es in der Rechteverwaltung unter „Glockensteuerung".</p>
               <p v-if="rules.length === 0" class="gs-empty">(noch keine Regeln)</p>
               <div v-for="(rule, i) in rules" :key="rule.id" class="gs-rule">
-                <label>Name</label><input type="text" v-model="rule.name">
+                <label>Name</label><input type="text" v-model="rule.name" :disabled="!rights.canEdit">
                 <label>Kalender</label>
-                <select :value="rule.calendarId ?? ''" @change="calId(rule, $event)">
+                <select :value="rule.calendarId ?? ''" :disabled="!rights.canEdit" @change="calId(rule, $event)">
                   <option value="">(jeder Kalender)</option>
                   <option v-for="c in calendars" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
-                <label>Veranstaltungsart</label><input type="text" v-model="rule.category" placeholder="(egal) z. B. Gottesdienst">
+                <label>Veranstaltungsart</label><input type="text" v-model="rule.category" placeholder="(egal) z. B. Gottesdienst" :disabled="!rights.canEdit">
                 <label>Läuteprogramm</label>
-                <input type="text" v-model="rule.pgsName" :list="'pgs-' + i" placeholder="Name des Sofort-PGS">
+                <input type="text" v-model="rule.pgsName" :list="'pgs-' + i" placeholder="Name des Sofort-PGS" :disabled="!rights.canEdit">
                 <datalist :id="'pgs-' + i"><option v-for="raw in playable" :key="raw" :value="decodeName(raw)"></option></datalist>
-                <label>Vorlauf (Min.)</label><input type="number" min="0" v-model.number="rule.leadMinutes">
-                <label>Aktiv</label><label class="gs-switch"><input type="checkbox" v-model="rule.active"></label>
-                <div></div><button class="gs-btn gs-stop sm" style="justify-self:start" @click="delRule(i)">Löschen</button>
+                <label>Vorlauf (Min.)</label><input type="number" min="0" v-model.number="rule.leadMinutes" :disabled="!rights.canEdit">
+                <label>Aktiv</label><label class="gs-switch"><input type="checkbox" v-model="rule.active" :disabled="!rights.canEdit"></label>
+                <template v-if="rights.canEdit"><div></div><button class="gs-btn gs-stop sm" style="justify-self:start" @click="delRule(i)">Löschen</button></template>
               </div>
-              <div class="gs-foot" style="justify-content:flex-start"><button class="gs-btn gs-primary" @click="saveRules">Regeln speichern</button><span style="margin-left:10px;color:var(--gs-success-fg);font-weight:600;align-self:center">{{ saveMsg }}</span></div>
+              <div v-if="rights.canEdit" class="gs-foot" style="justify-content:flex-start"><button class="gs-btn gs-primary" @click="saveRules">Regeln speichern</button><span style="margin-left:10px;color:var(--gs-success-fg);font-weight:600;align-self:center">{{ saveMsg }}</span></div>
             </div>
           </section>
 
           <!-- ▸ Gerät -->
           <section v-else-if="view === 'geraet'" class="gs-card">
-            <div class="gs-head"><h2>Gerät</h2></div>
+            <div class="gs-head"><h2>Gerät</h2><span class="gs-spacer"></span><span v-if="!rights.canEdit" class="gs-pill muted">nur lesen</span></div>
             <div class="gs-body">
+              <p v-if="!rights.canEdit" class="gs-readonly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Zum Ändern brauchst du das Recht „Daten in Kategorie bearbeiten". Ein Admin vergibt es in der Rechteverwaltung unter „Glockensteuerung".</p>
               <div class="gs-fields">
-                <label>Seriennummer</label><input type="text" v-model="device.serial" placeholder="VH-XXXXXX">
-                <label>Geräte-Passwort</label><input type="password" v-model="device.devicePw" placeholder="geheim">
-                <label>Broker-URL</label><input type="text" v-model="device.brokerUrl">
+                <label>Seriennummer</label><input type="text" v-model="device.serial" placeholder="VH-XXXXXX" :disabled="!rights.canEdit">
+                <label>Geräte-Passwort</label><input type="password" v-model="device.devicePw" placeholder="geheim" :disabled="!rights.canEdit">
+                <label>Broker-URL</label><input type="text" v-model="device.brokerUrl" :disabled="!rights.canEdit">
               </div>
               <p class="gs-note"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Seriennummer + Passwort erlauben das Läuten – Modulzugriff einschränken. Verbinden &amp; Status lesen ist ungefährlich.</p>
-              <div class="gs-foot" style="justify-content:flex-start"><button class="gs-btn gs-primary" @click="saveDevice">Gerät speichern &amp; verbinden</button></div>
+              <div v-if="rights.canEdit" class="gs-foot" style="justify-content:flex-start"><button class="gs-btn gs-primary" @click="saveDevice">Gerät speichern &amp; verbinden</button></div>
             </div>
           </section>
         </div>
