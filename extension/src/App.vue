@@ -51,7 +51,8 @@ const device = ref<DeviceConfig>({ serial: '', devicePw: '', brokerUrl: 'wss://h
 const rules = ref<MappingRule[]>([]);
 const calendars = ref<{ id: number; name: string }[]>([]);
 const nextRingings = ref<Array<{ when: Date; program: string; source: string }>>([]);
-type LogEntry = { ts: Date; dir: 'in' | 'out' | 'sim'; line: string };
+type LogDir = 'in' | 'out' | 'sim' | 'info';
+type LogEntry = { ts: Date; dir: LogDir; line: string };
 const logLines = ref<LogEntry[]>([]);
 const dlFrom = ref('');   // Log-Download: Von (datetime-local), leer = alles
 const dlTo = ref('');     // Log-Download: Bis
@@ -78,13 +79,13 @@ function ctx(): ReportContext {
     };
 }
 
-function pushLog(line: string, dir: 'in' | 'out' | 'sim') {
+function pushLog(line: string, dir: LogDir) {
     logLines.value.unshift({ ts: new Date(), dir, line });
     if (logLines.value.length > 500) logLines.value.pop();
 }
 
 async function handleError(where: string, err: unknown) {
-    pushLog('Fehler: ' + (err instanceof Error ? err.message : String(err)), 'in');
+    pushLog('Fehler: ' + (err instanceof Error ? err.message : String(err)), 'info');
     const sent = await reportError(where, err, ctx());
     if (!sent && !FEEDBACK_URL) errorCount.value++;
 }
@@ -179,7 +180,7 @@ function connectVoco() {
             melodies: [...voco!.catalog.melodies],
         };
     };
-    pushLog('Verbinde mit Broker …', 'out');
+    pushLog('Verbinde mit Broker …', 'info');
     voco.connect().catch((e) => handleError('mqtt.connect', e));
 }
 
@@ -298,7 +299,19 @@ async function sendFeedback() {
     else toast('Konnte nicht senden.');
 }
 
-const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶');
+const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : d === 'info' ? 'ℹ' : '▶');
+
+/** Steuerung zeigt nur ausgedünnte, wichtige Ereignisse: echtes Läuten
+ *  (Start/Ende), Simulationswechsel und Verbindungs-Infos (z. B. neu verbunden).
+ *  Der ausführliche Verlauf (inkl. Status/Katalog-Infos) steht im Ereignis-Log. */
+const steuerungLog = computed(() =>
+    logLines.value.filter(
+        (e) =>
+            e.dir === 'in' ||
+            e.dir === 'sim' ||
+            (e.dir === 'info' && /verbind|verbunden|unterbroch|broker|fehler/i.test(e.line)),
+    ),
+);
 
 const fmtDay = (d: Date) => d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
 const fmtTime = (d: Date) => d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
@@ -485,13 +498,13 @@ async function loadNextRingings() {
             </section>
 
             <!-- Ereignis-Log (abgespeckt) – voller Log unter „Ereignis-Log" -->
-            <section v-if="logLines.length" class="gs-card">
+            <section v-if="steuerungLog.length" class="gs-card">
               <div class="gs-head"><h2>Letzte Ereignisse</h2><span class="gs-spacer"></span>
-                <span class="gs-count">◀ Antwort · ▶ gesendet · ⚙ Simulation</span>
+                <span class="gs-count">ℹ Info · ◀ Läuten · ⚙ Simulation</span>
                 <button v-if="canView('log')" class="gs-btn gs-ghost sm" style="margin-left:10px" @click="view = 'log'">Ganzes Log</button></div>
               <div class="gs-body">
                 <div class="gs-log" style="max-height:160px">
-                  <div v-for="(e, i) in logLines.slice(0, 6)" :key="i"><span class="ts">{{ e.ts.toLocaleTimeString('de-DE') }}</span> <span :class="e.dir">{{ logIcon(e.dir) }}</span> {{ e.line }}</div>
+                  <div v-for="(e, i) in steuerungLog.slice(0, 6)" :key="i"><span class="ts">{{ e.ts.toLocaleTimeString('de-DE') }}</span> <span :class="e.dir">{{ logIcon(e.dir) }}</span> {{ e.line }}</div>
                 </div>
               </div>
             </section>
@@ -500,7 +513,7 @@ async function loadNextRingings() {
           <!-- ▸ Ereignis-Log -->
           <section v-else-if="view === 'log' && canView('log')" class="gs-card">
             <div class="gs-head"><h2>Ereignis-Log</h2><span class="gs-spacer"></span>
-              <span class="gs-count">◀ Antwort · ▶ gesendet · ⚙ Simulation</span>
+              <span class="gs-count">ℹ Info · ▶ gesendet · ◀ Antwort · ⚙ Simulation</span>
               <button class="gs-btn gs-ghost sm" style="margin-left:10px" @click="logLines = []">Leeren</button></div>
             <div class="gs-body">
               <div class="gs-dltools">
