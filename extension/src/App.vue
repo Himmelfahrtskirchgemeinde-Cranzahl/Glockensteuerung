@@ -317,46 +317,92 @@ const fmtDay = (d: Date) => d.toLocaleDateString('de-DE', { weekday: 'short', da
 const fmtTime = (d: Date) => d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
 /**
- * „Nächste automatische Läutungen": aus den aktiven Regeln × kommenden
- * ChurchTools-Terminen (Zeit = Terminbeginn − Vorlauf). Rein anzeigend – das
- * echte Auslösen macht der Gateway.
+ * „Nächste automatische Läutungen" (Zeit = Beginn − Vorlauf).
+ *
+ * Nutzt bewusst DIESELBE Zuordnung wie der Gateway (gateway/scheduler.py,
+ * `rule_matches`), damit die Vorschau nicht etwas anderes zeigt als real läutet:
+ *  - Regel OHNE Veranstaltungsart → Kalender-Termine, es zählt nur der Kalender.
+ *  - Regel MIT Veranstaltungsart  → ChurchTools-Veranstaltungen, deren Art
+ *    EXAKT übereinstimmt (früher wurde hier der Termin-TITEL als Teilstring
+ *    verglichen – dadurch matchte „Festgottesdienst" auch die Regel
+ *    „Gottesdienst" und der Termin erschien doppelt).
+ *
+ * Rein anzeigend – das echte Auslösen macht der Gateway.
  */
 async function loadNextRingings() {
     const active = rules.value.filter((r) => r.active && r.pgsName);
     if (!active.length) { nextRingings.value = []; return; }
-    const calIds = new Set<number>();
-    let needAll = false;
-    for (const r of active) { if (r.calendarId) calIds.add(r.calendarId); else needAll = true; }
-    if (needAll) for (const c of calendars.value) calIds.add(c.id);
-    if (!calIds.size) { nextRingings.value = []; return; }
     const iso = (d: Date) => d.toISOString().slice(0, 10);
-    const p = new URLSearchParams();
-    for (const id of calIds) p.append('calendar_ids[]', String(id));
-    p.set('from', iso(new Date()));
-    p.set('to', iso(new Date(Date.now() + 30 * 864e5)));
-    let items: any[] = [];
-    try {
-        const res = await churchtoolsClient.get<any>(`/calendars/appointments?${p.toString()}`);
-        items = Array.isArray(res) ? res : (res?.data ?? []);
-    } catch { nextRingings.value = []; return; }
+    const from = iso(new Date());
+    const to = iso(new Date(Date.now() + 30 * 864e5));
     const out: Array<{ when: Date; program: string; source: string }> = [];
-    for (const it of items) {
-        const base = it?.appointment?.base ?? it?.base ?? it;
-        const calc = it?.appointment?.calculated ?? it?.calculated;
-        const startStr = calc?.startDate ?? base?.startDate;
-        if (!startStr) continue;
-        const start = new Date(startStr);
-        const calId: number | undefined = base?.calendar?.id;
-        const calName: string = base?.calendar?.name ?? '';
-        const title: string = base?.title ?? base?.caption ?? '';
-        for (const r of active) {
-            if (r.calendarId && r.calendarId !== calId) continue;
-            if (r.category && !title.toLowerCase().includes(r.category.toLowerCase())) continue;
-            const when = new Date(start.getTime() - (r.leadMinutes || 0) * 60000);
-            if (when.getTime() < Date.now()) continue;
-            out.push({ when, program: r.pgsName, source: `Kalender „${calName}" · ${fmtTime(start)} ${title}`.trim() });
+
+    const add = (r: MappingRule, start: Date, source: string) => {
+        const when = new Date(start.getTime() - (r.leadMinutes || 0) * 60000);
+        if (when.getTime() < Date.now()) return;
+        out.push({ when, program: r.pgsName, source });
+    };
+
+    // 1) Regeln OHNE Veranstaltungsart → Kalender-Termine (nur Kalender zählt).
+    const calRules = active.filter((r) => !r.category);
+    if (calRules.length) {
+        const calIds = new Set<number>();
+        let needAll = false;
+        for (const r of calRules) { if (r.calendarId) calIds.add(r.calendarId); else needAll = true; }
+        if (needAll) for (const c of calendars.value) calIds.add(c.id);
+        if (calIds.size) {
+            const p = new URLSearchParams();
+            for (const id of calIds) p.append('calendar_ids[]', String(id));
+            p.set('from', from);
+            p.set('to', to);
+            let items: any[] = [];
+            try {
+                const res = await churchtoolsClient.get<any>(`/calendars/appointments?${p.toString()}`);
+                items = Array.isArray(res) ? res : (res?.data ?? []);
+            } catch { items = []; }
+            for (const it of items) {
+                const base = it?.appointment?.base ?? it?.base ?? it;
+                const calc = it?.appointment?.calculated ?? it?.calculated;
+                const startStr = calc?.startDate ?? base?.startDate;
+                if (!startStr) continue;
+                const start = new Date(startStr);
+                const calId: number | undefined = base?.calendar?.id;
+                const calName: string = base?.calendar?.name ?? '';
+                const title: string = base?.title ?? base?.caption ?? '';
+                for (const r of calRules) {
+                    if (r.calendarId && r.calendarId !== calId) continue;
+                    add(r, start, `Kalender „${calName}" · ${fmtTime(start)} ${title}`.trim());
+                }
+            }
         }
     }
+
+    // 2) Regeln MIT Veranstaltungsart → ChurchTools-Veranstaltungen. Die Art muss
+    //    EXAKT übereinstimmen – „Festgottesdienst" ist NICHT „Gottesdienst".
+    const evtRules = active.filter((r) => r.category);
+    if (evtRules.length) {
+        let items: any[] = [];
+        try {
+            const res = await churchtoolsClient.get<any>(`/events?from=${from}&to=${to}`);
+            items = Array.isArray(res) ? res : (res?.data ?? []);
+        } catch { items = []; }
+        for (const ev of items) {
+            const startStr = ev?.startDate;
+            if (!startStr) continue;
+            const start = new Date(startStr);
+            const cal = ev?.calendar;
+            const calId: number | undefined = typeof cal === 'object' ? cal?.id : cal;
+            const cat = ev?.eventCategory ?? ev?.category;
+            const catName: string = (typeof cat === 'object' ? cat?.name : cat) ?? '';
+            const title: string = ev?.name ?? ev?.title ?? '';
+            for (const r of evtRules) {
+                if (r.calendarId && calId != null && r.calendarId !== calId) continue;
+                if (catName.trim().toLowerCase() !== (r.category || '').trim().toLowerCase()) continue;
+                add(r, start, `Veranstaltung „${catName}" · ${fmtTime(start)} ${title}`.trim());
+            }
+        }
+    }
+
     out.sort((a, b) => a.when.getTime() - b.when.getTime());
     nextRingings.value = out.slice(0, 12);
 }
@@ -493,7 +539,7 @@ async function loadNextRingings() {
                     </tbody>
                   </table>
                 </div>
-                <p class="gs-note" style="color:var(--gs-dim)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Vorschau aus den ChurchTools-Terminen (Zeit = Terminbeginn − Vorlauf). Das tatsächliche Auslösen übernimmt der Gateway-Dienst.</p>
+                <p class="gs-note" style="color:var(--gs-dim)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><span>Vorschau aus ChurchTools (Zeit = Beginn − Vorlauf). Regeln <b>mit</b> Veranstaltungsart greifen nur bei <b>Veranstaltungen</b>, deren Art <b>exakt</b> übereinstimmt; Regeln <b>ohne</b> Veranstaltungsart greifen bei allen Terminen des Kalenders. Das tatsächliche Auslösen übernimmt der Gateway-Dienst.</span></p>
               </div>
             </section>
 
