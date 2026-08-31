@@ -58,6 +58,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "${GITHUB_REF_NAME}" extension/releases/*.zip
-             --title "Glockensteuerung ${GITHUB_REF_NAME}"
-             --notes "Automatisch gebaute ChurchTools-Extension. ZIP unten herunterladen und in ChurchTools installieren."
+        # Läuft im Arbeitsverzeichnis extension/ -> Pfad relativ dazu (releases/*.zip)
+        run: |
+          gh release create "${GITHUB_REF_NAME}" releases/*.zip \
+            --title "Glockensteuerung ${GITHUB_REF_NAME}" \
+            --notes "Automatisch gebaute ChurchTools-Extension. ZIP unten herunterladen und in ChurchTools installieren."
