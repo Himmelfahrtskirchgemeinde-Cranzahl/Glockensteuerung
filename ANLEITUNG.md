@@ -234,6 +234,41 @@ VOCO_QUIET=22:00-06:00     # in diesem Fenster wird NIE ausgelöst
 
 ---
 
+## Feedback & automatische Fehler-Benachrichtigung (wichtig für Tests mit mehreren Personen)
+
+Da mehrere Leute testen, sammeln wir Rückmeldungen und Fehler **zentral**.
+
+### In der Extension
+- Unten rechts gibt es einen **Feedback-Knopf** mit Formular. Zusätzlich meldet die
+  Extension **Fehler automatisch**.
+- **Ohne** konfigurierten Endpunkt: Feedback öffnet eine **E-Mail** an
+  `josua.hess@icloud.com` (automatische Fehlermeldung ist dann nur lokal sichtbar,
+  da ein Browser nicht ungefragt mailen kann).
+- **Mit** zentralem Endpunkt (empfohlen): Feedback **und** automatische Fehler
+  gehen per POST an eine zentrale Adresse → ein Postfach für alle Tester.
+
+**Zentralen Endpunkt einrichten (einmalig, empfohlen):**
+1. Bei einem Formular-zu-E-Mail-Dienst ein Formular anlegen (z. B.
+   **Formspree** oder **Web3Forms**, kostenlos) mit Zieladresse
+   `josua.hess@icloud.com`. Man erhält eine **Endpunkt-URL**.
+2. Diese URL im GitHub-Repo als **Variable** hinterlegen:
+   *Settings → Secrets and variables → Actions → Variables →* `VITE_FEEDBACK_URL`.
+3. Extension über den GitHub-Workflow neu bauen (die URL wird eingebacken).
+   Ab dann landen Feedback + automatische Fehler dort.
+
+### Im Gateway (automatische Fehler-Mails)
+Der Gateway läuft dauerhaft; er mailt bei Fehlern an `EMAIL_TO`
+(Standard `josua.hess@icloud.com`). Dazu in der `gateway/.env` die SMTP-Daten
+eines Postausgangs eintragen (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, …; siehe
+`gateway/.env.example`). Ohne SMTP bleibt es still (nur Log). Eine **Spam-Sperre**
+sendet dieselbe Fehlerart höchstens einmal pro Stunde.
+
+### Datenschutz
+Berichte enthalten **keine** Passwörter/Token; die Seriennummer wird **maskiert**.
+Angehängt werden nur technische Angaben (Instanz-Host, Version, letzte Ereignisse).
+
+---
+
 ## Teil 5 – Fehlersuche
 
 | Problem | Ursache / Lösung |
