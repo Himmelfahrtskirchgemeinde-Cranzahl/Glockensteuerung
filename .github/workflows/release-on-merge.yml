@@ -1,0 +1,62 @@
+name: Release bei Merge auf main
+
+# Bei jedem Push auf main (z. B. gemergter Pull Request) automatisch einen
+# Release mit Tag v<version> aus extension/package.json erstellen und die
+# gebaute Extension-ZIP anhaengen.
+#
+# Neuer Release = neue Version: dazu in einem PR die "version" in
+# extension/package.json erhoehen (z. B. 0.1.0 -> 0.1.1). Bleibt die Version
+# gleich, wird die ZIP am bestehenden Release des Tags aktualisiert.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      VITE_KEY: glockensteuerung
+      VITE_FEEDBACK_URL: ${{ vars.VITE_FEEDBACK_URL }}
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v4
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+
+      - name: Abhaengigkeiten installieren
+        working-directory: extension
+        run: npm ci
+
+      - name: Bauen und ZIP packen
+        working-directory: extension
+        run: npm run deploy
+
+      - name: Versions-Tag ermitteln
+        id: v
+        run: |
+          VERSION=$(node -p "require('./extension/package.json').version")
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Release anlegen oder ZIP aktualisieren
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.v.outputs.tag }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG existiert -> ZIP aktualisieren"
+            gh release upload "$TAG" extension/releases/*.zip --clobber
+          else
+            echo "Release $TAG neu anlegen"
+            gh release create "$TAG" extension/releases/*.zip \
+              --target "${GITHUB_SHA}" \
+              --title "Glockensteuerung $TAG" \
+              --notes "Automatischer Release bei Merge auf main. ZIP herunterladen und in ChurchTools installieren (Admin -> Erweiterungen)."
+          fi
