@@ -1,46 +1,50 @@
 /**
- * Rechte-Prüfung: leitet aus den ChurchTools-Rechten des aktuellen Nutzers ab,
- * ob er nur sehen/läuten darf oder auch Einstellungen ändern darf.
+ * Rechte-Prüfung: liest die ChurchTools-Rechte des aktuellen Nutzers und macht
+ * sie PRO KATEGORIE verfügbar. Die Custom-Module-Rechte sind Listen von
+ * Kategorie-IDs (`view/edit/create custom data`) – so kann ein Admin in der
+ * Rechteverwaltung je Untermenü (= Kategorie) festlegen, wer es sehen bzw.
+ * bearbeiten darf.
  *
- * Es werden die VORHANDENEN Rechte des Custom-Modules genutzt (sichtbar in der
- * Rechteverwaltung unter „Glockensteuerung"):
- *   - Sehen + Läuten:            „…sehen (view)"
- *   - Einstellungen ändern:      „Daten in Kategorie bearbeiten/erstellen
- *                                 (edit/create custom data)"
- * Admins mit „administer custom modules" dürfen ebenfalls alles.
- *
- * Wichtig: ChurchTools erzwingt dieselben Rechte serverseitig auf den
- * KV-Endpunkten (customdatavalues). Diese Prüfung blendet die Bedienelemente
- * nur passend aus – der eigentliche Schutz liegt am Server.
+ * Genutzt werden die VORHANDENEN Rechte des Custom-Modules „Glockensteuerung",
+ * keine neu erfundenen. ChurchTools erzwingt dieselben Rechte serverseitig auf
+ * den KV-Endpunkten – die UI blendet nur passend aus.
  */
 import { churchtoolsClient } from '@churchtools/churchtools-client';
 import type { CustomModulePermission } from './utils/ct-types';
 import { EXT_KEY } from './config';
 
 export interface Rights {
-    canView: boolean;
-    canEdit: boolean;
+    isAdmin: boolean;
+    /** ChurchTools-Recht „Erweiterung/Custom-Module verwalten" (administer custom modules). */
+    manageExt: boolean;
+    /** Kategorie-IDs, die der Nutzer sehen darf. */
+    viewCats: number[];
+    /** Kategorie-IDs, die der Nutzer bearbeiten/anlegen darf. */
+    editCats: number[];
 }
 
-const nonEmpty = (a: unknown): boolean => Array.isArray(a) && a.length > 0;
+const asIds = (x: unknown): number[] =>
+    Array.isArray(x) ? x.filter((n): n is number => typeof n === 'number') : [];
 
 export async function loadRights(): Promise<Rights> {
     try {
         const g = await churchtoolsClient.get<Record<string, unknown>>('/permissions/global');
         const core = (g?.churchcore ?? {}) as Record<string, unknown>;
-        const isAdmin =
-            core['administer custom modules'] === true ||
-            core['administer settings'] === true;
+        const manageExt = core['administer custom modules'] === true;
+        const isAdmin = manageExt || core['administer settings'] === true;
         const mod = g?.[EXT_KEY] as CustomModulePermission | undefined;
-        const canView = isAdmin || mod?.view !== false;
-        const canEdit =
-            isAdmin ||
-            nonEmpty(mod?.['edit custom data']) ||
-            nonEmpty(mod?.['create custom data']) ||
-            mod?.['create custom category'] === true;
-        return { canView, canEdit };
+        const viewCats = [
+            ...asIds(mod?.['view custom data']),
+            ...asIds(mod?.['view custom category']),
+        ];
+        const editCats = [
+            ...asIds(mod?.['edit custom data']),
+            ...asIds(mod?.['create custom data']),
+        ];
+        return { isAdmin, manageExt, viewCats, editCats };
     } catch {
-        // Rechte nicht lesbar -> sicherer Standard: sehen ja, ändern nein.
-        return { canView: true, canEdit: false };
+        // Rechte nicht lesbar -> sicherer Standard: nichts sichtbar/änderbar
+        // (außer dem, was ohnehin für alle offen ist, z. B. Hilfe/Feedback).
+        return { isAdmin: false, manageExt: false, viewCats: [], editCats: [] };
     }
 }

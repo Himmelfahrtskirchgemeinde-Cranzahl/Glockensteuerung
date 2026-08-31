@@ -21,11 +21,20 @@ Basiert auf dem offiziellen
 
 ## ZIP für ChurchTools bekommen
 
-- **Ohne eigene Software:** GitHub baut die ZIP – Repo-Tab **Actions** → Workflow
-  „ChurchTools-Extension bauen (ZIP)" → **Run workflow**; ZIP unter *Artifacts*.
-  Bei einem Versions-Tag (`v*`) hängt sie zusätzlich am **Release**. Details:
-  [`../ANLEITUNG.md`](../ANLEITUNG.md), Teil 1.
-- **Lokal:** siehe „Bauen & Installieren" unten.
+- **Empfohlen – Release:** Einen Versions-Tag (`v*`) pushen; der Workflow hängt
+  die **fertige, direkt installierbare ZIP** an ein **Release**. Dort liegt sie
+  als **einzelne Datei** – herunterladen und **unverändert** hochladen.
+- **Actions-Artifact:** Repo-Tab **Actions** → Workflow „ChurchTools-Extension
+  bauen (ZIP)" → **Run workflow**; ZIP unter *Artifacts*.
+  > ⚠️ **Wichtig:** GitHub verpackt jedes Artifact **noch einmal** in eine ZIP →
+  > du lädst also eine **ZIP-in-ZIP** herunter. Lade **nicht** diese äußere Datei
+  > hoch (sonst `ccm.files.zip.missing.index.html`), sondern **entpacke sie
+  > einmal** und lade die **innere** `glockensteuerung-v….zip` hoch. **Nicht**
+  > per Finder neu komprimieren (das erzeugt `__MACOSX/` → Upload-Fehler).
+- **Lokal:** siehe „Bauen & Installieren" unten (erzeugt direkt die richtige ZIP
+  in `releases/`).
+
+Details: [`../ANLEITUNG.md`](../ANLEITUNG.md), Teil 1.
 
 ## Entwicklung
 
@@ -64,19 +73,29 @@ KV-Store; der Zugriff auf dieses Modul sollte auf Berechtigte beschränkt werden
 Die Verbindung zum HEW-Broker läuft direkt aus dem Browser per MQTT-over-WSS
 (wie die offizielle HEW-Web-App).
 
-Die Extension nutzt die **vorhandenen ChurchTools-Rechte** des Custom-Modules
-(Rechteverwaltung → „Glockensteuerung") und trennt zwei Stufen:
+Die Extension nutzt die **vorhandenen ChurchTools-Rechte** des Custom-Modules –
+und zwar **pro Untermenü**. Jedes Untermenü ist eine eigene **Kategorie**, deren
+Rechte ein Admin in der Rechteverwaltung (→ „Glockensteuerung") einzeln vergibt:
 
-| Aktion | benötigtes Recht |
-|---|---|
-| Modul öffnen, Status sehen, **Läuten/Testen** | „*Glockensteuerung* sehen" (`view`) |
-| **Einstellungen** (Gerät, Automatik-Regeln) ändern, **Scharfschalten** | „Daten in Kategorie **bearbeiten/erstellen**" (`edit`/`create custom data`) – oder Admin mit „administer custom modules" |
+| Untermenü (= Kategorie) | „…sehen" (view custom data) | „…bearbeiten" (edit/create custom data) |
+|---|---|---|
+| **Steuerung** | Untermenü sichtbar + **Läuten/Testen** | – |
+| **Ereignis-Log** | Log sichtbar | – |
+| **Automatik-Regeln** | Regeln ansehen | Regeln anlegen/ändern/löschen |
+| **Gerät** | Gerätedaten ansehen | Seriennummer/Passwort ändern |
 
-Wer nur „sehen" hat, bekommt die Einstellungen **schreibgeschützt** angezeigt und
-kann die Simulation nicht ausschalten. Die Prüfung blendet die Bedienelemente
-nur passend aus – **erzwungen wird sie serverseitig** von ChurchTools auf den
-KV-Endpunkten. Ein Admin vergibt das Bearbeiten-Recht in der Rechteverwaltung
-gezielt an die Personen, die konfigurieren dürfen.
+**Sicherheitsmodus (Scharfschalten):** Den Simulationsmodus **deaktivieren** –
+und damit echtes Läuten freischalten – darf **nur**, wer die ChurchTools-
+Berechtigung **„Erweiterung verwalten"** (`administer custom modules`) hat. Für
+alle anderen ist der Schalter gar nicht sichtbar; sie können nur im
+Simulationsmodus „Testen".
+
+„Hilfe/Feedback" ist immer für alle da. Admins mit „administer custom modules"
+dürfen alles. Wer ein Untermenü nur „sehen" darf, bekommt es **schreibgeschützt**;
+ohne „sehen" ist das Untermenü ausgeblendet. Die UI blendet nur passend aus –
+**erzwungen werden die Rechte serverseitig** von ChurchTools auf den
+KV-Endpunkten. Die vier Kategorien werden beim ersten Öffnen durch eine
+berechtigte Person (Admin) automatisch angelegt.
 
 ## Technik
 
