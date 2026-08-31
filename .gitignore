@@ -28,6 +28,3 @@ releases/
 # Gateway-Laufzeitstatus
 state.json
 gateway/state.json
-
-# Hersteller-Handbuecher (Copyright) nicht einchecken
-*.pdf
