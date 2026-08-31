@@ -47,11 +47,12 @@ Für die Anbindung braucht ihr zwei Werte eures Geräts:
   und wird auch im HEW-Portal angezeigt.
 - **Geräte-Passwort:** nicht offiziell dokumentiert. Es steckt im **Quelltext der
   eingeloggten Geräteseite** im HEW-Portal – so kommt ihr dran:
-  1. Auf **`hew-voco.de`** mit eurem Konto **einloggen** und euer Gerät öffnen.
+  1. Auf **`app.hew-voco.de`** mit eurem Konto **einloggen** und euer Gerät öffnen.
      (Das Konto muss für dieses Gerät freigeschaltet sein – ggf. Freischaltcode/HEW.)
-  2. **Seitenquelltext anzeigen:** Rechtsklick → „Seitenquelltext anzeigen"
-     (bzw. `Strg`+`U`), oder `F12` → Bereich *Elements/Quelltext*.
-  3. Nach `serialNumber` und `mqttDeivcePw` suchen (`Strg`+`F`):
+  2. **Entwicklertools öffnen** mit `F12` und das Dokument **`(index)`** ansehen:
+     im Reiter *Elemente/Sources* die Seite `(index)`, oder unter *Netzwerk/Network*
+     den Eintrag `(index)` auswählen → *Antwort/Response*. (Alternativ `Strg`+`U`.)
+  3. Ganz oben im inline-`<script>` stehen die beiden Werte (`Strg`+`F` zum Suchen):
      ```js
      var serialNumber = "VH-xxxxxx";
      var mqttDeivcePw = "…euer Geräte-Passwort…";
@@ -188,11 +189,11 @@ Der Gateway meldet sich mit einem **Login-Token** an ChurchTools an
 ```bash
 # Projekt holen (oder als ZIP von GitHub herunterladen)
 git clone https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Uhrensteuerung.git
-cd Uhrsteuerung/gateway
+cd Uhrensteuerung/gateway
 
 # Python-Umgebung + Abhängigkeiten
 python3 -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+source .venv/bin/activate        # Windows: .venv\\Scripts\\activate
 pip install -r requirements.txt
 
 # Konfiguration
@@ -223,8 +224,8 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-WorkingDirectory=/pfad/zu/Uhrsteuerung/gateway
-ExecStart=/pfad/zu/Uhrsteuerung/gateway/.venv/bin/python scheduler.py
+WorkingDirectory=/pfad/zu/gateway
+ExecStart=/pfad/zu/gateway/.venv/bin/python scheduler.py
 Restart=always
 RestartSec=10
 
@@ -239,7 +240,7 @@ journalctl -u voco-gateway -f           # Live-Log
 ```
 
 **Windows** – Aufgabenplanung: neue Aufgabe „Bei Systemstart" →
-Programm `…\.venv\Scripts\python.exe`, Argument `scheduler.py`,
+Programm `…\\.venv\\Scripts\\python.exe`, Argument `scheduler.py`,
 „Ausführen, auch wenn nicht angemeldet".
 
 ### 3.6 Ruhezeit & Sicherheit (empfohlen)
