@@ -20,6 +20,15 @@ schnellen Überblick genügen die **fett** markierten Schritte.
 
 ---
 
+## Kompatibilität
+
+- ✅ **Aktuell unterstützt:** Läutesteuerungen der Reihe **HEW VOCO-futura**
+  (mit LAN/WLAN-Modul und `hew-voco.de`-Portal, z. B. **ST5**).
+- 🔜 **Geplant:** weitere HEW-Systeme sowie Steuerungen **anderer Hersteller**.
+- 🔜 **Später:** eine **universelle**, herstellerübergreifende Lösung.
+
+---
+
 ## Voraussetzungen
 
 - ChurchTools-Zugang mit **Administrator-Rechten** (zum Installieren der Extension).
@@ -29,6 +38,30 @@ schnellen Überblick genügen die **fett** markierten Schritte.
 - Am **VOCO-Gerät** je Läute-Anlass ein **„Sofort-PGS"** angelegt
   (z. B. `Gottesdienstgeläut`) – siehe Teil 2.
 - Für den Gateway: irgendein **dauerhaft laufender Rechner mit Internet**.
+
+### Zugangsdaten ermitteln: Seriennummer & Geräte-Passwort
+
+Für die Anbindung braucht ihr zwei Werte eures Geräts:
+
+- **Seriennummer** (Form `VH-xxxxxx`): steht auf dem **Typenschild** der Steuerung
+  und wird auch im HEW-Portal angezeigt.
+- **Geräte-Passwort:** nicht offiziell dokumentiert. Es steckt im **Quelltext der
+  eingeloggten Geräteseite** im HEW-Portal – so kommt ihr dran:
+  1. Auf **`app.hew-voco.de`** mit eurem Konto **einloggen** und euer Gerät öffnen.
+     (Das Konto muss für dieses Gerät freigeschaltet sein – ggf. Freischaltcode/HEW.)
+  2. **Entwicklertools öffnen** mit `F12` und das Dokument **`(index)`** ansehen:
+     im Reiter *Elemente/Sources* die Seite `(index)`, oder unter *Netzwerk/Network*
+     den Eintrag `(index)` auswählen → *Antwort/Response*. (Alternativ `Strg`+`U`.)
+  3. Ganz oben im inline-`<script>` stehen die beiden Werte (`Strg`+`F` zum Suchen):
+     ```js
+     var serialNumber = "VH-xxxxxx";
+     var mqttDeivcePw = "…euer Geräte-Passwort…";
+     ```
+  4. Beide Werte in der **Extension** (unter „Gerät") bzw. in `gateway/.env`
+     (`VOCO_SERIAL`, `VOCO_DEVICE_PW`) eintragen.
+
+> ⚠️ Das Geräte-Passwort ist ein **Geheimnis** – wie einen Schlüssel behandeln,
+> nicht teilen oder committen. Ändert HEW das Portal, kann sich der Weg ändern.
 
 ---
 
@@ -155,12 +188,12 @@ Der Gateway meldet sich mit einem **Login-Token** an ChurchTools an
 
 ```bash
 # Projekt holen (oder als ZIP von GitHub herunterladen)
-git clone https://github.com/JosuaDev/Uhrsteuerung.git
-cd Uhrsteuerung/gateway
+git clone https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Uhrensteuerung.git
+cd Uhrensteuerung/gateway
 
 # Python-Umgebung + Abhängigkeiten
 python3 -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+source .venv/bin/activate        # Windows: .venv\\Scripts\\activate
 pip install -r requirements.txt
 
 # Konfiguration
@@ -191,8 +224,8 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-WorkingDirectory=/pfad/zu/Uhrsteuerung/gateway
-ExecStart=/pfad/zu/Uhrsteuerung/gateway/.venv/bin/python scheduler.py
+WorkingDirectory=/pfad/zu/gateway
+ExecStart=/pfad/zu/gateway/.venv/bin/python scheduler.py
 Restart=always
 RestartSec=10
 
@@ -207,7 +240,7 @@ journalctl -u voco-gateway -f           # Live-Log
 ```
 
 **Windows** – Aufgabenplanung: neue Aufgabe „Bei Systemstart" →
-Programm `…\.venv\Scripts\python.exe`, Argument `scheduler.py`,
+Programm `…\\.venv\\Scripts\\python.exe`, Argument `scheduler.py`,
 „Ausführen, auch wenn nicht angemeldet".
 
 ### 3.6 Ruhezeit & Sicherheit (empfohlen)
@@ -288,6 +321,6 @@ Angehängt werden nur technische Angaben (Instanz-Host, Version, letzte Ereignis
 - Ein **Gateway pro Gemeinde** (eigener Login-Token + Gerät) ist am einfachsten und
   sichersten. Ein zentraler Multi-Mandanten-Dienst ist möglich, erfordert aber
   sorgfältiges Speichern fremder Zugangsdaten – und idealerweise eine **offizielle
-  Freigabe/Schnittstelle von HEW** (siehe [`docs/HEW-Rueckfragen.md`](docs/HEW-Rueckfragen.md)).
+  Freigabe/Schnittstelle von HEW**.
 - Hinweis: Die Steuerung basiert auf dem (nachgebauten) HEW-Cloud-Protokoll; für
   einen dauerhaften Produktbetrieb bei Dritten sollte HEW eingebunden werden.
