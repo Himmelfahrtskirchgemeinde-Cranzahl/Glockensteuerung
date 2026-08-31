@@ -14,7 +14,9 @@
  */
 export const FEEDBACK_URL: string = (import.meta.env.VITE_FEEDBACK_URL || '').trim();
 export const FEEDBACK_EMAIL = 'josua.hess@icloud.com';
-export const APP_VERSION = '0.1.0';
+// Wird beim Build aus git describe gesetzt (vite.config.ts define).
+declare const __APP_VERSION__: string;
+export const APP_VERSION: string = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
 
 export interface ReportContext {
     version: string;
