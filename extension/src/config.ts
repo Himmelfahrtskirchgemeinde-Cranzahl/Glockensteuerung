@@ -5,7 +5,6 @@
  */
 import {
     getOrCreateModule,
-    getModule,
     getCustomDataCategory,
     createCustomDataCategory,
     getCustomDataValues,
@@ -44,11 +43,18 @@ export class ConfigStore {
     categoryId!: number;
     private valueIds: Record<string, number> = {};
 
-    /** In DEV wird das Modul bei Bedarf erstellt, in PROD nur geladen. */
-    async init(dev: boolean): Promise<void> {
-        const mod = dev
-            ? await getOrCreateModule(EXT_KEY, 'Glockensteuerung', 'ChurchTools ⇄ VOCO-futura')
-            : await getModule(EXT_KEY);
+    /**
+     * Legt das Custom-Module im KV-Store bei Bedarf an (erste Nutzung durch
+     * eine berechtigte Person) und lädt es sonst. Ohne diesen Eintrag – der
+     * beim ZIP-Upload NICHT automatisch entsteht – käme sonst
+     * „Module for extension key … not found".
+     */
+    async init(): Promise<void> {
+        const mod = await getOrCreateModule(
+            EXT_KEY,
+            'Glockensteuerung',
+            'ChurchTools ⇄ VOCO-futura',
+        );
         this.moduleId = mod.id;
 
         let cat = await getCustomDataCategory<object>(CATEGORY);
