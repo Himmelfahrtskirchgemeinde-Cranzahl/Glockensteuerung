@@ -24,7 +24,6 @@ export const CATS = [
     { key: 'steuerung', shorty: 'steuerung', name: 'Steuerung', desc: 'Live-Steuerung / Läuten' },
     { key: 'log', shorty: 'ereignislog', name: 'Ereignis-Log', desc: 'Ereignis-Log' },
     { key: 'regeln', shorty: 'regeln', name: 'Automatik-Regeln', desc: 'Termin → Programm' },
-    { key: 'geraet', shorty: 'geraet', name: 'Gerät', desc: 'Geräte-Zugangsdaten' },
 ] as const;
 export type CatKey = (typeof CATS)[number]['key'];
 
@@ -96,7 +95,11 @@ export class ConfigStore {
 
     async load(): Promise<AppConfig> {
         const cfg: AppConfig = { device: null, rules: [], simulate: true, durations: {} };
-        await this.loadFrom('geraet', 'device', (d) => { cfg.device = d as DeviceConfig; });
+        // Gerät liegt in der operativen Kategorie „steuerung", damit JEDER, der das
+        // Modul bedienen darf, die Verbindungsdaten lesen kann (Status/Läuten).
+        // Es gehört NICHT in eine separat berechtigte „Gerät"-Kategorie – sonst sieht
+        // ein reiner Betrachter das Gerät als nicht eingerichtet.
+        await this.loadFrom('steuerung', 'device', (d) => { cfg.device = d as DeviceConfig; });
         await this.loadFrom('regeln', 'rules', (d) => { cfg.rules = (d as MappingRule[]) ?? []; });
         await this.loadFrom('steuerung', 'control', (d) => {
             const c = (d ?? {}) as Partial<{ simulate: boolean; durations: Record<string, number> }>;
@@ -104,7 +107,22 @@ export class ConfigStore {
         });
         cfg.simulate = this.control.simulate;
         cfg.durations = this.control.durations;
+        // Migration: früher lag das Gerät in einer eigenen „geraet"-Kategorie.
+        if (!cfg.device) await this.migrateLegacyDevice((d) => { cfg.device = d; });
         return cfg;
+    }
+
+    /** Liest Gerätedaten aus der alten „geraet"-Kategorie (falls vorhanden). */
+    private async migrateLegacyDevice(set: (d: DeviceConfig) => void): Promise<void> {
+        try {
+            const legacy = await getCustomDataCategory<object>('geraet');
+            if (!legacy) return;
+            const vals = await getCustomDataValues<StoredValue>((legacy as any).id, this.moduleId);
+            const dev = (vals as unknown as StoredValue[]).find((v) => v.key === 'device');
+            if (dev) set(dev.data as DeviceConfig);
+        } catch {
+            // keine Altdaten oder kein Leserecht -> ignorieren
+        }
     }
 
     private async loadFrom(catKey: CatKey, valueKey: string, set: (data: unknown) => void): Promise<void> {
@@ -137,7 +155,7 @@ export class ConfigStore {
         }
     }
 
-    saveDevice(device: DeviceConfig) { return this.upsert('geraet', 'device', device); }
+    saveDevice(device: DeviceConfig) { return this.upsert('steuerung', 'device', device); }
     saveRules(rules: MappingRule[]) { return this.upsert('regeln', 'rules', rules); }
 
     saveSimulate(on: boolean) {
