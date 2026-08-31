@@ -61,12 +61,17 @@ async function createModule(
     name: string,
     description: string
 ): Promise<CustomModule> {
-    const createData: CustomModuleCreate = {
+    // ChurchTools verlangt beim Anlegen zusaetzlich das Pflichtfeld `inMenu`
+    // (Boolean – ob das Modul in der Navigation erscheint). Fehlt es, antwortet
+    // die API mit HTTP 400 (validation.boolean auf `inMenu`). Der generierte
+    // Typ `CustomModuleCreate` kennt das Feld (noch) nicht -> bewusst ergaenzt.
+    const createData = {
         name: name,
         shorty: extensionkey,
         description: description,
         sortKey: 100,
-    };
+        inMenu: true,
+    } as CustomModuleCreate & { inMenu: boolean };
 
     const newModule = await churchtoolsClient.post<CustomModule>(
         '/custommodules',
