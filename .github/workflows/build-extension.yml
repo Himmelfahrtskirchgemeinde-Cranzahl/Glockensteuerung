@@ -44,12 +44,29 @@ jobs:
         # Fuer eine groessere Version einfach manuell einen Tag pushen (z. B.
         # v0.5.0) – der Auto-Bump zaehlt danach ab dort weiter.
         run: |
+          # Hauptversion = zweistellige Jahreszahl (2026 -> 26, 2027 -> 27).
+          # Wird automatisch aus dem aktuellen Datum abgeleitet: Der erste Merge
+          # im neuen Jahr startet von selbst bei v27.0.0.
+          MAJOR=$(date +%y)
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           LATEST=$(git tag -l 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
           LATEST=${LATEST:-v0.0.0}
           VER=${LATEST#v}; MA=${VER%%.*}; REST=${VER#*.}; MI=${REST%%.*}; PA=${REST##*.}
-          NEXT="v${MA}.${MI}.$((PA + 1))"
+          # 10# erzwingt Basis 10 (sonst waere z. B. "08" eine ungueltige Oktalzahl).
+          MA=$((10#$MA)); MI=$((10#$MI)); PA=$((10#$PA))
+          # Schema:  <Jahr zweistellig>.<Mittelstelle>.<Patch>
+          #   - Patch laeuft nur bis 9, dann Uebertrag:      v26.6.9 -> v26.7.0
+          #   - Die Mittelstelle zaehlt unbegrenzt weiter:   v26.9.9 -> v26.10.0
+          #   - Neues Jahr faengt wieder bei .0.0 an:        v26.12.3 -> v27.0.0
+          if [ "$MA" -lt "$MAJOR" ]; then
+            # Neues Jahr (oder alte Zaehlung wie v0.4.x) -> bei .0.0 starten.
+            MA=$MAJOR; MI=0; PA=0
+          else
+            PA=$((PA + 1))
+            if [ "$PA" -gt 9 ]; then PA=0; MI=$((MI + 1)); fi
+          fi
+          NEXT="v${MA}.${MI}.${PA}"
           echo "Neuer Tag: $NEXT (bisher: $LATEST)"
           git tag "$NEXT"
           git push origin "$NEXT"
