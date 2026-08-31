@@ -2,6 +2,12 @@
    Modul-Kopf, linker Modul-Navigation, weißen runden Karten, blauen Akzenten,
    grünen Primär-Buttons, Inter-Schrift. Alles unter .gs gescoped und mit .gs-
    präfixiert, damit ChurchTools-Styles nicht gestört werden (und umgekehrt). */
+
+/* Reset: volle Fläche/Höhe, kein Standard-Rand (index.html-Tailwind-Klassen
+   greifen ohne Tailwind nicht) – sonst füllt das Modul den Bildschirm nicht. */
+html, body { margin: 0; padding: 0; height: 100%; }
+#app { height: 100%; }
+
 .gs {
   --gs-navy: #1e2c52;
   --gs-blue: #2f6bed;
