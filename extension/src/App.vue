@@ -351,6 +351,16 @@ async function loadNextRingings() {
 
 <template>
   <div class="gs">
+    <!-- Ladezustand – 1:1 wie die ChurchTools-Modulanzeige -->
+    <div v-if="loading" class="gs-loading">
+      <div class="gs-loading-box">
+        <svg class="gs-loading-mi" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>
+        <div class="gs-loading-txt">Wird geladen …</div>
+        <div class="gs-loading-dots"><span></span><span></span><span></span></div>
+      </div>
+    </div>
+
+    <template v-else>
     <!-- Kopfleiste (voll breit, fix) -->
     <header class="gs-mhead">
         <span class="mi">
@@ -398,8 +408,7 @@ async function loadNextRingings() {
             <span>Unterstützt aktuell <b>HEW VOCO-futura</b> (z.&nbsp;B. ST5). Weitere Systeme &amp; andere Hersteller folgen – eine <b>universelle</b> Lösung ist später geplant.</span>
           </div>
 
-          <p v-if="loading">Lade …</p>
-          <div v-else-if="bootError" class="gs-card"><div class="gs-body" style="color:var(--gs-danger)">Fehler beim Start: {{ bootError }}</div></div>
+          <div v-if="bootError" class="gs-card"><div class="gs-body" style="color:var(--gs-danger)">Fehler beim Start: {{ bootError }}</div></div>
 
           <template v-else>
           <!-- ▸ Steuerung -->
@@ -568,6 +577,7 @@ async function loadNextRingings() {
           </template>
       </main>
     </div>
+    </template>
 
     <!-- Feedback modal -->
     <div v-if="showFeedback" class="gs-backdrop" @click.self="showFeedback = false">
