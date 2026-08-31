@@ -155,7 +155,7 @@ Der Gateway meldet sich mit einem **Login-Token** an ChurchTools an
 
 ```bash
 # Projekt holen (oder als ZIP von GitHub herunterladen)
-git clone https://github.com/JosuaDev/Uhrsteuerung.git
+git clone https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Uhrensteuerung.git
 cd Uhrsteuerung/gateway
 
 # Python-Umgebung + Abhängigkeiten
@@ -288,6 +288,6 @@ Angehängt werden nur technische Angaben (Instanz-Host, Version, letzte Ereignis
 - Ein **Gateway pro Gemeinde** (eigener Login-Token + Gerät) ist am einfachsten und
   sichersten. Ein zentraler Multi-Mandanten-Dienst ist möglich, erfordert aber
   sorgfältiges Speichern fremder Zugangsdaten – und idealerweise eine **offizielle
-  Freigabe/Schnittstelle von HEW** (siehe [`docs/HEW-Rueckfragen.md`](docs/HEW-Rueckfragen.md)).
+  Freigabe/Schnittstelle von HEW**.
 - Hinweis: Die Steuerung basiert auf dem (nachgebauten) HEW-Cloud-Protokoll; für
   einen dauerhaften Produktbetrieb bei Dritten sollte HEW eingebunden werden.
