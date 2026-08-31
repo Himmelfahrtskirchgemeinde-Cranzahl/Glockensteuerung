@@ -25,7 +25,7 @@ Basiert auf dem offiziellen
   „ChurchTools-Extension bauen (ZIP)" → **Run workflow**; ZIP unter *Artifacts*.
   Bei einem Versions-Tag (`v*`) hängt sie zusätzlich am **Release**. Details:
   [`../ANLEITUNG.md`](../ANLEITUNG.md), Teil 1.
-- **Lokal:** siehe „Bauen & Installieren" unten. (./README.md#bauen--installieren)
+- **Lokal:** siehe „Bauen & Installieren" unten. (/README.md#bauen--installieren)
 
 ## Entwicklung
 
