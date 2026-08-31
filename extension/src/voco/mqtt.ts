@@ -52,11 +52,46 @@ export type VocoStatus = {
     stoppable: string[];
 };
 
+/** Programm-Katalog des Geräts (aus /syncdata). */
+export type VocoCatalog = {
+    sPGS: string[];          // Sofort-PGS
+    programsteps: string[];  // Programmschritte (Vorlagen)
+    melodies: string[];      // Melodien (Name enthält oft die Dauer)
+};
+
+/** Extrahiert alle "..."-Werte aus einem Abschnitt (Werte dürfen Kommas enthalten). */
+function extractQuoted(seg: string): string[] {
+    return (seg.match(/"([^"]*)"/g) ?? []).map((s) => s.slice(1, -1).trim()).filter(Boolean);
+}
+
+/**
+ * Parst den /syncdata-Katalog. Abschnitte sind komma-getrennte KEY_…-Blöcke,
+ * die Listen (sPGS, programsteps, melodies) enthalten `_`-getrennte, doppelt
+ * gequotete Namen. Wir schneiden je Abschnitt zwischen seinem und dem nächsten
+ * bekannten Schlüssel und ziehen die gequoteten Namen heraus.
+ */
+export function parseCatalog(payload: string): VocoCatalog {
+    const section = (key: string, next: string): string => {
+        const s = payload.indexOf(`,${key}_`);
+        if (s < 0) return '';
+        const from = s + key.length + 2;
+        let e = payload.indexOf(`,${next}`, from);
+        if (e < 0) e = payload.length;
+        return payload.slice(from, e);
+    };
+    return {
+        sPGS: extractQuoted(section('sPGS', 'programsteps')),
+        programsteps: extractQuoted(section('programsteps', 'pgsmodes')),
+        melodies: extractQuoted(section('melodies', 'clockbhvs')),
+    };
+}
+
 export class VocoMqtt {
     private client?: MqttClient;
     private base: string;
     private cfg: Required<VocoConfig>;
     public status: VocoStatus = { online: null, playable: [], stoppable: [] };
+    public catalog: VocoCatalog = { sPGS: [], programsteps: [], melodies: [] };
     public onUpdate?: () => void;
     /** Simulationsmodus: sendet KEINE auslösenden Befehle, protokolliert sie nur. */
     public simulate = true;
@@ -168,11 +203,12 @@ export class VocoMqtt {
         } else if (sub === '/syncinfo') {
             this.log('Statusinfo empfangen', 'in');
         } else if (sub === '/syncdata') {
-            // Voller Katalog – einmalig komplett loggen, damit er sich per
-            // Log-Download zum Dekodieren (Melodien/Programmschritte) senden lässt.
+            // Katalog parsen: Sofort-PGS, Programmschritte, Melodien.
+            this.catalog = parseCatalog(payload);
             if (!this.syncdataLogged) {
                 this.syncdataLogged = true;
-                this.log(`KATALOG /syncdata (bitte 1x per Log-Download an den Entwickler senden): ${payload}`, 'in');
+                const c = this.catalog;
+                this.log(`Katalog empfangen: ${c.sPGS.length} Sofort-PGS, ${c.melodies.length} Melodien, ${c.programsteps.length} Programmschritte`, 'in');
             }
         } else if (sub === '/fetchinfo' || sub === '/fetchdata' || sub === '/playpgsD') {
             // Echo der eigenen Anfragen (retained) – nicht loggen.
