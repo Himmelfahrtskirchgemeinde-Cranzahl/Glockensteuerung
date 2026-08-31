@@ -20,6 +20,15 @@ schnellen Überblick genügen die **fett** markierten Schritte.
 
 ---
 
+## Kompatibilität
+
+- ✅ **Aktuell unterstützt:** Läutesteuerungen der Reihe **HEW VOCO-futura**
+  (mit LAN/WLAN-Modul und `hew-voco.de`-Portal, z. B. **ST5**).
+- 🔜 **Geplant:** weitere HEW-Systeme sowie Steuerungen **anderer Hersteller**.
+- 🔜 **Später:** eine **universelle**, herstellerübergreifende Lösung.
+
+---
+
 ## Voraussetzungen
 
 - ChurchTools-Zugang mit **Administrator-Rechten** (zum Installieren der Extension).
@@ -29,6 +38,29 @@ schnellen Überblick genügen die **fett** markierten Schritte.
 - Am **VOCO-Gerät** je Läute-Anlass ein **„Sofort-PGS"** angelegt
   (z. B. `Gottesdienstgeläut`) – siehe Teil 2.
 - Für den Gateway: irgendein **dauerhaft laufender Rechner mit Internet**.
+
+### Zugangsdaten ermitteln: Seriennummer & Geräte-Passwort
+
+Für die Anbindung braucht ihr zwei Werte eures Geräts:
+
+- **Seriennummer** (Form `VH-xxxxxx`): steht auf dem **Typenschild** der Steuerung
+  und wird auch im HEW-Portal angezeigt.
+- **Geräte-Passwort:** nicht offiziell dokumentiert. Es steckt im **Quelltext der
+  eingeloggten Geräteseite** im HEW-Portal – so kommt ihr dran:
+  1. Auf **`hew-voco.de`** mit eurem Konto **einloggen** und euer Gerät öffnen.
+     (Das Konto muss für dieses Gerät freigeschaltet sein – ggf. Freischaltcode/HEW.)
+  2. **Seitenquelltext anzeigen:** Rechtsklick → „Seitenquelltext anzeigen"
+     (bzw. `Strg`+`U`), oder `F12` → Bereich *Elements/Quelltext*.
+  3. Nach `serialNumber` und `mqttDeivcePw` suchen (`Strg`+`F`):
+     ```js
+     var serialNumber = "VH-xxxxxx";
+     var mqttDeivcePw = "…euer Geräte-Passwort…";
+     ```
+  4. Beide Werte in der **Extension** (unter „Gerät") bzw. in `gateway/.env`
+     (`VOCO_SERIAL`, `VOCO_DEVICE_PW`) eintragen.
+
+> ⚠️ Das Geräte-Passwort ist ein **Geheimnis** – wie einen Schlüssel behandeln,
+> nicht teilen oder committen. Ändert HEW das Portal, kann sich der Weg ändern.
 
 ---
 

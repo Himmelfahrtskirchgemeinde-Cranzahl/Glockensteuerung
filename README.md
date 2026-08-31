@@ -31,6 +31,13 @@ manuelle Programmwahl entfällt. Bedienung und Konfiguration laufen als
 - Beide sprechen den HEW-Broker per MQTT – Protokoll:
   [`docs/VOCO-MQTT-Protokoll.md`](docs/VOCO-MQTT-Protokoll.md).
 
+## Kompatibilität
+
+- ✅ **Aktuell:** **HEW VOCO-futura** (z. B. ST5, mit LAN/WLAN-Modul und
+  `hew-voco.de`-Portal).
+- 🔜 **Geplant:** weitere HEW-Systeme und Steuerungen **anderer Hersteller**.
+- 🔜 **Später:** eine **universelle**, herstellerübergreifende Lösung.
+
 ## 🛡️ Simulationsmodus (kein versehentliches Läuten)
 
 Zum Einrichten und Testen, ohne dass wirklich geläutet wird:
