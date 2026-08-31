@@ -57,6 +57,19 @@ html, body { margin: 0; padding: 0; height: 100%; }
 .gs-badge { background: var(--gs-danger); color: #fff; border-radius: 999px; font-size: 11px; min-width: 17px; height: 17px; padding: 0 5px; display: inline-grid; place-items: center; margin-left: 2px; }
 
 /* ---- Hauptbereich: Seitenleiste + Inhalt, volle Höhe ---- */
+/* Ladezustand – 1:1 wie die ChurchTools-Modulanzeige:
+   graues Modul-Icon, „Wird geladen …", darunter drei animierte Punkte. */
+.gs-loading { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; background: var(--gs-page); }
+.gs-loading-box { display: flex; flex-direction: column; align-items: center; gap: 15px; color: var(--gs-faint); }
+.gs-loading-mi { width: 56px; height: 56px; }
+.gs-loading-txt { font-size: 15px; font-weight: 500; }
+.gs-loading-dots { display: flex; gap: 9px; }
+.gs-loading-dots span { width: 9px; height: 9px; border-radius: 50%; background: currentColor; opacity: .3; animation: gs-dot 1.15s ease-in-out infinite; }
+.gs-loading-dots span:nth-child(2) { animation-delay: .19s; }
+.gs-loading-dots span:nth-child(3) { animation-delay: .38s; }
+@keyframes gs-dot { 0%, 65%, 100% { opacity: .25; transform: translateY(0); } 32% { opacity: 1; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .gs-loading-dots span { animation: gs-dot 2.4s ease-in-out infinite; } }
+
 .gs-main { flex: 1; display: flex; align-items: stretch; min-height: 0; }
 .gs-content { flex: 1; min-width: 0; padding: 20px 24px 48px; overflow-y: auto; }
 
