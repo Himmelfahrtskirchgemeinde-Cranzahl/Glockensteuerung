@@ -61,6 +61,7 @@ export class VocoMqtt {
     /** Simulationsmodus: sendet KEINE auslösenden Befehle, protokolliert sie nur. */
     public simulate = true;
     public onLog?: (line: string, dir: 'in' | 'out' | 'sim') => void;
+    private syncdataLogged = false;
 
     private log(line: string, dir: 'in' | 'out' | 'sim') { this.onLog?.(line, dir); }
 
@@ -86,12 +87,23 @@ export class VocoMqtt {
                 protocolVersion: 4,
             });
             this.client = c;
+            let settled = false;
             c.on('connect', () => {
+                const reconnected = settled;
+                settled = true;
                 c.subscribe(`${this.base}/#`);
                 this.requestSync();
+                if (reconnected) this.log('wieder verbunden', 'in');
                 resolve();
             });
-            c.on('error', (e) => reject(e));
+            // Nur der ERSTE Verbindungsfehler ist fatal. Spaetere sind vom
+            // Auto-Reconnect abgedeckt und werden nur als Info geloggt (kein
+            // gemeldeter Fehler).
+            c.on('error', (e) => {
+                if (!settled) { settled = true; reject(e); }
+                else this.log('Verbindung unterbrochen – verbinde neu …', 'in');
+            });
+            c.on('offline', () => { if (settled) this.log('Verbindung unterbrochen – verbinde neu …', 'in'); });
             c.on('message', (topic, payload) => this.onMessage(topic, payload.toString('latin1')));
         });
     }
@@ -119,6 +131,7 @@ export class VocoMqtt {
     requestSync() {
         this.pub('/fetchinfo', 'EN');
         this.pub('/playpgsD', 'list');
+        this.pub('/fetchdata', '1'); // Katalog (sPGS, Programmschritte, Melodien …) anfordern
         this.log('Status/Programme angefragt (lesend)', 'out');
     }
 
@@ -152,6 +165,17 @@ export class VocoMqtt {
             this.log(`Schlagwerk: ${payload}`, 'in');
         } else if (sub === '/auto') {
             this.log(`Automatik: ${payload}`, 'in');
+        } else if (sub === '/syncinfo') {
+            this.log('Statusinfo empfangen', 'in');
+        } else if (sub === '/syncdata') {
+            // Voller Katalog – einmalig komplett loggen, damit er sich per
+            // Log-Download zum Dekodieren (Melodien/Programmschritte) senden lässt.
+            if (!this.syncdataLogged) {
+                this.syncdataLogged = true;
+                this.log(`KATALOG /syncdata (bitte 1x per Log-Download an den Entwickler senden): ${payload}`, 'in');
+            }
+        } else if (sub === '/fetchinfo' || sub === '/fetchdata' || sub === '/playpgsD') {
+            // Echo der eigenen Anfragen (retained) – nicht loggen.
         } else {
             const short = payload.length > 80 ? payload.slice(0, 80) + '…' : payload;
             this.log(`${sub}: ${short}`, 'in');
