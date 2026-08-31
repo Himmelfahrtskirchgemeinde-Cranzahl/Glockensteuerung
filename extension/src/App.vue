@@ -50,6 +50,7 @@ let clockTimer: number | undefined;
 const device = ref<DeviceConfig>({ serial: '', devicePw: '', brokerUrl: 'wss://hew-voco.de:8084/mqtt' });
 const rules = ref<MappingRule[]>([]);
 const calendars = ref<{ id: number; name: string }[]>([]);
+const nextRingings = ref<Array<{ when: Date; program: string; source: string }>>([]);
 type LogEntry = { ts: Date; dir: 'in' | 'out' | 'sim'; line: string };
 const logLines = ref<LogEntry[]>([]);
 const dlFrom = ref('');   // Log-Download: Von (datetime-local), leer = alles
@@ -145,6 +146,7 @@ async function boot() {
         // Gemerkter Status gilt nur für Berechtigte; alle anderen bleiben in Simulation.
         simulate.value = rights.value.manageExt ? (cfg.simulate ?? true) : true;
         try { calendars.value = await churchtoolsClient.get<{ id: number; name: string }[]>('/calendars'); } catch { calendars.value = []; }
+        loadNextRingings();
         if (device.value.serial && device.value.devicePw) connectVoco();
         loading.value = false;
     } catch (e) {
@@ -276,6 +278,7 @@ async function saveRules() {
     try {
         await store.saveRules(rules.value);
         saveMsg.value = '✓ gespeichert';
+        loadNextRingings();
         setTimeout(() => (saveMsg.value = ''), 2500);
     } catch (e) { handleError('saveRules', e); }
 }
@@ -296,6 +299,54 @@ async function sendFeedback() {
 }
 
 const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶');
+
+const fmtDay = (d: Date) => d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
+const fmtTime = (d: Date) => d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
+/**
+ * „Nächste automatische Läutungen": aus den aktiven Regeln × kommenden
+ * ChurchTools-Terminen (Zeit = Terminbeginn − Vorlauf). Rein anzeigend – das
+ * echte Auslösen macht der Gateway.
+ */
+async function loadNextRingings() {
+    const active = rules.value.filter((r) => r.active && r.pgsName);
+    if (!active.length) { nextRingings.value = []; return; }
+    const calIds = new Set<number>();
+    let needAll = false;
+    for (const r of active) { if (r.calendarId) calIds.add(r.calendarId); else needAll = true; }
+    if (needAll) for (const c of calendars.value) calIds.add(c.id);
+    if (!calIds.size) { nextRingings.value = []; return; }
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const p = new URLSearchParams();
+    for (const id of calIds) p.append('calendar_ids[]', String(id));
+    p.set('from', iso(new Date()));
+    p.set('to', iso(new Date(Date.now() + 30 * 864e5)));
+    let items: any[] = [];
+    try {
+        const res = await churchtoolsClient.get<any>(`/calendars/appointments?${p.toString()}`);
+        items = Array.isArray(res) ? res : (res?.data ?? []);
+    } catch { nextRingings.value = []; return; }
+    const out: Array<{ when: Date; program: string; source: string }> = [];
+    for (const it of items) {
+        const base = it?.appointment?.base ?? it?.base ?? it;
+        const calc = it?.appointment?.calculated ?? it?.calculated;
+        const startStr = calc?.startDate ?? base?.startDate;
+        if (!startStr) continue;
+        const start = new Date(startStr);
+        const calId: number | undefined = base?.calendar?.id;
+        const calName: string = base?.calendar?.name ?? '';
+        const title: string = base?.title ?? base?.caption ?? '';
+        for (const r of active) {
+            if (r.calendarId && r.calendarId !== calId) continue;
+            if (r.category && !title.toLowerCase().includes(r.category.toLowerCase())) continue;
+            const when = new Date(start.getTime() - (r.leadMinutes || 0) * 60000);
+            if (when.getTime() < Date.now()) continue;
+            out.push({ when, program: r.pgsName, source: `Kalender „${calName}" · ${fmtTime(start)} ${title}`.trim() });
+        }
+    }
+    out.sort((a, b) => a.when.getTime() - b.when.getTime());
+    nextRingings.value = out.slice(0, 12);
+}
 </script>
 
 <template>
@@ -393,6 +444,39 @@ const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶'
                 <div v-if="playable.length" class="gs-foot">
                   <button class="gs-btn sm" :class="simulate ? 'gs-sim-btn' : 'gs-stop'" @click="stopAll">
                     <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>{{ simulate ? 'Stop testen' : 'Alles stoppen' }}</button>
+                </div>
+              </div>
+            </section>
+
+            <!-- Nächste automatische Läutungen (nur Anzeige, aus Regeln × Terminen) -->
+            <section class="gs-card">
+              <div class="gs-head"><h2>Nächste automatische Läutungen</h2><span class="gs-spacer"></span>
+                <button class="gs-btn gs-ghost sm" @click="loadNextRingings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>Aktualisieren</button></div>
+              <div class="gs-body">
+                <p v-if="nextRingings.length === 0" class="gs-empty">(keine anstehenden Läutungen aus den Regeln in den nächsten 30 Tagen)</p>
+                <div v-else class="gs-scroll">
+                  <table>
+                    <thead><tr><th>Wann</th><th>Programm</th><th>Ausgelöst durch</th></tr></thead>
+                    <tbody>
+                      <tr v-for="(n, i) in nextRingings" :key="i">
+                        <td><b>{{ fmtDay(n.when) }} · {{ fmtTime(n.when) }}</b></td>
+                        <td><span class="gs-label">{{ n.program }}</span></td>
+                        <td class="gs-muted">{{ n.source }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p class="gs-note" style="color:var(--gs-dim)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Vorschau aus den ChurchTools-Terminen (Zeit = Terminbeginn − Vorlauf). Das tatsächliche Auslösen übernimmt der Gateway-Dienst.</p>
+              </div>
+            </section>
+
+            <!-- Ereignis-Log (abgespeckt) – voller Log unter „Ereignis-Log" -->
+            <section v-if="logLines.length" class="gs-card">
+              <div class="gs-head"><h2>Letzte Ereignisse</h2><span class="gs-spacer"></span>
+                <button v-if="canView('log')" class="gs-btn gs-ghost sm" @click="view = 'log'">Ganzes Log</button></div>
+              <div class="gs-body">
+                <div class="gs-log" style="max-height:160px">
+                  <div v-for="(e, i) in logLines.slice(0, 6)" :key="i"><span class="ts">{{ e.ts.toLocaleTimeString('de-DE') }}</span> <span :class="e.dir">{{ logIcon(e.dir) }}</span> {{ e.line }}</div>
                 </div>
               </div>
             </section>
