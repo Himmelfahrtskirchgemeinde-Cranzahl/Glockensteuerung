@@ -59,7 +59,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # Läuft im Arbeitsverzeichnis extension/ -> Pfad relativ dazu (releases/*.zip)
+        # Idempotent: Release anlegen ODER (falls vorhanden) ZIP ersetzen.
         run: |
-          gh release create "${GITHUB_REF_NAME}" releases/*.zip \
-            --title "Glockensteuerung ${GITHUB_REF_NAME}" \
-            --notes "Automatisch gebaute ChurchTools-Extension. ZIP unten herunterladen und in ChurchTools installieren."
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" releases/*.zip --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" releases/*.zip \
+              --title "Glockensteuerung ${GITHUB_REF_NAME}" \
+              --notes "Automatisch gebaute ChurchTools-Extension. ZIP unten herunterladen und in ChurchTools installieren."
+          fi
