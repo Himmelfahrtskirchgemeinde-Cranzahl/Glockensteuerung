@@ -38,9 +38,10 @@ html, body { margin: 0; padding: 0; height: 100%; }
   font-size: 14px;
   line-height: 1.5;
   background: var(--gs-page);
-  /* Shell auf Sichthöhe begrenzen: nur der Inhalt scrollt, Kopfleiste +
-     Seitenleiste bleiben stehen (sticky/fix). */
-  height: 100vh;
+  /* Shell auf die IFRAME-Höhe begrenzen (nicht 100vh = Browserhöhe – das iframe
+     ist kleiner). Über die html/body/#app-Kette (alle height:100%). So scrollt
+     nur der Inhalt, Kopfleiste + Seitenleiste bleiben stehen. */
+  height: 100%;
   display: flex;
   flex-direction: column;
   -webkit-font-smoothing: antialiased;
