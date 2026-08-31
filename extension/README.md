@@ -15,6 +15,10 @@ Basiert auf dem offiziellen
 > (und die echten Antworten der Anlage). Erst nach bewusstem Ausschalten des
 > Schalters wird real geläutet.
 
+> **📟 Kompatibilität:** Aktuell werden nur **HEW VOCO-futura**-Geräte unterstützt
+> (z. B. ST5, mit LAN/WLAN-Modul und `hew-voco.de`-Portal). Weitere HEW-Systeme und
+> andere Hersteller folgen; eine **universelle** Lösung ist später geplant.
+
 ## ZIP für ChurchTools bekommen
 
 - **Ohne eigene Software:** GitHub baut die ZIP – Repo-Tab **Actions** → Workflow
