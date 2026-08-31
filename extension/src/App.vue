@@ -90,7 +90,22 @@ function toast(msg: string) {
     toastTimer = window.setTimeout(() => (toastMsg.value = ''), 2600);
 }
 
+/** Fehler lesbar machen – bei API-Fehlern inkl. Methode, URL, Status, Meldung. */
+function describeError(e: unknown): string {
+    const ax = e as { isAxiosError?: boolean; config?: { method?: string; url?: string }; response?: { status?: number; config?: { url?: string }; data?: { translatedMessage?: string; message?: string; errors?: { message?: string }[] } } };
+    if (ax && (ax.isAxiosError || ax.response)) {
+        const method = (ax.config?.method ?? '').toUpperCase();
+        const url = ax.response?.config?.url ?? ax.config?.url ?? '';
+        const status = ax.response?.status ?? '';
+        const d = ax.response?.data;
+        const detail = d?.errors?.[0]?.message ?? d?.translatedMessage ?? d?.message ?? '';
+        return `${status} ${method} ${url}${detail ? ' – ' + detail : ''}`.trim();
+    }
+    return e instanceof Error ? e.message : String(e);
+}
+
 onMounted(() => {
+    document.title = 'Glockensteuerung';
     window.addEventListener('error', (e) => handleError('window.onerror', e.error ?? e.message));
     window.addEventListener('unhandledrejection', (e) => handleError('promise', (e as PromiseRejectionEvent).reason));
     clockTimer = window.setInterval(() => (now.value = Date.now()), 10000);
@@ -125,7 +140,7 @@ async function boot() {
         loading.value = false;
     } catch (e) {
         loading.value = false;
-        bootError.value = String(e);
+        bootError.value = describeError(e);
         handleError('boot', e);
     }
 }
