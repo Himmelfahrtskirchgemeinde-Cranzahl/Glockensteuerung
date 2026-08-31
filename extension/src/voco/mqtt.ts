@@ -124,9 +124,9 @@ export class VocoMqtt {
 
     /** Programm sofort starten. name = ROHER Name (wie empfangen). */
     start(nameRaw: string, when: string = 'INSTANT') {
-        this.command('/playpgsD', `START:${nameRaw}:${when}`, `Programm „${decodeName(nameRaw)}" auslösen`);
+        this.command('/playpgsD', `START:${nameRaw}:${when}`, `Programm „${decodeName(nameRaw)}“ auslösen`);
     }
-    stop(nameRaw: string) { this.command('/playpgsD', `STOP:${nameRaw}`, `„${decodeName(nameRaw)}" stoppen`); }
+    stop(nameRaw: string) { this.command('/playpgsD', `STOP:${nameRaw}`, `„${decodeName(nameRaw)}“ stoppen`); }
     stopAll() { this.command('/playpgsD', 'STOP:ALL', 'alles stoppen'); }
 
     /** Findet rohen Namen anhand des Anzeigenamens. */
