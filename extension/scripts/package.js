@@ -12,15 +12,17 @@ const rootDir = path.resolve(__dirname, '..');
 // Read package.json for project info
 const packageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
 const projectName = packageJson.name;
-const version = packageJson.version;
 
-// Get git commit hash (short)
-let gitHash = '';
+// Version tag-getrieben: `git describe` liefert den letzten Tag (auf einem Tag
+// exakt v0.4.0, dazwischen v0.4.0-3-gabc123). Fallback: package.json-Version.
+let version = packageJson.version;
 try {
-    gitHash = execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
+    // Nur Versions-Tags (v*) – nicht das rollierende `latest`-Tag.
+    version = execSync("git describe --tags --always --match 'v*'", { encoding: 'utf8' })
+        .trim()
+        .replace(/^v/, '');
 } catch (error) {
-    console.warn('Warning: Could not get git hash, using timestamp');
-    gitHash = Date.now().toString(36);
+    console.warn('Warning: git describe fehlgeschlagen, nutze package.json-Version');
 }
 
 // Create releases directory
@@ -30,13 +32,12 @@ if (!fs.existsSync(releasesDir)) {
 }
 
 // Define archive name
-const archiveName = `${projectName}-v${version}-${gitHash}.zip`;
+const archiveName = `${projectName}-v${version}.zip`;
 const archivePath = path.join(releasesDir, archiveName);
 
 console.log('📦 Creating ChurchTools extension package...');
 console.log(`   Project: ${projectName}`);
 console.log(`   Version: ${version}`);
-console.log(`   Git Hash: ${gitHash}`);
 console.log(`   Archive: ${archiveName}`);
 
 // Check if dist directory exists
