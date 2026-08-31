@@ -48,9 +48,12 @@ if (!fs.existsSync(distDir)) {
 
 try {
     // Create ZIP archive using system zip command.
-    // Wichtig: Inhalt von dist/ liegt im ZIP-WURZELVERZEICHNIS (index.html oben),
-    // nicht in einem dist/-Unterordner – so erwartet ChurchTools das Modul.
-    const zipCommand = `cd "${distDir}" && zip -r "${archivePath}" . -x "*.map" ".DS_Store"`;
+    // Wichtig fuer ChurchTools:
+    //  - Inhalt von dist/ liegt im ZIP-WURZELVERZEICHNIS (index.html oben).
+    //  - '-D' = KEINE Verzeichnis-Eintraege: sonst haben Ordner-Eintraege das
+    //    Unix-x-Bit und ChurchTools lehnt ab ("ccm.files.zip.contains.executable.file").
+    //  - Alle Dateien vorher auf 644 (kein Ausfuehr-Bit).
+    const zipCommand = `cd "${distDir}" && find . -type f -exec chmod 644 {} \\; && zip -r -D -X "${archivePath}" . -x "*.map" ".DS_Store"`;
     execSync(zipCommand, { stdio: 'inherit' });
     
     console.log('✅ Package created successfully!');
