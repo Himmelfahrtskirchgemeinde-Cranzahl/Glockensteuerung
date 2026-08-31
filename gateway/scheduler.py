@@ -120,6 +120,10 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     load_dotenv()
 
+    # Simulation: per Flag ODER dauerhaft per .env (VOCO_SIMULATION=1) -> loest NICHT aus
+    sim_env = os.environ.get("VOCO_SIMULATION", "").strip().lower() in ("1", "true", "yes", "on")
+    dry = args.dry_run or sim_env
+
     base = os.environ.get("CT_BASE_URL")
     token = os.environ.get("CT_LOGIN_TOKEN") or os.environ.get("CT_API_TOKEN")
     if not base or not token:
@@ -131,7 +135,7 @@ def main():
         raise SystemExit("Kein Geraet konfiguriert (Extension oder .env: VOCO_SERIAL/VOCO_DEVICE_PW)")
 
     log.info("Geraet %s, %d Regel(n)%s", cfg.device.serial, len(cfg.rules),
-             "  [DRY-RUN]" if args.dry_run else "")
+             "  [SIMULATION – loest NICHT aus]" if dry else "")
 
     voco = Voco(serial=cfg.device.serial, device_pw=cfg.device.device_pw,
                 broker_url=cfg.device.broker_url)
@@ -166,8 +170,8 @@ def main():
                         fired.add(p["key"]); save_state(fired)
                         continue
                     raw = voco.resolve(p["pgs_name"]) or p["pgs_name"]
-                    if args.dry_run:
-                        log.info("[DRY-RUN] wuerde ausloesen: %s (%s)", decode_name(raw), p["title"])
+                    if dry:
+                        log.info("[SIMULATION] wuerde ausloesen: %s (%s)", decode_name(raw), p["title"])
                     else:
                         voco.start(raw)
                         log.info("AUSGELOEST: %s  (Termin: %s)", decode_name(raw), p["title"])

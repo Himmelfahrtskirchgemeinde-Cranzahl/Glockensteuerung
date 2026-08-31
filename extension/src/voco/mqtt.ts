@@ -58,6 +58,11 @@ export class VocoMqtt {
     private cfg: Required<VocoConfig>;
     public status: VocoStatus = { online: null, playable: [], stoppable: [] };
     public onUpdate?: () => void;
+    /** Simulationsmodus: sendet KEINE auslösenden Befehle, protokolliert sie nur. */
+    public simulate = true;
+    public onLog?: (line: string, dir: 'in' | 'out' | 'sim') => void;
+
+    private log(line: string, dir: 'in' | 'out' | 'sim') { this.onLog?.(line, dir); }
 
     constructor(cfg: VocoConfig) {
         this.cfg = {
@@ -97,18 +102,32 @@ export class VocoMqtt {
         this.client?.publish(this.base + subtopic, payload, { qos: 0, retain: false });
     }
 
-    /** Statusinfo + startbare Liste anfordern. */
+    /**
+     * Auslösende Befehle laufen hierüber. Im Simulationsmodus wird NICHTS
+     * gesendet – der Befehl wird nur protokolliert.
+     */
+    private command(subtopic: string, payload: string, human: string) {
+        if (this.simulate) {
+            this.log(`SIMULATION – würde senden: ${payload}  (${human})`, 'sim');
+            return;
+        }
+        this.pub(subtopic, payload);
+        this.log(`gesendet: ${payload}  (${human})`, 'out');
+    }
+
+    /** Statusinfo + startbare Liste anfordern (rein lesend, immer erlaubt). */
     requestSync() {
         this.pub('/fetchinfo', 'EN');
         this.pub('/playpgsD', 'list');
+        this.log('Status/Programme angefragt (lesend)', 'out');
     }
 
     /** Programm sofort starten. name = ROHER Name (wie empfangen). */
     start(nameRaw: string, when: string = 'INSTANT') {
-        this.pub('/playpgsD', `START:${nameRaw}:${when}`);
+        this.command('/playpgsD', `START:${nameRaw}:${when}`, `Programm „${decodeName(nameRaw)}" auslösen`);
     }
-    stop(nameRaw: string) { this.pub('/playpgsD', `STOP:${nameRaw}`); }
-    stopAll() { this.pub('/playpgsD', 'STOP:ALL'); }
+    stop(nameRaw: string) { this.command('/playpgsD', `STOP:${nameRaw}`, `„${decodeName(nameRaw)}" stoppen`); }
+    stopAll() { this.command('/playpgsD', 'STOP:ALL', 'alles stoppen'); }
 
     /** Findet rohen Namen anhand des Anzeigenamens. */
     resolve(displayName: string): string | undefined {
@@ -121,12 +140,21 @@ export class VocoMqtt {
         const sub = topic.substring(this.base.length);
         if (sub === '/connection') {
             this.status.online = payload === '1';
+            this.log(`Gerät meldet: ${payload === '1' ? 'online' : 'offline'}`, 'in');
         } else if (sub === '/sendpgsD') {
             const i = payload.indexOf(':');
             if (i >= 0) {
                 this.status.playable = parseLenPrefixed(payload.substring(0, i));
                 this.status.stoppable = parseLenPrefixed(payload.substring(i + 1));
             }
+            this.log(`Programmliste empfangen (${this.status.playable.length} startbar)`, 'in');
+        } else if (sub === '/sw') {
+            this.log(`Schlagwerk: ${payload}`, 'in');
+        } else if (sub === '/auto') {
+            this.log(`Automatik: ${payload}`, 'in');
+        } else {
+            const short = payload.length > 80 ? payload.slice(0, 80) + '…' : payload;
+            this.log(`${sub}: ${short}`, 'in');
         }
         this.onUpdate?.();
     }

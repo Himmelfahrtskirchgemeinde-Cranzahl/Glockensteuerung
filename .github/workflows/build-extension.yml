@@ -1,0 +1,59 @@
+name: ChurchTools-Extension bauen (ZIP)
+
+# Baut die Extension und stellt eine installierbare ZIP bereit:
+#  - bei jedem Push, der extension/ aendert
+#  - manuell ueber den "Run workflow"-Knopf (Tab "Actions")
+#  - bei einem Versions-Tag (v*) zusaetzlich als Release-Download
+on:
+  workflow_dispatch:
+  push:
+    branches: ['**']
+    paths:
+      - 'extension/**'
+      - '.github/workflows/build-extension.yml'
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # noetig, um bei Tags ein Release zu erstellen
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extension
+    env:
+      # Modul-Key der Extension (muss zum Gateway VOCO_EXT_KEY passen)
+      VITE_KEY: glockensteuerung
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v4
+
+      - name: Node einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+
+      - name: Abhaengigkeiten installieren
+        run: npm ci
+
+      - name: Bauen und ZIP packen
+        run: npm run deploy   # = build + scripts/package.js -> releases/*.zip
+
+      - name: ZIP als Download bereitstellen (Artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: glockensteuerung-extension
+          path: extension/releases/*.zip
+          if-no-files-found: error
+
+      - name: Bei Versions-Tag ein Release mit der ZIP erstellen
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "${GITHUB_REF_NAME}" extension/releases/*.zip
+             --title "Glockensteuerung ${GITHUB_REF_NAME}"
+             --notes "Automatisch gebaute ChurchTools-Extension. ZIP unten herunterladen und in ChurchTools installieren."

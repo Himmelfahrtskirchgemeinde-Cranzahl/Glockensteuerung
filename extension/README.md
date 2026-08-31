@@ -8,6 +8,21 @@ automatische Läuten genutzt.
 Basiert auf dem offiziellen
 [ChurchTools extension-boilerplate](https://github.com/churchtools/extension-boilerplate).
 
+> **📖 Komplette Einrichtung Schritt für Schritt: [`../ANLEITUNG.md`](../ANLEITUNG.md)**
+
+> **🛡️ Simulationsmodus:** Das Modul startet immer in Simulation – „Läuten"
+> sendet dann **nichts**, sondern zeigt im Ereignis-Log nur, was passieren würde
+> (und die echten Antworten der Anlage). Erst nach bewusstem Ausschalten des
+> Schalters wird real geläutet.
+
+## ZIP für ChurchTools bekommen
+
+- **Ohne eigene Software:** GitHub baut die ZIP – Repo-Tab **Actions** → Workflow
+  „ChurchTools-Extension bauen (ZIP)" → **Run workflow**; ZIP unter *Artifacts*.
+  Bei einem Versions-Tag (`v*`) hängt sie zusätzlich am **Release**. Details:
+  [`../ANLEITUNG.md`](../ANLEITUNG.md), Teil 1.
+- **Lokal:** siehe „Bauen & Installieren" unten.
+
 ## Entwicklung
 
 ```bash
