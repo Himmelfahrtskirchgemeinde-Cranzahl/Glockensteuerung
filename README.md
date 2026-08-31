@@ -63,7 +63,7 @@ Zum Einrichten und Testen, ohne dass wirklich geläutet wird:
 ```
 extension/   ChurchTools-Extension (Vue 3 + Vite)
 gateway/     Python-Dienst (Automatik + MQTT)
-docs/        VOCO-MQTT-Protokoll.md, mockup/ (Design-Vorschau)
+docs/        VOCO-MQTT-Protokoll.md · mockup/ (Design) · handbuch/ (HEW-Handbücher)
 ANLEITUNG.md Schritt-für-Schritt-Anleitung
 ```
 
