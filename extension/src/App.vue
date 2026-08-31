@@ -19,7 +19,7 @@ let voco: VocoMqtt | undefined;
 type View = 'steuerung' | 'log' | 'regeln' | 'geraet';
 const view = ref<View>('steuerung');
 
-const rights = ref<Rights>({ isAdmin: false, viewCats: [], editCats: [] });
+const rights = ref<Rights>({ isAdmin: false, manageExt: false, viewCats: [], editCats: [] });
 const catIds = ref<Partial<Record<CatKey, number>>>({});
 /** Sehen: Untermenü sichtbar / (bei Steuerung) läuten erlaubt. */
 const canView = (cat: CatKey): boolean => {
@@ -144,7 +144,7 @@ function fire(raw: string) {
 }
 
 function setSimulate(on: boolean) {
-    if (!on && !canEdit('steuerung')) { toast('Kein Recht zum Scharfschalten (Bearbeiten der Kategorie „Steuerung").'); return; }
+    if (!on && !rights.value.manageExt) { toast('Nur mit der Berechtigung „Erweiterung verwalten" kann der Sicherheitsmodus deaktiviert werden.'); return; }
     if (!on && !confirm('Simulation ausschalten?\n\nDanach lösen Knöpfe und Automatik ECHTES Läuten aus.')) return;
     simulate.value = on;
     if (voco) voco.simulate = on;
@@ -253,7 +253,8 @@ const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶'
                 <b>{{ simulate ? 'Simulationsmodus aktiv' : 'SCHARF – echtes Läuten möglich' }}</b><br>
                 <small>{{ simulate ? 'Es wird nichts an die Anlage gesendet. Du siehst nur, was passieren würde – und im Ereignis-Log die echten Antworten der Anlage.' : 'Knöpfe und Automatik lösen jetzt wirklich Läuten aus.' }}</small>
               </div>
-              <label class="gs-switch"><button class="gs-toggle" :class="{ off: !simulate }" role="switch" :aria-checked="simulate" :disabled="simulate && !canEdit('steuerung')" :title="simulate && !canEdit('steuerung') ? 'Scharfschalten braucht das Bearbeiten-Recht der Kategorie „Steuerung“' : ''" @click="setSimulate(!simulate)"></button> Simulation</label>
+              <label v-if="rights.manageExt" class="gs-switch"><button class="gs-toggle" :class="{ off: !simulate }" role="switch" :aria-checked="simulate" @click="setSimulate(!simulate)"></button> Simulation</label>
+              <span v-else class="gs-switch" style="opacity:.75" title="Nur „Erweiterung verwalten“ kann den Sicherheitsmodus deaktivieren"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg> Simulation</span>
             </div>
 
             <section class="gs-card">

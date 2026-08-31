@@ -15,6 +15,8 @@ import { EXT_KEY } from './config';
 
 export interface Rights {
     isAdmin: boolean;
+    /** ChurchTools-Recht „Erweiterung/Custom-Module verwalten" (administer custom modules). */
+    manageExt: boolean;
     /** Kategorie-IDs, die der Nutzer sehen darf. */
     viewCats: number[];
     /** Kategorie-IDs, die der Nutzer bearbeiten/anlegen darf. */
@@ -28,9 +30,8 @@ export async function loadRights(): Promise<Rights> {
     try {
         const g = await churchtoolsClient.get<Record<string, unknown>>('/permissions/global');
         const core = (g?.churchcore ?? {}) as Record<string, unknown>;
-        const isAdmin =
-            core['administer custom modules'] === true ||
-            core['administer settings'] === true;
+        const manageExt = core['administer custom modules'] === true;
+        const isAdmin = manageExt || core['administer settings'] === true;
         const mod = g?.[EXT_KEY] as CustomModulePermission | undefined;
         const viewCats = [
             ...asIds(mod?.['view custom data']),
@@ -40,10 +41,10 @@ export async function loadRights(): Promise<Rights> {
             ...asIds(mod?.['edit custom data']),
             ...asIds(mod?.['create custom data']),
         ];
-        return { isAdmin, viewCats, editCats };
+        return { isAdmin, manageExt, viewCats, editCats };
     } catch {
         // Rechte nicht lesbar -> sicherer Standard: nichts sichtbar/änderbar
         // (außer dem, was ohnehin für alle offen ist, z. B. Hilfe/Feedback).
-        return { isAdmin: false, viewCats: [], editCats: [] };
+        return { isAdmin: false, manageExt: false, viewCats: [], editCats: [] };
     }
 }

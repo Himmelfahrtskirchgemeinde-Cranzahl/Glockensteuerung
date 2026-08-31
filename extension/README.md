@@ -70,10 +70,16 @@ Rechte ein Admin in der Rechteverwaltung (→ „Glockensteuerung") einzeln verg
 
 | Untermenü (= Kategorie) | „…sehen" (view custom data) | „…bearbeiten" (edit/create custom data) |
 |---|---|---|
-| **Steuerung** | Untermenü sichtbar + **Läuten/Testen** | **Scharfschalten** (Simulation ausschalten) |
+| **Steuerung** | Untermenü sichtbar + **Läuten/Testen** | – |
 | **Ereignis-Log** | Log sichtbar | – |
 | **Automatik-Regeln** | Regeln ansehen | Regeln anlegen/ändern/löschen |
 | **Gerät** | Gerätedaten ansehen | Seriennummer/Passwort ändern |
+
+**Sicherheitsmodus (Scharfschalten):** Den Simulationsmodus **deaktivieren** –
+und damit echtes Läuten freischalten – darf **nur**, wer die ChurchTools-
+Berechtigung **„Erweiterung verwalten"** (`administer custom modules`) hat. Für
+alle anderen ist der Schalter gar nicht sichtbar; sie können nur im
+Simulationsmodus „Testen".
 
 „Hilfe/Feedback" ist immer für alle da. Admins mit „administer custom modules"
 dürfen alles. Wer ein Untermenü nur „sehen" darf, bekommt es **schreibgeschützt**;
