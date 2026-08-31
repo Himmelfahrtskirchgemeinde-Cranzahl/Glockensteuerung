@@ -21,11 +21,20 @@ Basiert auf dem offiziellen
 
 ## ZIP für ChurchTools bekommen
 
-- **Ohne eigene Software:** GitHub baut die ZIP – Repo-Tab **Actions** → Workflow
-  „ChurchTools-Extension bauen (ZIP)" → **Run workflow**; ZIP unter *Artifacts*.
-  Bei einem Versions-Tag (`v*`) hängt sie zusätzlich am **Release**. Details:
-  [`../ANLEITUNG.md`](../ANLEITUNG.md), Teil 1.
-- **Lokal:** siehe „Bauen & Installieren" unten.
+- **Empfohlen – Release:** Einen Versions-Tag (`v*`) pushen; der Workflow hängt
+  die **fertige, direkt installierbare ZIP** an ein **Release**. Dort liegt sie
+  als **einzelne Datei** – herunterladen und **unverändert** hochladen.
+- **Actions-Artifact:** Repo-Tab **Actions** → Workflow „ChurchTools-Extension
+  bauen (ZIP)" → **Run workflow**; ZIP unter *Artifacts*.
+  > ⚠️ **Wichtig:** GitHub verpackt jedes Artifact **noch einmal** in eine ZIP →
+  > du lädst also eine **ZIP-in-ZIP** herunter. Lade **nicht** diese äußere Datei
+  > hoch (sonst `ccm.files.zip.missing.index.html`), sondern **entpacke sie
+  > einmal** und lade die **innere** `glockensteuerung-v….zip` hoch. **Nicht**
+  > per Finder neu komprimieren (das erzeugt `__MACOSX/` → Upload-Fehler).
+- **Lokal:** siehe „Bauen & Installieren" unten (erzeugt direkt die richtige ZIP
+  in `releases/`).
+
+Details: [`../ANLEITUNG.md`](../ANLEITUNG.md), Teil 1.
 
 ## Entwicklung
 
