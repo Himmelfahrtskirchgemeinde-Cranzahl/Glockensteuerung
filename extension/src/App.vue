@@ -8,6 +8,7 @@ import { reportError, submitFeedback, maskSerial, APP_VERSION, FEEDBACK_URL } fr
 import type { ReportContext, FeedbackFields } from './feedback';
 import { loadRights } from './perms';
 import type { Rights } from './perms';
+import { fitInfo } from './utils/fit-height';
 
 const isDev = import.meta.env.MODE === 'development';
 declare const window: Window & typeof globalThis & { settings?: { base_url?: string } };
@@ -151,6 +152,10 @@ async function boot() {
         try { calendars.value = await churchtoolsClient.get<{ id: number; name: string }[]>('/calendars'); } catch { calendars.value = []; }
         loadNextRingings();
         if (device.value.serial && device.value.devicePw) connectVoco();
+        // Wie wurde die Modulhöhe ermittelt? Steht im Log, falls Kopfleiste/
+        // Seitenleiste doch mitscrollen – dann sieht man sofort, woran es liegt.
+        const fit = fitInfo();
+        pushLog(`Layout: ${fit.mode} – ${fit.detail} → Höhe ${fit.height}px`, 'info');
         loading.value = false;
     } catch (e) {
         loading.value = false;
