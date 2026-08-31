@@ -286,9 +286,8 @@ const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶'
 
 <template>
   <div class="gs">
-    <div class="gs-wrap">
-      <!-- Modul-Kopf (Design 3.0) -->
-      <div class="gs-mhead">
+    <!-- Kopfleiste (voll breit, fix) -->
+    <header class="gs-mhead">
         <span class="mi">
           <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2M5 10a7 7 0 0 1 14 0c0 5 2 6 2 6H3s2-1 2-6Z"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>
         </span>
@@ -302,20 +301,11 @@ const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶'
         <span v-else class="gs-pill muted"><span class="dot"></span> verbinde …</span>
         <button class="gs-btn gs-ghost" @click="requestSync">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>Aktualisieren</button>
-      </div>
+    </header>
 
-      <!-- Kompatibilitäts-Hinweis -->
-      <div class="gs-compat">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
-        <span>Unterstützt aktuell <b>HEW VOCO-futura</b> (z.&nbsp;B. ST5). Weitere Systeme &amp; andere Hersteller folgen – eine <b>universelle</b> Lösung ist später geplant.</span>
-      </div>
-
-      <p v-if="loading">Lade …</p>
-      <div v-else-if="bootError" class="gs-card"><div class="gs-body" style="color:var(--gs-danger)">Fehler beim Start: {{ bootError }}</div></div>
-
-      <div v-else class="gs-layout">
-        <!-- Linke Modul-Navigation -->
-        <nav class="gs-subnav">
+    <div class="gs-main">
+      <!-- Linke Modul-Navigation (durchgehend) -->
+      <nav v-if="!loading && !bootError" class="gs-subnav">
           <div v-if="showLaeuten" class="lbl">Läuten</div>
           <button v-if="canView('steuerung')" :class="{ active: view === 'steuerung' }" @click="view = 'steuerung'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2M5 10a7 7 0 0 1 14 0c0 5 2 6 2 6H3s2-1 2-6Z"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>Steuerung</button>
@@ -331,8 +321,17 @@ const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶'
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></svg>Feedback senden</button>
         </nav>
 
-        <!-- Inhalt -->
-        <div>
+      <main class="gs-content">
+          <!-- Kompatibilitäts-Hinweis -->
+          <div class="gs-compat">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+            <span>Unterstützt aktuell <b>HEW VOCO-futura</b> (z.&nbsp;B. ST5). Weitere Systeme &amp; andere Hersteller folgen – eine <b>universelle</b> Lösung ist später geplant.</span>
+          </div>
+
+          <p v-if="loading">Lade …</p>
+          <div v-else-if="bootError" class="gs-card"><div class="gs-body" style="color:var(--gs-danger)">Fehler beim Start: {{ bootError }}</div></div>
+
+          <template v-else>
           <!-- ▸ Steuerung -->
           <template v-if="view === 'steuerung' && canView('steuerung')">
             <div class="gs-banner" :class="simulate ? 'sim-on' : 'sim-off'">
@@ -451,8 +450,8 @@ const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶'
           <section v-else class="gs-card">
             <div class="gs-body gs-empty">Für dieses Modul sind dir noch keine Bereiche freigegeben. Ein Admin kann dir in der Rechteverwaltung unter „Glockensteuerung" Rechte geben (sehen/bearbeiten je Kategorie). Über „Feedback senden" kannst du dich melden.</div>
           </section>
-        </div>
-      </div>
+          </template>
+      </main>
     </div>
 
     <!-- Feedback FAB -->

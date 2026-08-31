@@ -32,26 +32,30 @@
   font-size: 14px;
   line-height: 1.5;
   background: var(--gs-page);
-  min-height: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   -webkit-font-smoothing: antialiased;
 }
 .gs * { box-sizing: border-box; }
-.gs-wrap { max-width: 1180px; margin: 0 auto; padding: 0 22px; }
 
-/* ---- Modul-Kopf ---- */
-.gs-mhead { display: flex; align-items: center; gap: 14px; padding: 22px 0 16px; flex-wrap: wrap; }
-.gs-mhead .mi { width: 40px; height: 40px; border-radius: 10px; flex: none; background: var(--gs-blue-tint); color: var(--gs-blue); display: grid; place-items: center; }
-.gs-mhead h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; color: var(--gs-head); margin: 0; }
+/* ---- Kopfleiste (voll breit, fix oben) ---- */
+.gs-mhead { display: flex; align-items: center; gap: 12px; padding: 0 22px; height: 58px; flex: none; background: var(--gs-surface); border-bottom: 1px solid var(--gs-border); position: sticky; top: 0; z-index: 20; }
+.gs-mhead .mi { width: 36px; height: 36px; border-radius: 9px; flex: none; background: var(--gs-blue-tint); color: var(--gs-blue); display: grid; place-items: center; }
+.gs-mhead h1 { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; color: var(--gs-head); margin: 0; }
 .gs-mhead .sp { flex: 1; }
+
+/* ---- Hauptbereich: Seitenleiste + Inhalt, volle Höhe ---- */
+.gs-main { flex: 1; display: flex; align-items: stretch; min-height: 0; }
+.gs-content { flex: 1; min-width: 0; padding: 20px 24px 48px; overflow-y: auto; }
 
 /* ---- Kompatibilitäts-Hinweis ---- */
 .gs-compat { display: flex; align-items: center; gap: 9px; background: var(--gs-blue-tint); color: var(--gs-blue); border: 1px solid color-mix(in srgb, var(--gs-blue) 22%, var(--gs-border)); border-radius: 10px; padding: 9px 13px; font-size: 13px; margin: 0 0 18px; }
 .gs-compat svg { flex: none; }
 .gs-compat b { color: var(--gs-head); }
 
-/* ---- Layout: linke Modul-Navigation + Inhalt ---- */
-.gs-layout { display: grid; grid-template-columns: 232px 1fr; gap: 22px; padding-bottom: 80px; align-items: start; }
-.gs-subnav { display: flex; flex-direction: column; gap: 2px; position: sticky; top: 16px; }
+/* ---- Seitenleiste (durchgehend, links bündig) ---- */
+.gs-subnav { display: flex; flex-direction: column; gap: 2px; width: 240px; flex: none; background: var(--gs-surface); border-right: 1px solid var(--gs-border); padding: 12px 12px 24px; position: sticky; top: 58px; align-self: flex-start; height: calc(100vh - 58px); overflow-y: auto; }
 .gs-subnav .lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gs-faint); padding: 14px 12px 6px; }
 .gs-subnav button { display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: var(--gs-radius-sm); color: var(--gs-text); font: inherit; font-weight: 500; font-size: 14px; background: none; border: none; cursor: pointer; text-align: left; width: 100%; }
 .gs-subnav button svg { width: 18px; height: 18px; color: var(--gs-dim); flex: none; }
@@ -175,9 +179,9 @@
 .gs-toast.show { opacity: 1; }
 
 @media (prefers-reduced-motion: reduce) { .gs *, .gs-toggle::after { transition: none !important; } }
-@media (max-width: 900px) {
-  .gs-layout { grid-template-columns: 1fr; }
-  .gs-subnav { flex-direction: row; flex-wrap: wrap; position: static; }
+@media (max-width: 820px) {
+  .gs-main { flex-direction: column; }
+  .gs-subnav { width: auto; height: auto; position: static; border-right: none; border-bottom: 1px solid var(--gs-border); flex-direction: row; flex-wrap: wrap; align-items: center; }
   .gs-subnav .lbl { width: 100%; }
 }
 @media (max-width: 560px) { .gs-fields, .gs-rule { grid-template-columns: 1fr; } }
