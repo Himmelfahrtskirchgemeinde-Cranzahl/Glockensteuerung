@@ -23,6 +23,7 @@ import time
 
 from churchtools import ChurchTools
 from config import GatewayConfig, Rule, load_dotenv, load_from_churchtools
+from notify import EmailNotifier
 from voco_mqtt import Voco, decode_name
 
 STATE_FILE = os.environ.get("VOCO_STATE_FILE", "state.json")
@@ -124,6 +125,10 @@ def main():
     sim_env = os.environ.get("VOCO_SIMULATION", "").strip().lower() in ("1", "true", "yes", "on")
     dry = args.dry_run or sim_env
 
+    # Automatische Fehler-E-Mails (an EMAIL_TO, Standard josua.hess@icloud.com)
+    notifier = EmailNotifier()
+    log.addHandler(notifier.log_handler())
+
     base = os.environ.get("CT_BASE_URL")
     token = os.environ.get("CT_LOGIN_TOKEN") or os.environ.get("CT_API_TOKEN")
     if not base or not token:
@@ -139,8 +144,12 @@ def main():
 
     voco = Voco(serial=cfg.device.serial, device_pw=cfg.device.device_pw,
                 broker_url=cfg.device.broker_url)
-    voco.connect()
-    voco.request_list()
+    try:
+        voco.connect()
+        voco.request_list()
+    except Exception as e:
+        log.error("Verbindung zur Steuerung (MQTT) fehlgeschlagen: %s", e)
+        raise
 
     fired = load_state()
     plan: list[dict] = []
@@ -159,7 +168,7 @@ def main():
                     log.info("Plan aktualisiert: %d Ausloesung(en). Naechste: %s",
                              len(plan), ", ".join(upcoming) or "keine")
                 except Exception as e:
-                    log.warning("Konfig/Termine laden fehlgeschlagen: %s", e)
+                    log.error("Konfig/Termine laden fehlgeschlagen: %s", e)
 
             for p in plan:
                 if p["key"] in fired:
@@ -173,8 +182,11 @@ def main():
                     if dry:
                         log.info("[SIMULATION] wuerde ausloesen: %s (%s)", decode_name(raw), p["title"])
                     else:
-                        voco.start(raw)
-                        log.info("AUSGELOEST: %s  (Termin: %s)", decode_name(raw), p["title"])
+                        try:
+                            voco.start(raw)
+                            log.info("AUSGELOEST: %s  (Termin: %s)", decode_name(raw), p["title"])
+                        except Exception as e:
+                            log.error("Ausloesen fehlgeschlagen: %s (%s): %s", decode_name(raw), p["title"], e)
                     fired.add(p["key"]); save_state(fired)
 
             time.sleep(TICK_S)

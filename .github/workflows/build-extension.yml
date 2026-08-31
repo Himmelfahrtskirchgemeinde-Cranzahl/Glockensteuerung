@@ -26,6 +26,10 @@ jobs:
     env:
       # Modul-Key der Extension (muss zum Gateway VOCO_EXT_KEY passen)
       VITE_KEY: glockensteuerung
+      # Zentraler Feedback-/Fehler-Endpunkt (optional): als Repository-Variable
+      # anlegen (Settings -> Secrets and variables -> Actions -> Variables ->
+      # VITE_FEEDBACK_URL). Leer = Feedback per mailto, keine Auto-Fehlermeldung.
+      VITE_FEEDBACK_URL: ${{ vars.VITE_FEEDBACK_URL }}
     steps:
       - name: Code auschecken
         uses: actions/checkout@v4

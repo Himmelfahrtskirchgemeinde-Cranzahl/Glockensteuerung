@@ -133,8 +133,8 @@ function render() {
         <section class="gs-card">
           <div class="gs-head"><h2>Status</h2><span class="gs-spacer"></span>${onlinePill}
             <button class="gs-btn gs-ghost" id="refresh" style="margin-left:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>Aktualisieren</button></div>
-          <div style="color:var(--gs-dim);font-size:14px;margin:-4px 0 12px">Gerät: <b style="color:var(--gs-text)">${d?.serial ? esc(d.serial) : '(nicht konfiguriert)'}</b></div>
-          <div style="font-weight:700;font-size:13px;color:var(--gs-dim);margin-bottom:6px">Programme ${simulate ? 'testen' : 'auslösen'}</div>
+          <div style="color:var(--gs-dim);font-size:14px;padding:14px 18px 0">Gerät: <b style="color:var(--gs-text)">${d?.serial ? esc(d.serial) : '(nicht konfiguriert)'}</b></div>
+          <div style="font-weight:700;font-size:13px;color:var(--gs-dim);padding:10px 18px 0">Programme ${simulate ? 'testen' : 'auslösen'}</div>
           ${playable.length === 0
             ? `<p class="gs-empty">(keine startbaren Programme – Gerät online &amp; konfiguriert?)</p>`
             : `<div class="gs-list">${playable.map((raw) => `
@@ -164,7 +164,7 @@ function render() {
 
         <section class="gs-card">
           <div class="gs-head"><h2>Automatik-Regeln</h2><span class="gs-spacer"></span><button class="gs-btn gs-ghost" id="add-rule"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Regel hinzufügen</button></div>
-          <p style="color:var(--gs-dim);font-size:13.5px;margin:-4px 0 12px">Vom Gateway-Dienst für automatisches Läuten genutzt (Termin → Programm).</p>
+          <p style="color:var(--gs-dim);font-size:13.5px;padding:14px 18px 0;margin:0">Vom Gateway-Dienst für automatisches Läuten genutzt (Termin → Programm).</p>
           <div id="rules"></div>
           <div class="gs-foot" style="justify-content:flex-start;margin-top:12px"><button class="gs-btn gs-primary" id="save-rules">Regeln speichern</button><span id="save-msg" style="margin-left:10px;color:var(--gs-success-strong);font-weight:600;align-self:center"></span></div>
         </section>
