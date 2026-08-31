@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { churchtoolsClient } from '@churchtools/churchtools-client';
 import { ConfigStore, newRule } from './config';
-import type { DeviceConfig, MappingRule } from './config';
+import type { CatKey, DeviceConfig, MappingRule } from './config';
 import { VocoMqtt, decodeName } from './voco/mqtt';
 import { reportError, submitFeedback, maskSerial, APP_VERSION, FEEDBACK_URL } from './feedback';
 import type { ReportContext, FeedbackFields } from './feedback';
@@ -19,7 +19,22 @@ let voco: VocoMqtt | undefined;
 type View = 'steuerung' | 'log' | 'regeln' | 'geraet';
 const view = ref<View>('steuerung');
 
-const rights = ref<Rights>({ canView: true, canEdit: false });
+const rights = ref<Rights>({ isAdmin: false, viewCats: [], editCats: [] });
+const catIds = ref<Partial<Record<CatKey, number>>>({});
+/** Sehen: Untermenü sichtbar / (bei Steuerung) läuten erlaubt. */
+const canView = (cat: CatKey): boolean => {
+    if (rights.value.isAdmin) return true;
+    const id = catIds.value[cat];
+    return id != null && rights.value.viewCats.includes(id);
+};
+/** Bearbeiten: Einstellungen ändern / scharfschalten. */
+const canEdit = (cat: CatKey): boolean => {
+    if (rights.value.isAdmin) return true;
+    const id = catIds.value[cat];
+    return id != null && rights.value.editCats.includes(id);
+};
+const showLaeuten = computed(() => canView('steuerung') || canView('log'));
+const showEinstellungen = computed(() => canView('regeln') || canView('geraet'));
 const simulate = ref(true);
 const online = ref<boolean | null>(null);
 const playable = ref<string[]>([]);
@@ -82,8 +97,10 @@ async function boot() {
                 password: import.meta.env.VITE_PASSWORD,
             });
         }
-        rights.value = await loadRights();
         await store.init();
+        catIds.value = { ...store.catIds };
+        rights.value = await loadRights();
+        pickDefaultView();
         const cfg = await store.load();
         if (cfg.device) device.value = { brokerUrl: 'wss://hew-voco.de:8084/mqtt', ...cfg.device };
         rules.value = cfg.rules;
@@ -94,6 +111,14 @@ async function boot() {
         loading.value = false;
         bootError.value = String(e);
         handleError('boot', e);
+    }
+}
+
+function pickDefaultView() {
+    const order: View[] = ['steuerung', 'log', 'regeln', 'geraet'];
+    if (!canView(view.value)) {
+        const first = order.find((v) => canView(v));
+        if (first) view.value = first;
     }
 }
 
@@ -119,7 +144,7 @@ function fire(raw: string) {
 }
 
 function setSimulate(on: boolean) {
-    if (!on && !rights.value.canEdit) { toast('Kein Recht zum Scharfschalten (Einstellungen ändern).'); return; }
+    if (!on && !canEdit('steuerung')) { toast('Kein Recht zum Scharfschalten (Bearbeiten der Kategorie „Steuerung").'); return; }
     if (!on && !confirm('Simulation ausschalten?\n\nDanach lösen Knöpfe und Automatik ECHTES Läuten aus.')) return;
     simulate.value = on;
     if (voco) voco.simulate = on;
@@ -200,15 +225,15 @@ const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶'
       <div v-else class="gs-layout">
         <!-- Linke Modul-Navigation -->
         <nav class="gs-subnav">
-          <div class="lbl">Läuten</div>
-          <button :class="{ active: view === 'steuerung' }" @click="view = 'steuerung'">
+          <div v-if="showLaeuten" class="lbl">Läuten</div>
+          <button v-if="canView('steuerung')" :class="{ active: view === 'steuerung' }" @click="view = 'steuerung'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2M5 10a7 7 0 0 1 14 0c0 5 2 6 2 6H3s2-1 2-6Z"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>Steuerung</button>
-          <button :class="{ active: view === 'log' }" @click="view = 'log'">
+          <button v-if="canView('log')" :class="{ active: view === 'log' }" @click="view = 'log'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Ereignis-Log<span v-if="logLines.length" class="cnt">{{ logLines.length }}</span></button>
-          <div class="lbl">Einstellungen</div>
-          <button :class="{ active: view === 'regeln' }" @click="view = 'regeln'">
+          <div v-if="showEinstellungen" class="lbl">Einstellungen</div>
+          <button v-if="canView('regeln')" :class="{ active: view === 'regeln' }" @click="view = 'regeln'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>Automatik-Regeln<span v-if="rules.length" class="cnt">{{ rules.length }}</span></button>
-          <button :class="{ active: view === 'geraet' }" @click="view = 'geraet'">
+          <button v-if="canView('geraet')" :class="{ active: view === 'geraet' }" @click="view = 'geraet'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 5V3m8 2V3M4 10h16"/></svg>Gerät</button>
           <div class="lbl">Hilfe</div>
           <button @click="showFeedback = true">
@@ -218,7 +243,7 @@ const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶'
         <!-- Inhalt -->
         <div>
           <!-- ▸ Steuerung -->
-          <template v-if="view === 'steuerung'">
+          <template v-if="view === 'steuerung' && canView('steuerung')">
             <div class="gs-banner" :class="simulate ? 'sim-on' : 'sim-off'">
               <span class="ic">
                 <svg v-if="simulate" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 7.5 8 9 4.5-1.5 8-4 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg>
@@ -228,7 +253,7 @@ const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶'
                 <b>{{ simulate ? 'Simulationsmodus aktiv' : 'SCHARF – echtes Läuten möglich' }}</b><br>
                 <small>{{ simulate ? 'Es wird nichts an die Anlage gesendet. Du siehst nur, was passieren würde – und im Ereignis-Log die echten Antworten der Anlage.' : 'Knöpfe und Automatik lösen jetzt wirklich Läuten aus.' }}</small>
               </div>
-              <label class="gs-switch"><button class="gs-toggle" :class="{ off: !simulate }" role="switch" :aria-checked="simulate" :disabled="simulate && !rights.canEdit" :title="simulate && !rights.canEdit ? 'Scharfschalten braucht das Recht „Daten bearbeiten“' : ''" @click="setSimulate(!simulate)"></button> Simulation</label>
+              <label class="gs-switch"><button class="gs-toggle" :class="{ off: !simulate }" role="switch" :aria-checked="simulate" :disabled="simulate && !canEdit('steuerung')" :title="simulate && !canEdit('steuerung') ? 'Scharfschalten braucht das Bearbeiten-Recht der Kategorie „Steuerung“' : ''" @click="setSimulate(!simulate)"></button> Simulation</label>
             </div>
 
             <section class="gs-card">
@@ -254,7 +279,7 @@ const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶'
           </template>
 
           <!-- ▸ Ereignis-Log -->
-          <section v-else-if="view === 'log'" class="gs-card">
+          <section v-else-if="view === 'log' && canView('log')" class="gs-card">
             <div class="gs-head"><h2>Ereignis-Log</h2><span class="gs-spacer"></span>
               <span class="gs-count">◀ Antwort · ▶ gesendet · ⚙ Simulation</span>
               <button class="gs-btn gs-ghost sm" style="margin-left:10px" @click="logLines = []">Leeren</button></div>
@@ -267,46 +292,51 @@ const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶'
           </section>
 
           <!-- ▸ Automatik-Regeln -->
-          <section v-else-if="view === 'regeln'" class="gs-card">
+          <section v-else-if="view === 'regeln' && canView('regeln')" class="gs-card">
             <div class="gs-head"><h2>Automatik-Regeln</h2><span class="gs-spacer"></span>
-              <span v-if="!rights.canEdit" class="gs-pill muted">nur lesen</span>
+              <span v-if="!canEdit('regeln')" class="gs-pill muted">nur lesen</span>
               <button v-else class="gs-btn gs-ghost sm" @click="addRule"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Regel hinzufügen</button></div>
             <div class="gs-body">
               <p style="color:var(--gs-dim);font-size:13.5px;margin:0 0 14px">Vom Gateway-Dienst für automatisches Läuten genutzt (Termin → Programm).</p>
-              <p v-if="!rights.canEdit" class="gs-readonly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Zum Ändern brauchst du das Recht „Daten in Kategorie bearbeiten". Ein Admin vergibt es in der Rechteverwaltung unter „Glockensteuerung".</p>
+              <p v-if="!canEdit('regeln')" class="gs-readonly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Zum Ändern brauchst du das Recht „Daten in Kategorie bearbeiten" für „Automatik-Regeln". Ein Admin vergibt es in der Rechteverwaltung unter „Glockensteuerung".</p>
               <p v-if="rules.length === 0" class="gs-empty">(noch keine Regeln)</p>
               <div v-for="(rule, i) in rules" :key="rule.id" class="gs-rule">
-                <label>Name</label><input type="text" v-model="rule.name" :disabled="!rights.canEdit">
+                <label>Name</label><input type="text" v-model="rule.name" :disabled="!canEdit('regeln')">
                 <label>Kalender</label>
-                <select :value="rule.calendarId ?? ''" :disabled="!rights.canEdit" @change="calId(rule, $event)">
+                <select :value="rule.calendarId ?? ''" :disabled="!canEdit('regeln')" @change="calId(rule, $event)">
                   <option value="">(jeder Kalender)</option>
                   <option v-for="c in calendars" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
-                <label>Veranstaltungsart</label><input type="text" v-model="rule.category" placeholder="(egal) z. B. Gottesdienst" :disabled="!rights.canEdit">
+                <label>Veranstaltungsart</label><input type="text" v-model="rule.category" placeholder="(egal) z. B. Gottesdienst" :disabled="!canEdit('regeln')">
                 <label>Läuteprogramm</label>
-                <input type="text" v-model="rule.pgsName" :list="'pgs-' + i" placeholder="Name des Sofort-PGS" :disabled="!rights.canEdit">
+                <input type="text" v-model="rule.pgsName" :list="'pgs-' + i" placeholder="Name des Sofort-PGS" :disabled="!canEdit('regeln')">
                 <datalist :id="'pgs-' + i"><option v-for="raw in playable" :key="raw" :value="decodeName(raw)"></option></datalist>
-                <label>Vorlauf (Min.)</label><input type="number" min="0" v-model.number="rule.leadMinutes" :disabled="!rights.canEdit">
-                <label>Aktiv</label><label class="gs-switch"><input type="checkbox" v-model="rule.active" :disabled="!rights.canEdit"></label>
-                <template v-if="rights.canEdit"><div></div><button class="gs-btn gs-stop sm" style="justify-self:start" @click="delRule(i)">Löschen</button></template>
+                <label>Vorlauf (Min.)</label><input type="number" min="0" v-model.number="rule.leadMinutes" :disabled="!canEdit('regeln')">
+                <label>Aktiv</label><label class="gs-switch"><input type="checkbox" v-model="rule.active" :disabled="!canEdit('regeln')"></label>
+                <template v-if="canEdit('regeln')"><div></div><button class="gs-btn gs-stop sm" style="justify-self:start" @click="delRule(i)">Löschen</button></template>
               </div>
-              <div v-if="rights.canEdit" class="gs-foot" style="justify-content:flex-start"><button class="gs-btn gs-primary" @click="saveRules">Regeln speichern</button><span style="margin-left:10px;color:var(--gs-success-fg);font-weight:600;align-self:center">{{ saveMsg }}</span></div>
+              <div v-if="canEdit('regeln')" class="gs-foot" style="justify-content:flex-start"><button class="gs-btn gs-primary" @click="saveRules">Regeln speichern</button><span style="margin-left:10px;color:var(--gs-success-fg);font-weight:600;align-self:center">{{ saveMsg }}</span></div>
             </div>
           </section>
 
           <!-- ▸ Gerät -->
-          <section v-else-if="view === 'geraet'" class="gs-card">
-            <div class="gs-head"><h2>Gerät</h2><span class="gs-spacer"></span><span v-if="!rights.canEdit" class="gs-pill muted">nur lesen</span></div>
+          <section v-else-if="view === 'geraet' && canView('geraet')" class="gs-card">
+            <div class="gs-head"><h2>Gerät</h2><span class="gs-spacer"></span><span v-if="!canEdit('geraet')" class="gs-pill muted">nur lesen</span></div>
             <div class="gs-body">
-              <p v-if="!rights.canEdit" class="gs-readonly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Zum Ändern brauchst du das Recht „Daten in Kategorie bearbeiten". Ein Admin vergibt es in der Rechteverwaltung unter „Glockensteuerung".</p>
+              <p v-if="!canEdit('geraet')" class="gs-readonly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Zum Ändern brauchst du das Recht „Daten in Kategorie bearbeiten" für „Gerät". Ein Admin vergibt es in der Rechteverwaltung unter „Glockensteuerung".</p>
               <div class="gs-fields">
-                <label>Seriennummer</label><input type="text" v-model="device.serial" placeholder="VH-XXXXXX" :disabled="!rights.canEdit">
-                <label>Geräte-Passwort</label><input type="password" v-model="device.devicePw" placeholder="geheim" :disabled="!rights.canEdit">
-                <label>Broker-URL</label><input type="text" v-model="device.brokerUrl" :disabled="!rights.canEdit">
+                <label>Seriennummer</label><input type="text" v-model="device.serial" placeholder="VH-XXXXXX" :disabled="!canEdit('geraet')">
+                <label>Geräte-Passwort</label><input type="password" v-model="device.devicePw" placeholder="geheim" :disabled="!canEdit('geraet')">
+                <label>Broker-URL</label><input type="text" v-model="device.brokerUrl" :disabled="!canEdit('geraet')">
               </div>
               <p class="gs-note"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Seriennummer + Passwort erlauben das Läuten – Modulzugriff einschränken. Verbinden &amp; Status lesen ist ungefährlich.</p>
-              <div v-if="rights.canEdit" class="gs-foot" style="justify-content:flex-start"><button class="gs-btn gs-primary" @click="saveDevice">Gerät speichern &amp; verbinden</button></div>
+              <div v-if="canEdit('geraet')" class="gs-foot" style="justify-content:flex-start"><button class="gs-btn gs-primary" @click="saveDevice">Gerät speichern &amp; verbinden</button></div>
             </div>
+          </section>
+
+          <!-- ▸ Kein Bereich freigegeben -->
+          <section v-else class="gs-card">
+            <div class="gs-body gs-empty">Für dieses Modul sind dir noch keine Bereiche freigegeben. Ein Admin kann dir in der Rechteverwaltung unter „Glockensteuerung" Rechte geben (sehen/bearbeiten je Kategorie). Über „Feedback senden" kannst du dich melden.</div>
           </section>
         </div>
       </div>
