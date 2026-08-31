@@ -68,3 +68,19 @@ jobs:
               --title "Glockensteuerung ${GITHUB_REF_NAME}" \
               --notes "Automatisch gebaute ChurchTools-Extension. ZIP unten herunterladen und in ChurchTools installieren."
           fi
+
+      - name: Rollierendes "latest"-Release aktualisieren (nur main)
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Ein Release "latest" mit der fertigen, DIREKT installierbaren Einzel-ZIP.
+        # Release-Dateien werden einzeln (unverpackt) heruntergeladen -> kein
+        # ZIP-in-ZIP wie beim Actions-Artifact. Idempotent: anlegen oder ersetzen.
+        run: |
+          if gh release view latest >/dev/null 2>&1; then
+            gh release upload latest releases/*.zip --clobber
+          else
+            gh release create latest releases/*.zip \
+              --prerelease --title "Aktueller Build (main)" \
+              --notes "Automatisch gebaute, **direkt installierbare** ChurchTools-ZIP vom letzten main-Stand. Einzelne Datei herunterladen und unveraendert hochladen (kein Entpacken noetig)."
+          fi
