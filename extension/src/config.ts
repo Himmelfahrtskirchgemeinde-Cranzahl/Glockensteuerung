@@ -47,6 +47,10 @@ export interface MappingRule {
 export interface AppConfig {
     device: DeviceConfig | null;
     rules: MappingRule[];
+    /** Persistierter Simulations-Status der Extension (nicht Gateway). Standard: an. */
+    simulate: boolean;
+    /** Dauer je Programm (Anzeigename -> Minuten) für den „läuft"-Countdown. */
+    durations: Record<string, number>;
 }
 
 interface StoredValue { id: number; key: string; data: unknown }
@@ -56,6 +60,7 @@ export class ConfigStore {
     /** Kategorie-IDs je Untermenü (fehlt, falls nicht vorhanden & kein Anlege-Recht). */
     catIds: Partial<Record<CatKey, number>> = {};
     private valueIds: Record<string, number> = {}; // `${catKey}:${valueKey}` -> id
+    private control: { simulate: boolean; durations: Record<string, number> } = { simulate: true, durations: {} };
 
     /**
      * Legt Modul und die vier Kategorien bei Bedarf an (erste Nutzung durch eine
@@ -90,9 +95,15 @@ export class ConfigStore {
     }
 
     async load(): Promise<AppConfig> {
-        const cfg: AppConfig = { device: null, rules: [] };
+        const cfg: AppConfig = { device: null, rules: [], simulate: true, durations: {} };
         await this.loadFrom('geraet', 'device', (d) => { cfg.device = d as DeviceConfig; });
         await this.loadFrom('regeln', 'rules', (d) => { cfg.rules = (d as MappingRule[]) ?? []; });
+        await this.loadFrom('steuerung', 'control', (d) => {
+            const c = (d ?? {}) as Partial<{ simulate: boolean; durations: Record<string, number> }>;
+            this.control = { simulate: c.simulate ?? true, durations: c.durations ?? {} };
+        });
+        cfg.simulate = this.control.simulate;
+        cfg.durations = this.control.durations;
         return cfg;
     }
 
@@ -128,6 +139,15 @@ export class ConfigStore {
 
     saveDevice(device: DeviceConfig) { return this.upsert('geraet', 'device', device); }
     saveRules(rules: MappingRule[]) { return this.upsert('regeln', 'rules', rules); }
+
+    saveSimulate(on: boolean) {
+        this.control.simulate = on;
+        return this.upsert('steuerung', 'control', this.control);
+    }
+    saveDurations(durations: Record<string, number>) {
+        this.control.durations = durations;
+        return this.upsert('steuerung', 'control', this.control);
+    }
 }
 
 export function newRule(): MappingRule {

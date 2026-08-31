@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { churchtoolsClient } from '@churchtools/churchtools-client';
 import { ConfigStore, newRule } from './config';
 import type { CatKey, DeviceConfig, MappingRule } from './config';
@@ -38,11 +38,18 @@ const showEinstellungen = computed(() => canView('regeln') || canView('geraet'))
 const simulate = ref(true);
 const online = ref<boolean | null>(null);
 const playable = ref<string[]>([]);
+const stoppable = ref<string[]>([]);          // laufende (= stoppbare) Programme
+const runningSince = ref<Record<string, number>>({}); // roher Name -> Startzeit (ms)
+const durations = ref<Record<string, number>>({});    // Anzeigename -> Minuten
+const now = ref<number>(Date.now());
+let clockTimer: number | undefined;
 const device = ref<DeviceConfig>({ serial: '', devicePw: '', brokerUrl: 'wss://hew-voco.de:8084/mqtt' });
 const rules = ref<MappingRule[]>([]);
 const calendars = ref<{ id: number; name: string }[]>([]);
-type LogEntry = { t: string; dir: 'in' | 'out' | 'sim'; line: string };
+type LogEntry = { ts: Date; dir: 'in' | 'out' | 'sim'; line: string };
 const logLines = ref<LogEntry[]>([]);
+const dlFrom = ref('');   // Log-Download: Von (datetime-local), leer = alles
+const dlTo = ref('');     // Log-Download: Bis
 const errorCount = ref(0);
 const loading = ref(true);
 const bootError = ref('');
@@ -62,13 +69,13 @@ function ctx(): ReportContext {
         device: maskSerial(device.value.serial),
         online: online.value,
         userAgent: navigator.userAgent,
-        logTail: logLines.value.slice(0, 15).map((e) => `${e.t} ${e.dir} ${e.line}`),
+        logTail: logLines.value.slice(0, 15).map((e) => `${e.ts.toLocaleTimeString('de-DE')} ${e.dir} ${e.line}`),
     };
 }
 
 function pushLog(line: string, dir: 'in' | 'out' | 'sim') {
-    logLines.value.unshift({ t: new Date().toLocaleTimeString('de-DE'), dir, line });
-    if (logLines.value.length > 80) logLines.value.pop();
+    logLines.value.unshift({ ts: new Date(), dir, line });
+    if (logLines.value.length > 500) logLines.value.pop();
 }
 
 async function handleError(where: string, err: unknown) {
@@ -86,7 +93,13 @@ function toast(msg: string) {
 onMounted(() => {
     window.addEventListener('error', (e) => handleError('window.onerror', e.error ?? e.message));
     window.addEventListener('unhandledrejection', (e) => handleError('promise', (e as PromiseRejectionEvent).reason));
+    clockTimer = window.setInterval(() => (now.value = Date.now()), 10000);
     boot();
+});
+
+onUnmounted(() => {
+    clearInterval(clockTimer);
+    voco?.disconnect();
 });
 
 async function boot() {
@@ -104,6 +117,9 @@ async function boot() {
         const cfg = await store.load();
         if (cfg.device) device.value = { brokerUrl: 'wss://hew-voco.de:8084/mqtt', ...cfg.device };
         rules.value = cfg.rules;
+        durations.value = cfg.durations ?? {};
+        // Gemerkter Status gilt nur für Berechtigte; alle anderen bleiben in Simulation.
+        simulate.value = rights.value.manageExt ? (cfg.simulate ?? true) : true;
         try { calendars.value = await churchtoolsClient.get<{ id: number; name: string }[]>('/calendars'); } catch { calendars.value = []; }
         if (device.value.serial && device.value.devicePw) connectVoco();
         loading.value = false;
@@ -130,6 +146,7 @@ function connectVoco() {
     voco.onUpdate = () => {
         online.value = voco!.status.online;
         playable.value = [...voco!.status.playable];
+        updateRunning([...voco!.status.stoppable]);
     };
     pushLog('Verbinde mit Broker …', 'out');
     voco.connect().catch((e) => handleError('mqtt.connect', e));
@@ -149,9 +166,68 @@ function setSimulate(on: boolean) {
     simulate.value = on;
     if (voco) voco.simulate = on;
     pushLog(on ? 'Simulation EIN – es wird nichts gesendet.' : 'Simulation AUS – Befehle werden real gesendet!', 'sim');
+    store.saveSimulate(on).catch((e) => handleError('saveSimulate', e));
+}
+
+/** Verfolgt laufende (stoppbare) Programme: merkt Startzeit, loggt Start/Ende. */
+function updateRunning(list: string[]) {
+    const since = { ...runningSince.value };
+    for (const raw of list) {
+        if (since[raw] == null) { since[raw] = Date.now(); pushLog(`läuft: ${decodeName(raw)}`, 'in'); }
+    }
+    for (const raw of Object.keys(since)) {
+        if (!list.includes(raw)) { pushLog(`beendet: ${decodeName(raw)}`, 'in'); delete since[raw]; }
+    }
+    runningSince.value = since;
+    stoppable.value = list;
+}
+
+/** Anzeigetext „läuft" je Programm: Countdown wenn Dauer bekannt, sonst Laufzeit. */
+function runningText(raw: string): string {
+    const startedMs = runningSince.value[raw];
+    const elapsedMin = startedMs ? (now.value - startedMs) / 60000 : 0;
+    const dur = durations.value[decodeName(raw)] ?? durations.value[raw];
+    if (dur && dur > 0) {
+        const rem = Math.max(0, Math.ceil(dur - elapsedMin));
+        return rem > 0 ? `noch ~${rem} min` : 'endet gleich';
+    }
+    return `läuft seit ${Math.max(0, Math.floor(elapsedMin))} min`;
+}
+
+function setDuration(displayName: string, minutes: number) {
+    const map = { ...durations.value };
+    if (minutes > 0) map[displayName] = minutes; else delete map[displayName];
+    durations.value = map;
+    store.saveDurations(map).catch((e) => handleError('saveDurations', e));
+}
+
+/** Log als Textdatei herunterladen; optional auf Zeitraum [von,bis] eingegrenzt. */
+function downloadLog() {
+    const from = dlFrom.value ? new Date(dlFrom.value).getTime() : -Infinity;
+    const to = dlTo.value ? new Date(dlTo.value).getTime() : Infinity;
+    const rows = logLines.value
+        .filter((e) => e.ts.getTime() >= from && e.ts.getTime() <= to)
+        .slice()
+        .reverse()
+        .map((e) => `${e.ts.toLocaleString('de-DE')}\t${e.dir}\t${e.line}`);
+    if (rows.length === 0) { toast('Keine Log-Einträge im gewählten Zeitraum.'); return; }
+    const header = `Glockensteuerung – Ereignis-Log (${rows.length} Einträge)\n`;
+    const blob = new Blob([header + rows.join('\n') + '\n'], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `glockensteuerung-log-${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function requestSync() { voco?.requestSync(); }
+function stopProgram(raw: string) {
+    if (simulate.value) { voco?.stop(raw); toast('Simulation: nichts gesendet.'); }
+    else if (confirm(`„${decodeName(raw)}“ wirklich stoppen?`)) voco?.stop(raw);
+}
 function stopAll() {
     if (simulate.value) { voco?.stopAll(); toast('Simulation: nichts gesendet.'); }
     else if (confirm('Wirklich ALLES stoppen?')) voco?.stopAll();
@@ -257,6 +333,20 @@ const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶'
               <span v-else class="gs-switch" style="opacity:.75" title="Nur „Erweiterung verwalten“ kann den Sicherheitsmodus deaktivieren"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg> Simulation</span>
             </div>
 
+            <!-- Aktuell läuft (aus stoppbaren Programmen – auch in Simulation echt) -->
+            <section v-if="stoppable.length" class="gs-card">
+              <div class="gs-head"><h2>Aktuell läuft</h2><span class="gs-spacer"></span><span class="gs-pill ok"><span class="dot"></span> {{ stoppable.length }} aktiv</span></div>
+              <div class="gs-body">
+                <div class="gs-list">
+                  <div v-for="raw in stoppable" :key="raw" class="gs-row">
+                    <span class="gs-ic" style="background:var(--gs-success-bg);color:var(--gs-green)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2M5 10a7 7 0 0 1 14 0c0 5 2 6 2 6H3s2-1 2-6Z"/><path d="M10 21a2 2 0 0 0 4 0"/></svg></span>
+                    <div class="grow"><div class="name">{{ decodeName(raw) }}</div><div class="meta">{{ runningText(raw) }}</div></div>
+                    <button class="gs-btn sm" :class="simulate ? 'gs-sim-btn' : 'gs-stop'" @click="stopProgram(raw)"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>{{ simulate ? 'Stop testen' : 'Stoppen' }}</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
             <section class="gs-card">
               <div class="gs-head"><h2>Programme</h2><span class="gs-spacer"></span>
                 <span class="gs-pill blue">{{ simulate ? 'Simulation – „Testen"' : 'Scharf – „Läuten"' }}</span></div>
@@ -267,6 +357,7 @@ const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶'
                   <div v-for="raw in playable" :key="raw" class="gs-row">
                     <span class="gs-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2M5 10a7 7 0 0 1 14 0c0 5 2 6 2 6H3s2-1 2-6Z"/><path d="M10 21a2 2 0 0 0 4 0"/></svg></span>
                     <div class="grow"><div class="name">{{ decodeName(raw) }}</div></div>
+                    <label v-if="canEdit('steuerung')" class="gs-dur" title="Dauer für den „läuft“-Countdown">Dauer <input type="number" min="0" :value="durations[decodeName(raw)] ?? ''" @change="setDuration(decodeName(raw), Number(($event.target as HTMLInputElement).value))"> min</label>
                     <button class="gs-btn sm" :class="simulate ? 'gs-sim-btn' : 'gs-ring'" @click="fire(raw)">
                       <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>{{ simulate ? 'Testen' : 'Läuten' }}</button>
                   </div>
@@ -285,9 +376,15 @@ const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : '▶'
               <span class="gs-count">◀ Antwort · ▶ gesendet · ⚙ Simulation</span>
               <button class="gs-btn gs-ghost sm" style="margin-left:10px" @click="logLines = []">Leeren</button></div>
             <div class="gs-body">
+              <div class="gs-dltools">
+                <label>Von <input type="datetime-local" v-model="dlFrom"></label>
+                <label>Bis <input type="datetime-local" v-model="dlTo"></label>
+                <button class="gs-btn gs-ghost sm" @click="downloadLog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 19h16"/></svg>Herunterladen</button>
+                <span class="hint">leer = alles</span>
+              </div>
               <div class="gs-log">
                 <span v-if="logLines.length === 0" style="color:#7c8b99">(noch keine Ereignisse – „Aktualisieren" drücken oder Gerät verbinden)</span>
-                <div v-for="(e, i) in logLines" :key="i"><span class="ts">{{ e.t }}</span> <span :class="e.dir">{{ logIcon(e.dir) }}</span> {{ e.line }}</div>
+                <div v-for="(e, i) in logLines" :key="i"><span class="ts">{{ e.ts.toLocaleTimeString('de-DE') }}</span> <span :class="e.dir">{{ logIcon(e.dir) }}</span> {{ e.line }}</div>
               </div>
             </div>
           </section>
