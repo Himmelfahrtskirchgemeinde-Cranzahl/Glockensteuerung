@@ -40,9 +40,31 @@ class Rule:
 
 
 @dataclass
+class EmailConfig:
+    """Zugang zum Postausgang, gepflegt in der Extension (Kategorie 'email').
+
+    Die Extension kann selbst keine E-Mail verschicken - ein Browser spricht kein
+    SMTP. Sie hinterlegt hier nur die Zugangsdaten; verschickt wird vom Gateway.
+    """
+    host: str
+    port: int = 587
+    user: str = ""
+    password: str = ""
+    mail_from: str = ""
+    mail_to: str = ""
+    security: str = "starttls"      # 'starttls' (Port 587) oder 'ssl' (Port 465)
+    send_feedback: bool = True
+    send_errors: bool = True
+
+
+@dataclass
 class GatewayConfig:
     device: DeviceConfig | None
     rules: list[Rule] = field(default_factory=list)
+    email: EmailConfig | None = None
+    """Modul-ID und Kategorie-ID von 'steuerung' - fuer den Postausgang."""
+    module_id: int | None = None
+    steuerung_cat_id: int | None = None
 
 
 def _find_module(ct) -> dict | None:
@@ -83,18 +105,23 @@ def load_from_churchtools(ct) -> GatewayConfig:
     """
     device = None
     rules: list[Rule] = []
+    email = None
+    module_id = None
+    steuerung_cat_id = None
     devices_by_cat: dict[str, DeviceConfig] = {}
     rules_by_cat: dict[str, list[Rule]] = {}
 
     mod = _find_module(ct)
     if mod:
-        mid = mod["id"]
+        mid = module_id = mod["id"]
         try:
             cats = ct.get(f"/custommodules/{mid}/customdatacategories")
         except Exception:
             cats = []
         for cat in cats or []:
             shorty = cat.get("shorty") or ""
+            if shorty == "steuerung":
+                steuerung_cat_id = cat.get("id")
             try:
                 values = ct.get(
                     f"/custommodules/{mid}/customdatacategories/{cat['id']}/customdatavalues"
@@ -113,6 +140,8 @@ def load_from_churchtools(ct) -> GatewayConfig:
                             payload.get("brokerUrl") or "wss://hew-voco.de:8084/mqtt")
                 elif key == "rules" and isinstance(payload, list):
                     rules_by_cat[shorty] = [_to_rule(r) for r in payload if isinstance(r, dict)]
+                elif key == "email" and isinstance(payload, dict):
+                    email = _to_email(payload)
 
     # Aktuelle Kategorie gewinnt, sonst irgendeine gefundene.
     for shorty in _DEVICE_CAT_ORDER:
@@ -133,7 +162,37 @@ def load_from_churchtools(ct) -> GatewayConfig:
     if device is None and os.environ.get("VOCO_SERIAL") and os.environ.get("VOCO_DEVICE_PW"):
         device = DeviceConfig(os.environ["VOCO_SERIAL"], os.environ["VOCO_DEVICE_PW"],
                               os.environ.get("VOCO_BROKER_URL", "wss://hew-voco.de:8084/mqtt"))
-    return GatewayConfig(device=device, rules=rules)
+
+    # Fallback Postausgang aus .env. Die Extension hat Vorrang, damit sich die
+    # Zugangsdaten ohne Zugriff auf den Server aendern lassen.
+    if email is None and os.environ.get("SMTP_HOST"):
+        email = EmailConfig(
+            host=os.environ["SMTP_HOST"].strip(),
+            port=int(os.environ.get("SMTP_PORT", "587") or 587),
+            user=os.environ.get("SMTP_USER", "").strip(),
+            password=os.environ.get("SMTP_PASS", ""),
+            mail_from=os.environ.get("EMAIL_FROM", "").strip(),
+            mail_to=os.environ.get("EMAIL_TO", "").strip(),
+            security="ssl" if os.environ.get("SMTP_SSL", "").strip().lower() in ("1", "true", "yes")
+                     else "starttls",
+        )
+
+    return GatewayConfig(device=device, rules=rules, email=email,
+                         module_id=module_id, steuerung_cat_id=steuerung_cat_id)
+
+
+def _to_email(d: dict) -> EmailConfig:
+    return EmailConfig(
+        host=str(d.get("host") or "").strip(),
+        port=int(d.get("port") or 587),
+        user=str(d.get("user") or "").strip(),
+        password=str(d.get("password") or ""),
+        mail_from=str(d.get("from") or "").strip(),
+        mail_to=str(d.get("to") or "").strip(),
+        security=str(d.get("security") or "starttls"),
+        send_feedback=bool(d.get("sendFeedback", True)),
+        send_errors=bool(d.get("sendErrors", True)),
+    )
 
 
 def _parse_value(raw):

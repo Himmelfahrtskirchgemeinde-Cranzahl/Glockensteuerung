@@ -25,6 +25,10 @@ export const CATS = [
     { key: 'steuerung', shorty: 'steuerung', name: 'Steuerung', desc: 'Live-Steuerung / Läuten' },
     { key: 'log', shorty: 'ereignislog', name: 'Ereignis-Log', desc: 'Ereignis-Log' },
     { key: 'regeln', shorty: 'regeln', name: 'Automatik-Regeln', desc: 'Termin → Programm' },
+    // Eigene Kategorie fuer den E-Mail-Versand. Sie enthaelt das
+    // Postausgangs-Passwort und darf deshalb NICHT wie „steuerung" fuer alle
+    // lesbar sein - Rechte hierauf nur an Verwalter vergeben.
+    { key: 'email', shorty: 'email', name: 'E-Mail-Versand', desc: 'Postausgang (Zugangsdaten)' },
 ] as const;
 export type CatKey = (typeof CATS)[number]['key'];
 
@@ -53,12 +57,66 @@ export interface MappingRule {
     active: boolean;
 }
 
+/**
+ * Zugang zum Postausgang. Der Gateway verschickt damit; die Extension kann es
+ * nicht selbst, weil ein Browser kein SMTP sprechen kann.
+ *
+ * Liegt in der Kategorie „email", nicht in „steuerung": Dort steht ein Passwort,
+ * und „steuerung" ist bewusst fuer jeden lesbar, der das Modul bedient.
+ */
+export interface EmailConfig {
+    host: string;
+    port: number;
+    user: string;
+    /** GEHEIM. Verlaesst den Server nie – nur der Gateway liest ihn. */
+    password: string;
+    /** Absender. Leer = derselbe wie `user`. */
+    from: string;
+    /** Empfaenger fuer Feedback und Stoerungsmeldungen. */
+    to: string;
+    /** Verschluesselung: STARTTLS (ueblich, Port 587) oder SSL (Port 465). */
+    security: 'starttls' | 'ssl';
+    /** Feedback-Formular per E-Mail verschicken statt das Mailprogramm zu oeffnen. */
+    sendFeedback: boolean;
+    /** Stoerungen und Fehler melden. */
+    sendErrors: boolean;
+}
+
+export function newEmailConfig(): EmailConfig {
+    return {
+        host: '', port: 587, user: '', password: '', from: '', to: '',
+        security: 'starttls', sendFeedback: true, sendErrors: true,
+    };
+}
+
+/**
+ * Eine Nachricht im Postausgang. Die Extension legt sie ab, der Gateway holt
+ * sie beim naechsten Durchlauf und verschickt sie.
+ *
+ * Liegt in „steuerung", damit JEDER etwas einstellen kann, der das Modul
+ * bedient - das Feedback-Formular steht schliesslich allen offen. Hier steht
+ * kein Geheimnis drin, nur Betreff und Text.
+ */
+export interface MailJob {
+    id: string;
+    subject: string;
+    body: string;
+    /** Wann eingestellt (ISO). Der Gateway raeumt Altes weg. */
+    at: string;
+}
+
 /** Lebenszeichen des Gateway-Dienstes (vom Gateway geschrieben, hier nur gelesen). */
 export interface GatewayStatus {
     at: string;              // ISO-Zeitstempel des letzten Lebenszeichens
     rules?: number;          // wie viele Regeln der Dienst geladen hat
     simulation?: boolean;    // laeuft der Dienst im Simulationsmodus?
     device?: string | null;  // Seriennummer, die er nutzt
+    /**
+     * Kann Feedback per E-Mail rausgehen? Der Gateway beantwortet das, weil die
+     * Extension es nicht kann: Die Zugangsdaten liegen in der Kategorie „email",
+     * die normale Benutzer nicht lesen dürfen.
+     */
+    mail?: boolean;
 }
 
 export interface AppConfig {
@@ -207,6 +265,37 @@ export class ConfigStore {
     }
 
     saveUpdateCheck(check: UpdateCheck) { return this.upsert('steuerung', 'updateCheck', check); }
+
+    /** Zugang zum Postausgang. Nur lesbar, wer Rechte auf „email" hat. */
+    async loadEmail(): Promise<EmailConfig | null> {
+        const holder: { v: EmailConfig | null } = { v: null };
+        await this.loadFrom('email', 'email', (d) => { holder.v = (d ?? null) as EmailConfig | null; });
+        return holder.v;
+    }
+
+    saveEmail(cfg: EmailConfig) { return this.upsert('email', 'email', cfg); }
+
+    /** Postausgang lesen – der Gateway arbeitet ihn ab und leert ihn. */
+    async loadOutbox(): Promise<MailJob[]> {
+        const holder: { v: MailJob[] } = { v: [] };
+        await this.loadFrom('steuerung', 'outbox', (d) => { holder.v = (d as MailJob[]) ?? []; });
+        return holder.v;
+    }
+
+    /**
+     * Nachricht in den Postausgang stellen.
+     *
+     * Bewusst lesen-anhaengen-schreiben: Der KV-Store kennt keine Listen, nur
+     * einen Wert je Schluessel. Zwei Personen, die im selben Moment absenden,
+     * koennten sich damit theoretisch ueberschreiben - bei einem Feedback-
+     * Formular ist das hinnehmbar, und der Gateway leert den Ausgang laufend.
+     * Es bleiben hoechstens die letzten 20 Nachrichten stehen, damit der Wert
+     * nicht unbegrenzt waechst.
+     */
+    async queueMail(job: MailJob): Promise<void> {
+        const bisher = await this.loadOutbox();
+        await this.upsert('steuerung', 'outbox', [...bisher, job].slice(-20));
+    }
 
     saveDevice(device: DeviceConfig) { return this.upsert('steuerung', 'device', device); }
     saveRules(rules: MappingRule[]) { return this.upsert('regeln', 'rules', rules); }

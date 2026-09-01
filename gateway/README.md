@@ -30,6 +30,26 @@ Lebenszeichen (Heartbeat), das der Dienst alle 2 Minuten hinterlegt, damit die
 Extension anzeigen kann, ob die Automatik ueberhaupt laeuft. Fehlt das Recht,
 laeuft der Dienst normal weiter und laeutet wie gewohnt - er schreibt dann nur
 eine Warnung ins Log, und die Extension meldet „Gateway nicht erreichbar".
+
+Kommt der **E-Mail-Versand** zum Einsatz, braucht der Benutzer zusaetzlich
+**Leserecht** auf die Kategorie `email` - dort liegen die Zugangsdaten zum
+Postausgang. Diese Kategorie sollte **sonst niemand** lesen duerfen: Sie
+enthaelt ein Passwort.
+
+## E-Mail-Versand
+
+Die Extension kann selbst keine E-Mail senden - ein Browser spricht kein SMTP.
+Sie stellt Nachrichten nur in einen Postausgang; verschickt werden sie hier.
+
+Die Zugangsdaten koennen in der Extension gepflegt werden (Untermenue
+„E-Mail-Versand", nur mit dem Recht „Erweiterung verwalten"). Sie haben Vorrang
+vor der `.env`, damit sich der Postausgang aendern laesst, ohne an den Server zu
+muessen. Fehlt dort ein Host, gelten die `SMTP_*`-Werte aus der `.env`.
+
+Einmal je Minute holt der Dienst, was eingestellt wurde, verschickt es und leert
+den Ausgang - auch wenn einzelne Nachrichten nicht rausgingen. Sonst versuchte
+er es im Minutentakt erneut und wuerde das Postfach fluten, sobald es doch
+klappt; Fehlschlaege stehen im Log.
 Das Gerät (Seriennummer + Passwort) wird bevorzugt in der **Extension**
 konfiguriert; der Gateway liest es von dort. Alternativ in `.env` eintragen.
 
