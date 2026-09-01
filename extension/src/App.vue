@@ -105,9 +105,22 @@ const gatewayDownText = computed(() => {
 });
 /** Erklärt, WARUM die Vorschau leer ist (Ladefehler, keine Treffer, Schreibweise). */
 const ringingHint = ref('');
-type LogDir = 'in' | 'out' | 'sim' | 'info';
+type LogDir = 'in' | 'out' | 'sim' | 'info' | 'gw';
 type LogEntry = { ts: Date; dir: LogDir; line: string };
 const logLines = ref<LogEntry[]>([]);
+/**
+ * Ereignisse, die der Gateway-Dienst festgehalten hat.
+ *
+ * Getrennt von `logLines`, nicht hineingemischt: Diese Liste wird bei jeder
+ * Abfrage komplett ersetzt. Würde sie eingemischt, entstünden bei jedem
+ * Nachladen Dubletten – und beim Verwerfen ginge das mit weg, was der Browser
+ * selbst mitgeschrieben hat.
+ */
+const gatewayEreignisse = ref<LogEntry[]>([]);
+/** Alles zusammen, neueste zuerst – so wird das Ereignis-Log angezeigt. */
+const alleLogZeilen = computed(() =>
+    [...logLines.value, ...gatewayEreignisse.value]
+        .sort((a, b) => b.ts.getTime() - a.ts.getTime()));
 const dlFrom = ref('');   // Log-Download: Von (datetime-local), leer = alles
 const dlTo = ref('');     // Log-Download: Bis
 const errorCount = ref(0);
@@ -252,6 +265,18 @@ async function refreshGatewayStatus() {
     } catch {
         /* kein Leserecht oder Netz weg – alter Stand bleibt stehen */
     }
+    try {
+        const roh = await store.loadGatewayEvents();
+        gatewayEreignisse.value = roh
+            .map((e) => ({
+                ts: new Date(e.at),
+                dir: (e.art === 'an' ? 'in' : e.art === 'aus' ? 'gw' : 'info') as LogDir,
+                line: e.text,
+            }))
+            .filter((e) => Number.isFinite(e.ts.getTime()));
+    } catch {
+        /* dito – die zuletzt geholten Ereignisse bleiben stehen */
+    }
 }
 
 async function boot() {
@@ -278,6 +303,7 @@ async function boot() {
         gatewayStatus.value = cfg.gateway ?? null;
         // Regelmaessig nachladen – sonst altert der einmal geladene Wert vor sich
         // hin und das Warnbanner erschiene allein deshalb, weil die Seite offen ist.
+        refreshGatewayStatus();
         gatewayTimer = window.setInterval(refreshGatewayStatus, GATEWAY_POLL_MS);
         checkForUpdate();
         // Gemerkter Status gilt nur für Berechtigte; alle anderen bleiben in Simulation.
@@ -377,7 +403,7 @@ function setDuration(displayName: string, minutes: number) {
 function downloadLog() {
     const from = dlFrom.value ? new Date(dlFrom.value).getTime() : -Infinity;
     const to = dlTo.value ? new Date(dlTo.value).getTime() : Infinity;
-    const rows = logLines.value
+    const rows = alleLogZeilen.value
         .filter((e) => e.ts.getTime() >= from && e.ts.getTime() <= to)
         .slice()
         .reverse()
@@ -514,7 +540,25 @@ async function sendFeedback() {
     else toast('Konnte nicht senden.');
 }
 
-const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : d === 'info' ? 'ℹ' : '▶');
+/**
+ * Uhrzeit – mit Datum, sobald der Eintrag nicht von heute ist.
+ *
+ * Die Ereignisse des Dienstes reichen Tage zurück. „03:14:07" allein ließe
+ * offen, ob die Verbindung heute Nacht oder vorletzte Woche wegbrach.
+ */
+function zeitstempel(ts: Date): string {
+    const heute = new Date();
+    const gleicherTag = ts.getDate() === heute.getDate()
+        && ts.getMonth() === heute.getMonth()
+        && ts.getFullYear() === heute.getFullYear();
+    return gleicherTag
+        ? ts.toLocaleTimeString('de-DE')
+        : ts.toLocaleString('de-DE', { day: '2-digit', month: '2-digit',
+                                       hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+const logIcon = (d: string) =>
+    (d === 'in' ? '◀' : d === 'sim' ? '⚙' : d === 'info' ? 'ℹ' : d === 'gw' ? '⚠' : '▶');
 
 /** Steuerung zeigt nur ausgedünnte, wichtige Ereignisse: die eigenen Befehle
  *  (Läuten, Stoppen), echtes Läuten (Start/Ende), Simulationswechsel und
@@ -692,7 +736,7 @@ async function loadNextRingings() {
           <button v-if="canView('steuerung')" :class="{ active: view === 'steuerung' }" @click="view = 'steuerung'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2M5 10a7 7 0 0 1 14 0c0 5 2 6 2 6H3s2-1 2-6Z"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>Steuerung</button>
           <button v-if="canView('log')" :class="{ active: view === 'log' }" @click="view = 'log'">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Ereignis-Log<span v-if="logLines.length" class="cnt">{{ logLines.length }}</span></button>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Ereignis-Log<span v-if="alleLogZeilen.length" class="cnt">{{ alleLogZeilen.length }}</span></button>
           <div v-if="showEinstellungen" class="lbl">Einstellungen</div>
           <button v-if="canView('regeln')" :class="{ active: view === 'regeln' }" @click="view = 'regeln'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>Automatik-Regeln<span v-if="rules.length" class="cnt">{{ rules.length }}</span></button>
@@ -823,8 +867,9 @@ async function loadNextRingings() {
           <!-- ▸ Ereignis-Log -->
           <section v-else-if="view === 'log' && canView('log')" class="gs-card">
             <div class="gs-head"><h2>Ereignis-Log</h2><span class="gs-spacer"></span>
-              <span class="gs-count">ℹ Info · ▶ gesendet · ◀ Antwort · ⚙ Simulation</span>
-              <button class="gs-btn gs-ghost sm" style="margin-left:10px" @click="logLines = []">Leeren</button></div>
+              <span class="gs-count">ℹ Info · ▶ gesendet · ◀ Antwort · ⚙ Simulation · ⚠ Automatik</span>
+              <button class="gs-btn gs-ghost sm" style="margin-left:10px" @click="logLines = []"
+                      title="Leert nur die Zeilen dieser Sitzung. Was der Automatik-Dienst festgehalten hat, bleibt stehen.">Leeren</button></div>
             <div class="gs-body">
               <div class="gs-dltools">
                 <label>Von <input type="datetime-local" v-model="dlFrom"></label>
@@ -833,8 +878,8 @@ async function loadNextRingings() {
                 <span class="hint">leer = alles</span>
               </div>
               <div class="gs-log">
-                <span v-if="logLines.length === 0" style="color:#7c8b99">(noch keine Ereignisse – „Aktualisieren" drücken oder Gerät verbinden)</span>
-                <div v-for="(e, i) in logLines" :key="i"><span class="ts">{{ e.ts.toLocaleTimeString('de-DE') }}</span> <span :class="e.dir">{{ logIcon(e.dir) }}</span> {{ e.line }}</div>
+                <span v-if="alleLogZeilen.length === 0" style="color:#7c8b99">(noch keine Ereignisse – „Aktualisieren" drücken oder Gerät verbinden)</span>
+                <div v-for="(e, i) in alleLogZeilen" :key="i"><span class="ts">{{ zeitstempel(e.ts) }}</span> <span :class="e.dir">{{ logIcon(e.dir) }}</span> {{ e.line }}</div>
               </div>
             </div>
           </section>

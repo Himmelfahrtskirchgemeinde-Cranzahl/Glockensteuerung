@@ -119,6 +119,20 @@ export interface GatewayStatus {
     mail?: boolean;
 }
 
+/**
+ * Ein vom Gateway festgehaltenes Ereignis (verbunden, getrennt, gestartet …).
+ *
+ * Das Ereignis-Log der Extension lebt sonst nur im Browser: Es zeigt, was seit
+ * dem Öffnen der Seite geschah. Ob der Dienst nachts um drei die Verbindung
+ * verloren hat, sah dort niemand. Der Dienst schreibt solche Wechsel deshalb
+ * selbst mit — hier werden sie nur gelesen.
+ */
+export interface GatewayEvent {
+    at: string;                      // ISO-Zeitstempel
+    art: 'an' | 'aus' | 'info';      // verbunden / getrennt / sonstiges
+    text: string;
+}
+
 export interface AppConfig {
     device: DeviceConfig | null;
     rules: MappingRule[];
@@ -247,6 +261,20 @@ export class ConfigStore {
         const holder: { v: GatewayStatus | null } = { v: null };
         await this.loadFrom('steuerung', 'gatewayStatus', (d) => {
             holder.v = (d ?? null) as GatewayStatus | null;
+        });
+        return holder.v;
+    }
+
+    /**
+     * Ereignisse, die der Gateway-Dienst festgehalten hat – neueste zuerst.
+     *
+     * Liegt wie das Lebenszeichen in „steuerung": Wer das Modul bedienen darf,
+     * soll auch sehen, ob die Automatik zwischendurch weg war.
+     */
+    async loadGatewayEvents(): Promise<GatewayEvent[]> {
+        const holder: { v: GatewayEvent[] } = { v: [] };
+        await this.loadFrom('steuerung', 'gatewayEvents', (d) => {
+            holder.v = Array.isArray(d) ? (d as GatewayEvent[]) : [];
         });
         return holder.v;
     }
