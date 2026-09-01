@@ -391,13 +391,20 @@ async function sendFeedback() {
 
 const logIcon = (d: string) => (d === 'in' ? '◀' : d === 'sim' ? '⚙' : d === 'info' ? 'ℹ' : '▶');
 
-/** Steuerung zeigt nur ausgedünnte, wichtige Ereignisse: echtes Läuten
- *  (Start/Ende), Simulationswechsel und Verbindungs-Infos (z. B. neu verbunden).
- *  Der ausführliche Verlauf (inkl. Status/Katalog-Infos) steht im Ereignis-Log. */
+/** Steuerung zeigt nur ausgedünnte, wichtige Ereignisse: die eigenen Befehle
+ *  (Läuten, Stoppen), echtes Läuten (Start/Ende), Simulationswechsel und
+ *  Verbindungs-Infos (z. B. neu verbunden). Der ausführliche Verlauf (inkl.
+ *  Status- und Katalog-Meldungen) steht im Ereignis-Log.
+ *
+ *  „out" MUSS dabei sein: Das sind die gesendeten Befehle – also genau das, was
+ *  der Bedienende gerade getan hat. Ohne sie blieb das Läuten und Stoppen hier
+ *  unsichtbar, und zwar ausgerechnet im scharfen Betrieb: In der Simulation
+ *  wird stattdessen „sim" geloggt, das war zu sehen. */
 const steuerungLog = computed(() =>
     logLines.value.filter(
         (e) =>
             e.dir === 'in' ||
+            e.dir === 'out' ||
             e.dir === 'sim' ||
             (e.dir === 'info' && /verbind|verbunden|unterbroch|broker|fehler/i.test(e.line)),
     ),
@@ -663,7 +670,7 @@ async function loadNextRingings() {
             <!-- Ereignis-Log (abgespeckt) – voller Log unter „Ereignis-Log" -->
             <section v-if="steuerungLog.length" class="gs-card">
               <div class="gs-head"><h2>Letzte Ereignisse</h2><span class="gs-spacer"></span>
-                <span class="gs-count">ℹ Info · ◀ Läuten · ⚙ Simulation</span>
+                <span class="gs-count">ℹ Info · ▶ Befehl · ◀ Läuten · ⚙ Simulation</span>
                 <button v-if="canView('log')" class="gs-btn gs-ghost sm" style="margin-left:10px" @click="view = 'log'">Ganzes Log</button></div>
               <div class="gs-body">
                 <div class="gs-log" style="max-height:160px">
