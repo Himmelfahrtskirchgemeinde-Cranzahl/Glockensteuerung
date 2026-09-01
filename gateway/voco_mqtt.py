@@ -95,7 +95,7 @@ class Voco:
         # Zertifikatsspeicher des Systems aus - dann scheitert der Aufbau, sobald
         # ein Virenscanner oder Firmen-Proxy die Verbindung aufbricht. Siehe
         # tls.py.
-        self.c.tls_set_context(tls.context())
+        self.c.tls_set_context(tls.context_fuer(self.host, self.port))
         self.c.on_connect = self._on_connect
         self.c.on_message = self._on_message
 
@@ -108,6 +108,8 @@ class Voco:
             raise RuntimeError(
                 f"Das Zertifikat von {self.host} konnte nicht geprueft werden ({e}).\n"
                 f"Geprueft wurde gegen: {', '.join(tls.quellen())}.\n"
+                "Ein fehlendes Zwischenzertifikat wurde bereits vergeblich "
+                "nachzuladen versucht.\n"
                 "Was jetzt hilft, der Reihe nach:\n"
                 "  1. 'python -m diagnose' im gateway-Ordner ausfuehren - das sagt, "
                 "wer das Zertifikat ausgestellt hat.\n"

@@ -123,14 +123,17 @@ python -m diagnose
 Sie nennt die benutzten Zertifikatsquellen und vor allem, **wer das Zertifikat
 des Brokers ausgestellt hat**. Zugangsdaten braucht sie keine.
 
-**Es fehlt das Zwischenzertifikat.** Der einzige Fall, in dem im Browser alles
-funktioniert und nur das Programm scheitert: Der Server sendet nur sein eigenes
-Zertifikat, nicht das der ausstellenden Zwischenstelle. Browser holen das
-fehlende Stück selbstständig an der Adresse nach, die im Zertifikat steht;
-Python tut das nicht. Die Diagnose erkennt das, holt das Zwischenzertifikat,
-prüft damit erneut und legt es als `zwischenzertifikat.pem` ab — samt der einen
-Zeile, die dann in die `.env` gehört. Ein bereits eingetragenes eigenes Bundle
-wird dabei übernommen, nicht verdrängt.
+**Es fehlt das Zwischenzertifikat.** Genau das ist bei `hew-voco.de` der Fall,
+und es ist der einzige, in dem im Browser alles funktioniert und nur das
+Programm scheitert: Der Server sendet nur sein eigenes Zertifikat, nicht das der
+ausstellenden Zwischenstelle. Browser holen das fehlende Stück selbstständig an
+der Adresse nach, die im Zertifikat steht; Python tut das nicht.
+
+**Der Dienst holt es jetzt selbst** — einmal, und legt es als
+`zwischenzertifikat.pem` daneben. Beim nächsten Start reicht die Datei, es wird
+nichts mehr geladen. Einzutragen ist dafür nichts. Nachgeladen wird nur bei
+einem echten Zertifikatsfehler: Ein Netzproblem oder ein Port, der gar kein TLS
+spricht, löst keinen Abruf aus.
 
 **Aussteller ist eine öffentliche Stelle** (Let's Encrypt, DigiCert, Sectigo …):
 Dann fehlen nur Wurzelzertifikate. Python bringt unter Windows keine mit. Der

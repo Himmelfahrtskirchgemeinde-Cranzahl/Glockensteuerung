@@ -23,8 +23,6 @@ import os
 import socket
 import ssl
 import sys
-import tempfile
-import urllib.request
 from urllib.parse import urlparse
 
 import config
@@ -50,27 +48,6 @@ def _name(paare) -> str:
     return flach.get("commonName") or flach.get("organizationName") or str(flach)
 
 
-def _entschluesseln(roh: bytes) -> dict:
-    """DER-Zertifikat in dieselbe Form bringen, die getpeercert() liefert.
-
-    Noetig, weil getpeercert() ein LEERES Ergebnis liefert, solange nicht
-    geprueft wurde - und genau dann will man ja wissen, wer da ausgestellt hat.
-    Python bringt keinen oeffentlichen Zertifikatsleser mit; die interne
-    Hilfsfunktion tut es seit Langem und wird hier abgesichert benutzt.
-    """
-    try:
-        pem = ssl.DER_cert_to_PEM_cert(roh)
-        with tempfile.NamedTemporaryFile("w", suffix=".pem", delete=False) as f:
-            f.write(pem)
-            pfad = f.name
-        try:
-            return ssl._ssl._test_decode_cert(pfad)  # type: ignore[attr-defined]
-        finally:
-            os.unlink(pfad)
-    except Exception:
-        return {}
-
-
 def _blattzertifikat(host: str, port: int):
     """Zertifikat und Kette holen, OHNE zu pruefen.
 
@@ -94,34 +71,8 @@ def _blattzertifikat(host: str, port: int):
                 except Exception:
                     zert = {}
             if not zert:
-                zert = _entschluesseln(s.getpeercert(binary_form=True) or b"")
+                zert = tls._lies_zertifikat(s.getpeercert(binary_form=True) or b"")
             return zert, laenge
-
-
-def _hole_aussteller(urls) -> bytes | None:
-    """Das fehlende Zwischenzertifikat unter der im Zertifikat genannten
-    Adresse laden. Genau das tun Browser von sich aus; Python nicht."""
-    for url in urls or ():
-        if not str(url).lower().startswith(("http://", "https://")):
-            continue
-        try:
-            with urllib.request.urlopen(url, timeout=15) as antwort:
-                daten = antwort.read(200_000)
-            if daten:
-                return daten
-        except Exception as e:
-            print(f"  {url} nicht ladbar: {e}")
-    return None
-
-
-def _als_pem(daten: bytes) -> str | None:
-    """Geladenes Zertifikat in PEM umwandeln - egal ob es als PEM oder DER kam."""
-    if daten.lstrip().startswith(b"-----BEGIN"):
-        return daten.decode("ascii", "ignore")
-    try:
-        return ssl.DER_cert_to_PEM_cert(daten)
-    except Exception:
-        return None
 
 
 def _prueft_mit(pem_zusatz: str | None, host: str, port: int) -> bool:
@@ -190,10 +141,11 @@ def main() -> int:
             print("Der Broker sendet nur sein eigenes Zertifikat.")
         print("Das Zwischenzertifikat wird jetzt an der im Zertifikat genannten")
         print("Adresse geholt und die Pruefung damit wiederholt.")
-        daten = _hole_aussteller(urls)
-        pem = _als_pem(daten) if daten else None
+        pem = tls.hole_aussteller(urls)
         if pem and _prueft_mit(pem, host, port):
-            ziel = os.path.abspath("zwischenzertifikat.pem")
+            # Denselben Ort benutzen, an dem der Dienst sie erwartet - sonst
+            # holt er sie beim naechsten Start noch einmal.
+            ziel = tls.zwischenspeicher()
             # Ein bereits eingetragenes eigenes Bundle mit hineinschreiben:
             # VOCO_CA_BUNDLE nennt EINE Datei, und wer dort schon die eigene
             # Zertifizierungsstelle stehen hat, verloere sie sonst beim Wechsel
@@ -212,8 +164,8 @@ def main() -> int:
             print("\nDAS WAR ES. Mit dem nachgeladenen Zwischenzertifikat gelingt")
             print("die Pruefung. Es wurde gespeichert unter:")
             print(f"  {ziel}")
-            print("\nDiese Zeile in die .env eintragen, dann laeuft das Gateway:")
-            print(f"  VOCO_CA_BUNDLE={ziel}")
+            print("\nEinzutragen ist nichts: Der Dienst benutzt diese Datei von")
+            print("selbst und holt sie auch selbst, wenn sie einmal fehlt.")
             print("\nGeprueft wird weiterhin vollstaendig: Das Zwischenzertifikat")
             print("muss selbst von einer bekannten Stelle unterschrieben sein,")
             print("sonst haette auch dieser Versuch nicht funktioniert.")
