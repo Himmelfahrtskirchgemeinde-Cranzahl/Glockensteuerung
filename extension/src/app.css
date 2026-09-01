@@ -94,6 +94,10 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 .gs-subfoot { margin-top: auto; padding: 14px 12px 2px; font-size: 11.5px; line-height: 1.7; color: var(--gs-faint); border-top: 1px solid var(--gs-border); }
 .gs-subfoot .ver { font-weight: 700; color: var(--gs-dim); }
 .gs-subfoot .heart { color: var(--gs-faint); }
+/* Hinweis auf eine neuere Fassung – sichtbar, aber nicht so laut wie eine Störung. */
+.gs-update { display: inline-flex; align-items: center; gap: 5px; margin: 5px 0 7px; padding: 4px 9px; border-radius: 999px; background: var(--gs-blue-tint); color: var(--gs-blue); border: 1px solid color-mix(in srgb, var(--gs-blue) 22%, var(--gs-border)); font-size: 11.5px; font-weight: 700; text-decoration: none; }
+.gs-update:hover { background: color-mix(in srgb, var(--gs-blue) 14%, #fff); }
+.gs-update svg { flex: none; }
 
 /* ---- Karten ---- */
 .gs-card { background: var(--gs-surface); border: 1px solid var(--gs-border); border-radius: var(--gs-radius); margin-bottom: 16px; }
