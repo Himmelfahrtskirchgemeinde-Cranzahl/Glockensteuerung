@@ -7,7 +7,7 @@ import { VocoMqtt, decodeName } from './voco/mqtt';
 import { reportError, submitFeedback, maskSerial, APP_VERSION, FEEDBACK_URL } from './feedback';
 import type { ReportContext, FeedbackFields } from './feedback';
 import { loadRights } from './perms';
-import { fetchLatest, isFresh, isNewer, DOWNLOAD_URL } from './update';
+import { fetchLatest, isFresh, isNewer, parseChangelog, DOWNLOAD_URL, RELEASES_URL } from './update';
 import type { UpdateCheck } from './update';
 import type { Rights } from './perms';
 import { fitInfo } from './utils/fit-height';
@@ -69,8 +69,14 @@ const gatewayAgeMin = computed<number | null>(() => {
     if (!Number.isFinite(t)) return null;
     return Math.max(0, (now.value - t) / 60000);
 });
-/** Neueste veröffentlichte Version – nur für „Erweiterung verwalten" geprüft. */
+/** Neueste veröffentlichte Version samt Changelog. */
 const updateCheck = ref<UpdateCheck | null>(null);
+/** Changelog-Fenster offen? */
+const showChangelog = ref(false);
+/** Wird der Changelog gerade nachgeladen? */
+const changelogLaedt = ref(false);
+/** Aufbereiteter Changelog für die Anzeige – ohne v-html, siehe update.ts. */
+const changelog = computed(() => parseChangelog(updateCheck.value?.notes ?? ''));
 /** Liegt eine neuere Fassung vor als die installierte? */
 const updateAvailable = computed(() =>
     !!updateCheck.value && isNewer(updateCheck.value.latest, APP_VERSION),
@@ -178,10 +184,16 @@ onUnmounted(() => {
  * darf das Läuten nie stören.
  */
 async function checkForUpdate() {
-    if (!rights.value.manageExt) return;
     try {
+        // Den gespeicherten Stand liest JEDER: Er liegt in „steuerung", und der
+        // Changelog soll allen offenstehen, die das Modul bedienen.
         const gespeichert = await store.loadUpdateCheck();
-        if (isFresh(gespeichert)) { updateCheck.value = gespeichert; return; }
+        if (gespeichert) updateCheck.value = gespeichert;
+
+        // Bei GitHub nachfragen darf nur, wer die Erweiterung auch aktualisieren
+        // kann – das hält die 60 Abfragen je Stunde und IP frei.
+        if (!rights.value.manageExt) return;
+        if (isFresh(gespeichert) && gespeichert?.notes) return;
 
         const frisch = await fetchLatest();
         if (!frisch) return;
@@ -191,6 +203,32 @@ async function checkForUpdate() {
         store.saveUpdateCheck(frisch).catch(() => { /* Cache ist Beiwerk */ });
     } catch {
         /* Update-Prüfung darf nie stören */
+    }
+}
+
+/**
+ * Changelog-Fenster öffnen.
+ *
+ * Liegt noch kein Changelog vor – etwa weil noch nie ein Berechtigter das Modul
+ * geöffnet hat –, wird er hier einmalig geholt. Das ist ein Klick, kein
+ * Seitenaufruf, fällt beim Rate-Limit also kaum ins Gewicht.
+ */
+async function openChangelog() {
+    showChangelog.value = true;
+    if (updateCheck.value?.notes || changelogLaedt.value) return;
+    changelogLaedt.value = true;
+    try {
+        const frisch = await fetchLatest();
+        if (frisch) {
+            updateCheck.value = frisch;
+            if (rights.value.manageExt) {
+                store.saveUpdateCheck(frisch).catch(() => { /* Cache ist Beiwerk */ });
+            }
+        }
+    } catch {
+        /* bleibt beim Hinweis „nicht abrufbar" im Fenster */
+    } finally {
+        changelogLaedt.value = false;
     }
 }
 
@@ -563,7 +601,8 @@ async function loadNextRingings() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 5V3m8 2V3M4 10h16"/></svg>Gerät</button>
 
           <div class="gs-subfoot">
-            <div class="ver">v{{ APP_VERSION }}</div>
+            <button class="ver" type="button" @click="openChangelog"
+                    title="Was ist neu? Changelog anzeigen">v{{ APP_VERSION }}</button>
             <a v-if="updateAvailable" class="gs-update" :href="DOWNLOAD_URL" target="_blank" rel="noopener noreferrer"
                :title="`Version ${updateCheck!.latest} herunterladen und in ChurchTools hochladen`">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
@@ -763,6 +802,37 @@ async function loadNextRingings() {
     </template>
 
     <!-- Feedback modal -->
+    <!-- Changelog: „Was ist neu?" – geoeffnet ueber die Versionsnummer unten links.
+         Bewusst ohne v-html: Der Text kommt zwar aus dem eigenen Release, wird
+         aber als Daten gerendert, nicht als Markup (siehe update.ts). -->
+    <div v-if="showChangelog" class="gs-backdrop" @click.self="showChangelog = false">
+      <div class="gs-modal gs-cl-modal" role="dialog" aria-modal="true" aria-label="Was ist neu">
+        <h3>Was ist neu?</h3>
+        <p class="hint">Installiert ist Version {{ APP_VERSION }}.<span v-if="updateAvailable"> Verfügbar ist {{ updateCheck!.latest }}.</span></p>
+
+        <div v-if="changelogLaedt" class="gs-cl-info">Changelog wird geladen …</div>
+        <div v-else-if="!changelog.length" class="gs-cl-info">
+          Der Changelog konnte nicht abgerufen werden. Er steht bei den
+          <a :href="RELEASES_URL" target="_blank" rel="noopener noreferrer">Releases auf GitHub</a>.
+        </div>
+        <div v-else class="gs-cl">
+          <template v-for="(z, i) in changelog" :key="i">
+            <h4 v-if="z.art === 'version'" class="v">{{ z.text }}</h4>
+            <div v-else-if="z.art === 'gruppe'" class="g">{{ z.text }}</div>
+            <div v-else-if="z.art === 'bereich'" class="b">{{ z.text }}</div>
+            <div v-else-if="z.art === 'eintrag'" class="e">{{ z.text }}</div>
+            <p v-else class="t">{{ z.text }}</p>
+          </template>
+        </div>
+
+        <div class="actions">
+          <a v-if="updateAvailable" class="gs-btn gs-primary" :href="DOWNLOAD_URL" target="_blank" rel="noopener noreferrer">
+            Version {{ updateCheck!.latest }} herunterladen</a>
+          <button class="gs-btn gs-ghost" @click="showChangelog = false">Schließen</button>
+        </div>
+      </div>
+    </div>
+
     <div v-if="showFeedback" class="gs-backdrop" @click.self="showFeedback = false">
       <div class="gs-modal" role="dialog" aria-modal="true" aria-label="Feedback">
         <h3>Feedback senden</h3>

@@ -25,6 +25,9 @@ const RELEASES_API = `https://api.github.com/repos/${REPO}/releases/latest`;
 /** Fester Download-Link – ändert sich nie (siehe .github/workflows). */
 export const DOWNLOAD_URL = `https://github.com/${REPO}/releases/download/latest/glockensteuerung.zip`;
 
+/** Übersicht aller Releases – Rückfallweg, wenn der Changelog nicht ladbar ist. */
+export const RELEASES_URL = `https://github.com/${REPO}/releases`;
+
 /** Wie lange ein geholtes Ergebnis gilt: ein Tag. */
 export const CHECK_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
@@ -34,7 +37,17 @@ export interface UpdateCheck {
     latest: string;
     /** Wann zuletzt bei GitHub gefragt wurde (ISO-Zeitstempel). */
     at: string;
+    /** Beschreibung des Releases – der Changelog. Fehlt bei alten Einträgen. */
+    notes?: string;
 }
+
+/** Eine Zeile des aufbereiteten Changelogs (siehe `parseChangelog`). */
+export type ChangelogZeile =
+    | { art: 'version'; text: string }   // ## v26.5.6
+    | { art: 'gruppe'; text: string }    // ### Verbesserungen
+    | { art: 'bereich'; text: string }   // * **Steuerung**
+    | { art: 'eintrag'; text: string }   //    * Der Satz
+    | { art: 'text'; text: string };     // alles Übrige
 
 /**
  * „26.5.7" oder „26.5.7-3-gabc123" -> [26, 5, 7]. Alles Unbrauchbare -> null.
@@ -86,10 +99,50 @@ export async function fetchLatest(): Promise<UpdateCheck | null> {
             headers: { Accept: 'application/vnd.github+json' },
         });
         if (!res.ok) return null;
-        const j = (await res.json()) as { tag_name?: string };
+        const j = (await res.json()) as { tag_name?: string; body?: string };
         const latest = String(j?.tag_name ?? '').trim().replace(/^v/, '');
-        return parts(latest) ? { latest, at: new Date().toISOString() } : null;
+        if (!parts(latest)) return null;
+        return { latest, at: new Date().toISOString(), notes: String(j?.body ?? '') };
     } catch {
         return null;
     }
+}
+
+/** Marker, hinter dem in der Release-Beschreibung die Versionsabschnitte beginnen. */
+const MARKER = '<!-- changelog -->';
+
+/**
+ * Zerlegt die Release-Beschreibung in anzeigbare Zeilen.
+ *
+ * Bewusst ein eigener kleiner Parser statt einer Markdown-Bibliothek und ohne
+ * `v-html`: Der Text stammt zwar aus dem eigenen Release, aber ungeprüftes HTML
+ * in die Seite zu schreiben ist eine Tür, die man nicht aufmacht, wenn man sie
+ * nicht braucht. Die Vorlage erzeugt ohnehin nur vier Formen (Version, Gruppe,
+ * Bereich, Eintrag); alles andere wird als schlichter Text durchgereicht.
+ */
+export function parseChangelog(md: string): ChangelogZeile[] {
+    let text = String(md ?? '');
+    // Die Einleitung („Automatisch gebaute …") interessiert im Dialog nicht.
+    const i = text.indexOf(MARKER);
+    if (i >= 0) text = text.slice(i + MARKER.length);
+
+    const raus: ChangelogZeile[] = [];
+    for (const roh of text.split(/\r?\n/)) {
+        const zeile = roh.trimEnd();
+        if (!zeile.trim()) continue;
+        // Sterne der Auszeichnung entfernen – sie werden nicht gerendert.
+        const ohneFett = (t: string) => t.replace(/\*\*/g, '').trim();
+
+        if (/^##\s+/.test(zeile)) { raus.push({ art: 'version', text: ohneFett(zeile.replace(/^##\s+/, '')) }); continue; }
+        if (/^###\s+/.test(zeile)) { raus.push({ art: 'gruppe', text: ohneFett(zeile.replace(/^###\s+/, '')) }); continue; }
+        // Eingerückter Punkt = Eintrag, Punkt am Zeilenanfang = Bereich.
+        const punkt = /^(\s*)[*-]\s+(.*)$/.exec(zeile);
+        if (punkt) {
+            const eingerueckt = punkt[1].length > 0;
+            raus.push({ art: eingerueckt ? 'eintrag' : 'bereich', text: ohneFett(punkt[2]) });
+            continue;
+        }
+        raus.push({ art: 'text', text: ohneFett(zeile) });
+    }
+    return raus;
 }
