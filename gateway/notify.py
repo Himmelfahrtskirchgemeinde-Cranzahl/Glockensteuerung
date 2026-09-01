@@ -14,10 +14,11 @@ from __future__ import annotations
 import logging
 import os
 import smtplib
-import ssl
 import time
 from email.message import EmailMessage
 from email.utils import formatdate
+
+import tls
 
 log = logging.getLogger("voco-gateway")
 DEFAULT_TO = "josua.hess@icloud.com"
@@ -60,12 +61,12 @@ class EmailNotifier:
             msg["Date"] = formatdate(localtime=True)
             msg.set_content(body)
             if self.use_ssl:
-                with smtplib.SMTP_SSL(self.host, self.port, context=ssl.create_default_context(), timeout=20) as s:
+                with smtplib.SMTP_SSL(self.host, self.port, context=tls.context(), timeout=20) as s:
                     self._login_send(s, msg)
             else:
                 with smtplib.SMTP(self.host, self.port, timeout=20) as s:
                     if self.use_tls:
-                        s.starttls(context=ssl.create_default_context())
+                        s.starttls(context=tls.context())
                     self._login_send(s, msg)
             log.info("Fehler-E-Mail an %s gesendet: %s", self.mail_to, subject)
         except Exception as e:

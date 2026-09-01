@@ -23,6 +23,8 @@ Beispiele:
 import argparse
 import os
 import ssl
+
+import tls
 import sys
 import time
 
@@ -75,16 +77,40 @@ class Voco:
         self._got_list = False
 
         cid = f"{self.serial}-web-ct"
-        self.c = mqtt.Client(client_id=cid, transport="websockets",
-                             clean_session=True)
+        # Callback-API Version 2 (paho-mqtt 2.x). Version 1 warnt bei jedem
+        # Start, dass sie veraltet ist. Die Rueckrufe hier vertragen beide:
+        # _on_connect faengt das zusaetzliche Argument mit *a ab, und weder der
+        # Rueckgabecode noch die Flags werden ausgewertet. Aeltere
+        # paho-Fassungen kennen den Parameter nicht - dann eben ohne.
+        try:
+            self.c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=cid,
+                                 transport="websockets", clean_session=True)
+        except (AttributeError, TypeError):
+            self.c = mqtt.Client(client_id=cid, transport="websockets",
+                                 clean_session=True)
         self.c.ws_set_options(path=ws_path)
         self.c.username_pw_set(user, pw)
-        self.c.tls_set(cert_reqs=ssl.CERT_REQUIRED)
+        # Wurzelzertifikate ausdruecklich mitgeben: Ohne sie schlaegt der
+        # Verbindungsaufbau unter Windows fehl ("unable to get local issuer
+        # certificate"), weil Python dort keine mitbringt und den
+        # Windows-Zertifikatsspeicher nicht benutzt. Siehe tls.py.
+        self.c.tls_set(ca_certs=tls.ca_bundle(), cert_reqs=ssl.CERT_REQUIRED)
         self.c.on_connect = self._on_connect
         self.c.on_message = self._on_message
 
     def connect(self, timeout=10):
-        self.c.connect(self.host, self.port, keepalive=600)
+        try:
+            self.c.connect(self.host, self.port, keepalive=600)
+        except ssl.SSLCertVerificationError as e:
+            # Haeufigster Stolperstein unter Windows - die blosse
+            # OpenSSL-Meldung hilft dabei niemandem weiter.
+            raise RuntimeError(
+                f"Das Zertifikat von {self.host} konnte nicht geprueft werden ({e}). "
+                "Meist fehlen dem System die Wurzelzertifikate: "
+                "'pip install --upgrade certifi' im venv installiert sie. "
+                "Hinter einem Firmen-Proxy mit eigener Zertifizierungsstelle "
+                "deren Bundle in VOCO_CA_BUNDLE eintragen."
+            ) from e
         self.c.loop_start()
         t0 = time.time()
         while self.c.is_connected() is False and time.time() - t0 < timeout:
@@ -99,6 +125,8 @@ class Voco:
             pass
 
     # --- MQTT-Callbacks ---
+    # Signatur passt fuer beide Callback-Fassungen: Version 2 reicht zusaetzlich
+    # 'properties' herein, was *a auffaengt. rc und flags werden nicht benutzt.
     def _on_connect(self, client, userdata, flags, rc, *a):
         client.subscribe(self.base + "/#")
 
