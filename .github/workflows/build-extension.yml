@@ -136,7 +136,11 @@ jobs:
           Die Datei herunterladen und **unveraendert** in ChurchTools hochladen – kein
           Entpacken noetig. Die versionierten ZIPs liegen als Archiv in den
           Releases der jeweiligen Versionsgruppe.
+          
+          ## Neu in dieser Version
+          
           EOF
+          bash ../.github/scripts/changelog.sh "${TAG}" >> latest-notes.md
 
           if gh release view latest >/dev/null 2>&1; then
             gh release edit latest --title "Aktueller Build (main)" --notes-file latest-notes.md
