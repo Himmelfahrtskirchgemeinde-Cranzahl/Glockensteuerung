@@ -97,7 +97,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # Läuft im Arbeitsverzeichnis extension/ -> Pfade relativ dazu.
-        # Sammelt in das Gruppen-Release (z. B. "Release 26.4").
+        # Legt das Release dieser Version an (z. B. "Version 26.6.1").
         run: bash ../.github/scripts/release.sh "${GITHUB_REF_NAME}" releases/*.zip
 
       - name: Release für den neuen Auto-Tag erstellen (nur main)
@@ -108,56 +108,8 @@ jobs:
         # daher wird das Release hier direkt erstellt/erweitert.
         run: bash ../.github/scripts/release.sh "${{ steps.bump.outputs.tag }}" releases/*.zip
 
-      - name: Rollierendes "latest"-Release aktualisieren (nur main)
-        if: github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.bump.outputs.tag }}
-        # Ein Release "latest" mit der fertigen, DIREKT installierbaren Einzel-ZIP.
-        # Release-Dateien werden einzeln (unverpackt) heruntergeladen -> kein
-        # ZIP-in-ZIP wie beim Actions-Artifact. Idempotent: anlegen oder ersetzen.
-        #
-        # Die Datei heisst hier bewusst IMMER 'glockensteuerung.zip' – ohne
-        # Versionsnummer. Nur so bleibt der Download-Link dauerhaft gueltig und
-        # kann weitergegeben oder in eine Anleitung geschrieben werden. Die
-        # versionierten ZIPs liegen weiterhin in den Gruppen-Releases (Archiv).
-        run: |
-          ZIP="$(ls releases/*.zip | head -1)"
-          cp "$ZIP" glockensteuerung.zip
-          echo "Feste Datei aus $ZIP erzeugt (Version ${TAG#v})."
-
-          cat > latest-notes.md <<EOF
-          Automatisch gebaute, **direkt installierbare** ChurchTools-ZIP vom letzten
-          main-Stand. Aktuell enthalten: **Version ${TAG#v}**.
-          
-          **Dauerhafter Download-Link** (bleibt immer gleich):
-          https://github.com/${GITHUB_REPOSITORY}/releases/download/latest/glockensteuerung.zip
-          
-          Die Datei herunterladen und **unveraendert** in ChurchTools hochladen – kein
-          Entpacken noetig. Die versionierten ZIPs liegen als Archiv in den
-          Releases der jeweiligen Versionsgruppe.
-          
-          ## Neu in dieser Version
-          
-          EOF
-          bash ../.github/scripts/changelog.sh "${TAG}" >> latest-notes.md
-
-          if gh release view latest >/dev/null 2>&1; then
-            gh release edit latest --title "Aktueller Build (main)" --notes-file latest-notes.md
-            gh release upload latest glockensteuerung.zip --clobber
-          else
-            gh release create latest glockensteuerung.zip \
-              --prerelease --title "Aktueller Build (main)" \
-              --notes-file latest-notes.md
-          fi
-
-          # Altbestand aufraeumen: Frueher wurde hier die VERSIONIERTE ZIP
-          # abgelegt. Weil deren Name je Version wechselt, ersetzt --clobber sie
-          # nicht, sondern legt sie daneben – die Assets haetten sich sonst
-          # endlos angesammelt. Alles ausser der festen Datei entfernen.
-          gh release view latest --json assets \
-            --jq '.assets[].name | select(. != "glockensteuerung.zip")' \
-          | while read -r NAME; do
-              echo "Alt-Asset entfernen: $NAME"
-              gh release delete-asset latest "$NAME" -y
-            done
+      # Das rollierende "latest"-Release ist entfallen: Es lebte davon, seine ZIP
+      # bei jedem Merge zu ersetzen - mit unveraenderlichen Releases geht das
+      # nicht mehr. Den Dauerlink liefert jetzt GitHub selbst, weil jedes
+      # Versions-Release eine 'glockensteuerung.zip' unter festem Namen traegt:
+      #   .../releases/latest/download/glockensteuerung.zip
