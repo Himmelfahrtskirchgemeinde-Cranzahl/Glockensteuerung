@@ -22,6 +22,15 @@ cp .env.example .env      # und ausfüllen (CT_BASE_URL, CT_LOGIN_TOKEN)
 ```
 
 `CT_LOGIN_TOKEN` = Login-Token eines (technischen) ChurchTools-Benutzers.
+
+**Benoetigte Rechte:** Der Benutzer muss die Kategorien des Moduls
+„Glockensteuerung" **lesen** duerfen (Geraet + Regeln) und in der Kategorie
+`steuerung` zusaetzlich **schreiben** duerfen. Das Schreibrecht braucht nur das
+Lebenszeichen (Heartbeat), das der Dienst alle 2 Minuten hinterlegt, damit die
+Extension anzeigen kann, ob die Automatik ueberhaupt laeuft. Fehlt das Recht,
+laeuft der Dienst normal weiter und laeutet wie gewohnt - er schreibt dann nur
+eine Warnung ins Log, und die Extension meldet „Automatik-Dienst nicht
+erreichbar".
 Das Gerät (Seriennummer + Passwort) wird bevorzugt in der **Extension**
 konfiguriert; der Gateway liest es von dort. Alternativ in `.env` eintragen.
 

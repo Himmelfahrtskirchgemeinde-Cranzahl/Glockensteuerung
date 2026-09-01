@@ -52,6 +52,14 @@ export interface MappingRule {
     active: boolean;
 }
 
+/** Lebenszeichen des Gateway-Dienstes (vom Gateway geschrieben, hier nur gelesen). */
+export interface GatewayStatus {
+    at: string;              // ISO-Zeitstempel des letzten Lebenszeichens
+    rules?: number;          // wie viele Regeln der Dienst geladen hat
+    simulation?: boolean;    // laeuft der Dienst im Simulationsmodus?
+    device?: string | null;  // Seriennummer, die er nutzt
+}
+
 export interface AppConfig {
     device: DeviceConfig | null;
     rules: MappingRule[];
@@ -59,6 +67,8 @@ export interface AppConfig {
     simulate: boolean;
     /** Dauer je Programm (Anzeigename -> Minuten) für den „läuft"-Countdown. */
     durations: Record<string, number>;
+    /** Letztes Lebenszeichen des Gateways – null, wenn nie eines geschrieben wurde. */
+    gateway: GatewayStatus | null;
 }
 
 interface StoredValue { id: number; key: string; data: unknown }
@@ -103,7 +113,7 @@ export class ConfigStore {
     }
 
     async load(): Promise<AppConfig> {
-        const cfg: AppConfig = { device: null, rules: [], simulate: true, durations: {} };
+        const cfg: AppConfig = { device: null, rules: [], simulate: true, durations: {}, gateway: null };
         // Gerät liegt in der operativen Kategorie „steuerung", damit JEDER, der das
         // Modul bedienen darf, die Verbindungsdaten lesen kann (Status/Läuten).
         // Es gehört NICHT in eine separat berechtigte „Gerät"-Kategorie – sonst sieht
@@ -116,6 +126,11 @@ export class ConfigStore {
         });
         cfg.simulate = this.control.simulate;
         cfg.durations = this.control.durations;
+        // Lebenszeichen des Gateways – gleiche Kategorie wie das Gerät, damit es
+        // jeder sieht, der das Modul bedienen darf (nicht nur Berechtigte).
+        await this.loadFrom('steuerung', 'gatewayStatus', (d) => {
+            cfg.gateway = (d ?? null) as GatewayStatus | null;
+        });
         // Migration: früher lag das Gerät in einer eigenen „geraet"-Kategorie.
         if (!cfg.device) await this.migrateLegacyDevice((d) => { cfg.device = d; });
         return cfg;
@@ -162,6 +177,19 @@ export class ConfigStore {
             );
             this.valueIds[idKey] = (created as any).id;
         }
+    }
+
+    /**
+     * Laedt NUR das Lebenszeichen neu. Die Extension ruft das regelmaessig auf:
+     * Sonst waere der Wert so alt wie der Seitenaufruf und das Warnbanner
+     * erschiene zwangslaeufig, sobald die Seite ein paar Minuten offen ist.
+     */
+    async loadGatewayStatus(): Promise<GatewayStatus | null> {
+        const holder: { v: GatewayStatus | null } = { v: null };
+        await this.loadFrom('steuerung', 'gatewayStatus', (d) => {
+            holder.v = (d ?? null) as GatewayStatus | null;
+        });
+        return holder.v;
     }
 
     saveDevice(device: DeviceConfig) { return this.upsert('steuerung', 'device', device); }
