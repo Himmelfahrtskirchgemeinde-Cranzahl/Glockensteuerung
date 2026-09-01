@@ -26,6 +26,7 @@ import time
 
 from churchtools import ChurchTools
 from config import EXT_KEY, GatewayConfig, Rule, load_dotenv, load_from_churchtools
+from ereignisse import Ereignisse, Zustandswaechter
 from heartbeat import Heartbeat, mask_serial
 from notify import EmailNotifier
 import outbox
@@ -188,13 +189,24 @@ def main():
     log.info("Geraet %s, %d Regel(n)%s", cfg.device.serial, len(cfg.rules),
              "  [SIMULATION – loest NICHT aus]" if dry else "")
 
+    # Ereignisse fuer das Ereignis-Log der Extension. Sie werden dort auch dann
+    # sichtbar, wenn zur fraglichen Zeit niemand die Seite offen hatte - das
+    # Log im Browser vergisst beim Schliessen alles.
+    ereignisse = Ereignisse(ct, EXT_KEY)
+    waechter = Zustandswaechter(ereignisse)
+    ereignisse.melde("info", "Automatik-Dienst gestartet."
+                     + (" Simulation: es wird nichts ausgeloest." if dry else ""))
+
     voco = Voco(serial=cfg.device.serial, device_pw=cfg.device.device_pw,
                 broker_url=cfg.device.broker_url)
+    # Vor dem Verbinden setzen, damit auch der erste Aufbau protokolliert wird.
+    voco.on_zustand = waechter.setze
     try:
         voco.connect()
         voco.request_list()
     except Exception as e:
         log.error("Verbindung zur Steuerung (MQTT) fehlgeschlagen: %s", e)
+        ereignisse.melde("aus", f"Verbindungsaufbau zur Anlage fehlgeschlagen: {e}")
         raise
 
     fired = load_state()
@@ -263,6 +275,10 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
+        # Zuerst melden, dann trennen: Das Trennen loest den Zustandswaechter
+        # aus, und "Verbindung verloren" waere beim geplanten Beenden irrefuehrend.
+        voco.on_zustand = None
+        ereignisse.melde("info", "Automatik-Dienst beendet.")
         voco.close()
 
 
