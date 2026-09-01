@@ -7,6 +7,8 @@ import { VocoMqtt, decodeName } from './voco/mqtt';
 import { reportError, submitFeedback, maskSerial, APP_VERSION, FEEDBACK_URL } from './feedback';
 import type { ReportContext, FeedbackFields } from './feedback';
 import { loadRights } from './perms';
+import { fetchLatest, isFresh, isNewer, DOWNLOAD_URL } from './update';
+import type { UpdateCheck } from './update';
 import type { Rights } from './perms';
 import { fitInfo } from './utils/fit-height';
 
@@ -67,6 +69,13 @@ const gatewayAgeMin = computed<number | null>(() => {
     if (!Number.isFinite(t)) return null;
     return Math.max(0, (now.value - t) / 60000);
 });
+/** Neueste veröffentlichte Version – nur für „Erweiterung verwalten" geprüft. */
+const updateCheck = ref<UpdateCheck | null>(null);
+/** Liegt eine neuere Fassung vor als die installierte? */
+const updateAvailable = computed(() =>
+    !!updateCheck.value && isNewer(updateCheck.value.latest, APP_VERSION),
+);
+
 /** Gibt es überhaupt Automatik, die ausfallen könnte? Ohne aktive Regel läutet
  *  nichts von allein – das ist dann so gewollt und keine Störung. */
 const hasAutomation = computed(() => rules.value.some((r) => r.active && r.pgsName));
@@ -157,6 +166,34 @@ onUnmounted(() => {
     voco?.disconnect();
 });
 
+/**
+ * Sucht nach einer neueren Fassung der Extension.
+ *
+ * Nur für „Erweiterung verwalten": Wer nicht aktualisieren darf, kann mit dem
+ * Hinweis nichts anfangen – und jede ersparte Abfrage schont das GitHub-Limit
+ * von 60 Abfragen je Stunde und IP. Ein einmal geholtes Ergebnis liegt einen
+ * Tag im KV-Store, sodass EINE Abfrage für die ganze Gemeinde reicht.
+ *
+ * Schlägt etwas fehl, passiert schlicht nichts: Die Prüfung ist Beiwerk und
+ * darf das Läuten nie stören.
+ */
+async function checkForUpdate() {
+    if (!rights.value.manageExt) return;
+    try {
+        const gespeichert = await store.loadUpdateCheck();
+        if (isFresh(gespeichert)) { updateCheck.value = gespeichert; return; }
+
+        const frisch = await fetchLatest();
+        if (!frisch) return;
+        updateCheck.value = frisch;
+        // Ohne Schreibrecht auf „steuerung" schlägt das fehl – dann fragt eben
+        // jeder Aufruf selbst. Kein Grund, den Hinweis zu unterschlagen.
+        store.saveUpdateCheck(frisch).catch(() => { /* Cache ist Beiwerk */ });
+    } catch {
+        /* Update-Prüfung darf nie stören */
+    }
+}
+
 /** Holt das Lebenszeichen erneut. Fehler bleiben still: Der alte Wert altert
  *  dann weiter, und genau das soll das Banner ja anzeigen. */
 async function refreshGatewayStatus() {
@@ -192,6 +229,7 @@ async function boot() {
         // Regelmaessig nachladen – sonst altert der einmal geladene Wert vor sich
         // hin und das Warnbanner erschiene allein deshalb, weil die Seite offen ist.
         gatewayTimer = window.setInterval(refreshGatewayStatus, GATEWAY_POLL_MS);
+        checkForUpdate();
         // Gemerkter Status gilt nur für Berechtigte; alle anderen bleiben in Simulation.
         simulate.value = rights.value.manageExt ? (cfg.simulate ?? true) : true;
         try { calendars.value = await churchtoolsClient.get<{ id: number; name: string }[]>('/calendars'); } catch { calendars.value = []; }
@@ -519,6 +557,11 @@ async function loadNextRingings() {
 
           <div class="gs-subfoot">
             <div class="ver">v{{ APP_VERSION }}</div>
+            <a v-if="updateAvailable" class="gs-update" :href="DOWNLOAD_URL" target="_blank" rel="noopener noreferrer"
+               :title="`Version ${updateCheck!.latest} herunterladen und in ChurchTools hochladen`">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+              Version {{ updateCheck!.latest }} verfügbar
+            </a>
             <div>Entwickelt mit <span class="heart">♥</span> von JosuaDev</div>
           </div>
         </nav>

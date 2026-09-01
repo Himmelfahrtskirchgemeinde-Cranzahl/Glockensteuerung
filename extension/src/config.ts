@@ -16,6 +16,7 @@ import {
     createCustomDataValue,
     updateCustomDataValue,
 } from './utils/kv-store';
+import type { UpdateCheck } from './update';
 
 export const EXT_KEY: string = import.meta.env.VITE_KEY;
 
@@ -191,6 +192,21 @@ export class ConfigStore {
         });
         return holder.v;
     }
+
+    /**
+     * Ergebnis der letzten Update-Prüfung. Liegt in „steuerung", damit EINE
+     * Abfrage bei GitHub für die ganze Gemeinde reicht – unauthentifiziert sind
+     * nur 60 Abfragen pro Stunde und IP erlaubt.
+     */
+    async loadUpdateCheck(): Promise<UpdateCheck | null> {
+        const holder: { v: UpdateCheck | null } = { v: null };
+        await this.loadFrom('steuerung', 'updateCheck', (d) => {
+            holder.v = (d ?? null) as UpdateCheck | null;
+        });
+        return holder.v;
+    }
+
+    saveUpdateCheck(check: UpdateCheck) { return this.upsert('steuerung', 'updateCheck', check); }
 
     saveDevice(device: DeviceConfig) { return this.upsert('steuerung', 'device', device); }
     saveRules(rules: MappingRule[]) { return this.upsert('regeln', 'rules', rules); }
