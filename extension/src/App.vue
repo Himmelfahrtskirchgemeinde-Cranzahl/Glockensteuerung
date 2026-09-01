@@ -21,6 +21,8 @@ let voco: VocoMqtt | undefined;
 
 type View = 'steuerung' | 'log' | 'regeln' | 'geraet' | 'email';
 const view = ref<View>('steuerung');
+/** Menü auf schmalen Schirmen ausgeklappt? Am Schreibtisch ohne Bedeutung. */
+const navOffen = ref(false);
 
 const rights = ref<Rights>({ isAdmin: false, manageExt: false, viewCats: [], editCats: [] });
 const catIds = ref<Partial<Record<CatKey, number>>>({});
@@ -647,6 +649,14 @@ async function loadNextRingings() {
     <template v-else>
     <!-- Kopfleiste (voll breit, fix) -->
     <header class="gs-mhead">
+        <!-- Nur auf schmalen Schirmen sichtbar (siehe app.css): klappt die
+             Modul-Navigation als Menü aus, wie ChurchTools es selbst tut. -->
+        <button class="gs-burger" type="button" :class="{ offen: navOffen }"
+                :aria-expanded="navOffen" aria-controls="gs-nav"
+                :title="navOffen ? 'Menü schließen' : 'Menü öffnen'"
+                @click="navOffen = !navOffen">
+          <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
         <span class="mi">
           <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2M5 10a7 7 0 0 1 14 0c0 5 2 6 2 6H3s2-1 2-6Z"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>
         </span>
@@ -666,8 +676,12 @@ async function loadNextRingings() {
     </header>
 
     <div class="gs-main">
-      <!-- Linke Modul-Navigation (durchgehend) -->
-      <nav v-if="!loading && !bootError" class="gs-subnav">
+      <!-- Abdunklung: fängt den Klick daneben ab und schließt das Menü. -->
+      <div v-if="navOffen" class="gs-navback" @click="navOffen = false"></div>
+      <!-- Linke Modul-Navigation. Auf schmalen Schirmen ein ausklappbares Menü;
+           ein Klick auf einen Eintrag schließt es wieder. -->
+      <nav v-if="!loading && !bootError" id="gs-nav" class="gs-subnav"
+           :class="{ offen: navOffen }" @click="navOffen = false">
           <div v-if="showLaeuten" class="lbl">Läuten</div>
           <button v-if="canView('steuerung')" :class="{ active: view === 'steuerung' }" @click="view = 'steuerung'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2M5 10a7 7 0 0 1 14 0c0 5 2 6 2 6H3s2-1 2-6Z"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>Steuerung</button>
