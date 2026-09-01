@@ -8,6 +8,8 @@ Ablauf:
   - kommende Termine holen, per Regeln (Kalender + exakter Titel) auf PGS abbilden
   - zum Zeitpunkt (Start - Vorlauf) 'START:<PGS>:INSTANT' per MQTT senden
   - bereits ausgeloeste Termine werden gemerkt (state.json), kein Doppel-Laeuten
+  - alle 2 min ein Lebenszeichen nach ChurchTools schreiben, damit die Extension
+    warnen kann, wenn dieser Dienst nicht laeuft
 
 Start:  python scheduler.py         (laeuft dauerhaft)
         python scheduler.py --dry-run   (plant, loest aber NICHT aus)
@@ -22,7 +24,8 @@ import os
 import time
 
 from churchtools import ChurchTools
-from config import GatewayConfig, Rule, load_dotenv, load_from_churchtools
+from config import EXT_KEY, GatewayConfig, Rule, load_dotenv, load_from_churchtools
+from heartbeat import Heartbeat, mask_serial
 from notify import EmailNotifier
 from voco_mqtt import Voco, decode_name
 
@@ -31,6 +34,7 @@ HORIZON_HOURS = 26          # so weit im Voraus planen
 CONFIG_REFRESH_S = 300      # Konfig/Termine alle 5 min neu laden
 TICK_S = 20                 # so oft pruefen, ob etwas ansteht
 FIRE_WINDOW_S = 150         # Toleranz: bis 2,5 min nach Soll noch ausloesen
+HEARTBEAT_S = 120           # so oft ein Lebenszeichen nach ChurchTools schreiben
 
 log = logging.getLogger("voco-gateway")
 
@@ -191,10 +195,20 @@ def main():
     fired = load_state()
     plan: list[dict] = []
     last_refresh = 0.0
+    # Lebenszeichen: Ohne das sieht in der Extension niemand, ob dieser Dienst
+    # ueberhaupt laeuft – ein stiller Ausfall faellt sonst erst auf, wenn ein
+    # Gottesdienst ungelaeutet bleibt. 0.0 = gleich beim Start einmal senden.
+    beat = Heartbeat(ct, EXT_KEY)
+    last_beat = 0.0
 
     try:
         while True:
             now = time.time()
+            if now - last_beat > HEARTBEAT_S:
+                last_beat = now
+                beat.send(rules=len([r for r in cfg.rules if r.active and r.pgs_name]),
+                          simulation=dry,
+                          device=mask_serial(cfg.device.serial))
             if now - last_refresh > CONFIG_REFRESH_S:
                 try:
                     cfg = load_from_churchtools(ct)

@@ -138,6 +138,9 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 .gs-banner.sim-off .ic { color: var(--gs-dim); }
 .gs-banner.sim-off b { color: var(--gs-text); }
 .gs-banner b { color: var(--gs-head); font-weight: 700; }
+/* Gateway nicht erreichbar – deutlicher als die Simulationshinweise. */
+.gs-banner.gw-down { background: var(--gs-danger-tint); color: var(--gs-danger); border-color: color-mix(in srgb, var(--gs-danger) 35%, var(--gs-border)); }
+.gs-banner.gw-down b { color: var(--gs-danger); }
 .gs-banner .txt { flex: 1; }
 .gs-banner .txt small { color: var(--gs-dim); font-size: 13px; }
 
