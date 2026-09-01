@@ -37,9 +37,29 @@ NOTES_FILE="$(mktemp)"
 ARBEIT="$(mktemp -d)"
 trap 'rm -rf "${NOTES_FILE}" "${ARBEIT}"' EXIT
 
+# Der Dauerlink wird in jeder Beschreibung genannt. Auf die Reihenfolge kommt es
+# an: '/releases/latest/download/<datei>' liefert die Datei des NEUESTEN Release,
+# '/releases/download/latest/<datei>' dagegen die eines Release mit dem Tag
+# "latest" - also eine feste, alte Datei. Die beiden Formen sehen fast gleich
+# aus; steht der richtige in jeder Beschreibung, wird der falsche nicht
+# weitergegeben.
+REPO="${GITHUB_REPOSITORY:-}"
+if [ -z "${REPO}" ]; then
+  REPO="$(git remote get-url origin 2>/dev/null \
+    | sed -E 's#^.*github\.com[:/]##; s#\.git$##')"
+fi
+
 {
   printf 'Automatisch gebaute ChurchTools-Extension. Die ZIP unten herunterladen und\n'
   printf '**unveraendert** in ChurchTools hochladen (kein Entpacken noetig).\n\n'
+  if [ -n "${REPO}" ]; then
+    printf 'Dauerlink zur jeweils neuesten Fassung (bleibt immer gleich):\n'
+    printf 'https://github.com/%s/releases/latest/download/glockensteuerung.zip\n\n' "${REPO}"
+  fi
+  # Ab hier beginnt der Changelog. Die Extension zeigt beim Klick auf die
+  # Versionsnummer nur den Teil hinter dieser Marke - Einleitung und Dauerlink
+  # gehoeren nicht in das Fenster "Was ist neu".
+  printf '<!-- changelog -->\n\n'
   bash "${HIER}/changelog.sh" "${TAG}"
 } > "${NOTES_FILE}"
 
