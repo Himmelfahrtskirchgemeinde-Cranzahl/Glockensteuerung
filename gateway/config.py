@@ -30,7 +30,10 @@ class Rule:
     id: str
     name: str
     calendar_id: int | None
-    category: str | None
+    # Nur Termine mit GENAU diesem Titel. Verglichen wird der Termin-Titel, nicht
+    # mehr die Veranstaltungsart: Die haengt an einer verknuepften Veranstaltung
+    # und ist in der Praxis nicht gepflegt, wodurch solche Regeln nie griffen.
+    title: str | None
     pgs_name: str
     lead_minutes: int
     active: bool
@@ -61,7 +64,9 @@ def _to_rule(r: dict) -> Rule:
         id=str(r.get("id", "")),
         name=r.get("name", "Regel"),
         calendar_id=r.get("calendarId"),
-        category=r.get("category"),
+        # 'category' ist das Altfeld (Veranstaltungsart) – der dort eingetragene
+        # Text wird als Termin-Titel weiterverwendet, damit alte Regeln greifen.
+        title=r.get("title") or r.get("category") or None,
         pgs_name=r.get("pgsName", ""),
         lead_minutes=int(r.get("leadMinutes", 0) or 0),
         active=bool(r.get("active", True)),

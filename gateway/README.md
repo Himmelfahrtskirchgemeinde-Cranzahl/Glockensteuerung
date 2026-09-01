@@ -70,6 +70,6 @@ WantedBy=multi-user.target
 | Datei | Zweck |
 |---|---|
 | `scheduler.py` | Hauptdienst (Planung + Auslösung) |
-| `churchtools.py` | ChurchTools-API-Client (Termine/Events) |
+| `churchtools.py` | ChurchTools-API-Client (Kalender-Termine) |
 | `config.py` | lädt Gerät + Regeln aus ChurchTools (oder .env) |
 | `voco_mqtt.py` | MQTT-Client + CLI (`list`/`status`/`start`/`stop`) |

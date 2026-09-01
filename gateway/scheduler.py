@@ -5,7 +5,7 @@ ChurchTools-Termin-Zeit aus.
 
 Ablauf:
   - Konfiguration (Geraet + Regeln) aus ChurchTools laden (von der Extension gepflegt)
-  - kommende Termine/Veranstaltungen holen, per Regeln auf PGS abbilden
+  - kommende Termine holen, per Regeln (Kalender + exakter Titel) auf PGS abbilden
   - zum Zeitpunkt (Start - Vorlauf) 'START:<PGS>:INSTANT' per MQTT senden
   - bereits ausgeloeste Termine werden gemerkt (state.json), kein Doppel-Laeuten
 
@@ -68,12 +68,20 @@ def quiet_now() -> bool:
 
 
 def rule_matches(rule: Rule, occ: dict) -> bool:
+    """Passt die Regel auf dieses Termin-Vorkommen?
+
+    Deckungsgleich mit der Vorschau in der Extension (App.vue,
+    `loadNextRingings`) – sonst zeigt sie etwas anderes an, als real laeutet:
+      - Regel OHNE Titel → jeder Termin der gewaehlten Kalender.
+      - Regel MIT Titel  → nur Termine, deren Titel EXAKT uebereinstimmt.
+        „Gottesdienst" trifft also NICHT auch „Festgottesdienst".
+    """
     if not rule.active:
         return False
     if rule.calendar_id is not None and occ.get("calendarId") != rule.calendar_id:
         return False
-    if rule.category:
-        if (occ.get("category") or "").strip().lower() != rule.category.strip().lower():
+    if rule.title:
+        if (occ.get("title") or "").strip().lower() != rule.title.strip().lower():
             return False
     return True
 
@@ -81,13 +89,26 @@ def rule_matches(rule: Rule, occ: dict) -> bool:
 def build_schedule(ct: ChurchTools, cfg: GatewayConfig) -> list[dict]:
     """Liefert Liste geplanter Ausloesungen: {ts, key, pgs_name, title}."""
     today = dt.date.today()
-    to = today + dt.timedelta(hours=HORIZON_HOURS) + dt.timedelta(days=1)
-    cal_ids = sorted({r.calendar_id for r in cfg.rules if r.calendar_id})
-    occs = []
-    if cal_ids:
-        occs += ct.appointments(cal_ids, today, to)
-    if any(r.category for r in cfg.rules):
-        occs += ct.events(today, to)
+    # HORIZON_HOURS ab JETZT – spaet abends reicht ein Tag Aufschlag nicht,
+    # deshalb grosszuegig bis uebermorgen holen und unten exakt filtern.
+    to = today + dt.timedelta(days=HORIZON_HOURS // 24 + 2)
+
+    active = [r for r in cfg.rules if r.active and r.pgs_name]
+    if not active:
+        log.warning("Keine aktive Regel mit Laeuteprogramm – es wird nichts geplant.")
+        return []
+
+    cal_ids = {r.calendar_id for r in active if r.calendar_id}
+    # Eine Regel ohne Kalenderangabe gilt fuer ALLE Kalender – dann muessen auch
+    # alle abgefragt werden. Frueher wurden nur die Kalender geholt, die andere
+    # Regeln ausdruecklich nannten; gab es keine solche Regel, wurden gar keine
+    # Termine abgerufen und es wurde nie ausgeloest.
+    if any(r.calendar_id is None for r in active):
+        try:
+            cal_ids |= {c["id"] for c in ct.calendars() if c.get("id")}
+        except Exception as e:
+            log.error("Kalenderliste laden fehlgeschlagen: %s", e)
+    occs = ct.appointments(sorted(cal_ids), today, to) if cal_ids else []
 
     now_ts = time.time()
     horizon_ts = now_ts + HORIZON_HOURS * 3600
@@ -97,8 +118,8 @@ def build_schedule(ct: ChurchTools, cfg: GatewayConfig) -> list[dict]:
         if not start:
             continue
         start_ts = start.timestamp()
-        for rule in cfg.rules:
-            if not rule.pgs_name or not rule_matches(rule, occ):
+        for rule in active:
+            if not rule_matches(rule, occ):
                 continue
             fire_ts = start_ts - rule.lead_minutes * 60
             if fire_ts < now_ts - FIRE_WINDOW_S or fire_ts > horizon_ts:
@@ -110,6 +131,22 @@ def build_schedule(ct: ChurchTools, cfg: GatewayConfig) -> list[dict]:
                 "title": occ.get("title", ""),
             })
     plan.sort(key=lambda p: p["ts"])
+
+    # Leerer Plan darf nie unerklaert bleiben – sonst sucht man den Fehler im
+    # Nichts. Dieselbe Diagnose zeigt die Extension unter der leeren Vorschau.
+    if not plan:
+        gesucht = sorted({r.title.strip() for r in active if r.title})
+        vorhanden = sorted({o["title"] for o in occs if o.get("title")})[:12]
+        if not occs:
+            log.warning("Keine Ausloesung geplant: im Zeitraum liegen keine Termine "
+                        "in den Kalendern %s.", sorted(cal_ids) or "(keine)")
+        elif gesucht:
+            log.warning("Keine Ausloesung geplant: %d Termin(e) gefunden, aber kein Titel "
+                        "passt exakt. Gesucht: %s – vorhanden: %s",
+                        len(occs), ", ".join(gesucht), ", ".join(vorhanden) or "(ohne Titel)")
+        else:
+            log.warning("Keine Ausloesung geplant: %d Termin(e) gefunden, aber alle liegen "
+                        "ausserhalb des Zeitfensters (%d h).", len(occs), HORIZON_HOURS)
     return plan
 
 
