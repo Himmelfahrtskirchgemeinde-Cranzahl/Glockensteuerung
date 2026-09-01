@@ -79,7 +79,7 @@ class Heartbeat:
                     break
 
     # --- Schreiben ---------------------------------------------------------
-    def send(self, *, rules: int, simulation: bool, device: str) -> bool:
+    def send(self, *, rules: int, simulation: bool, device: str, mail: bool = False) -> bool:
         """Schreibt einen Schlag. Gibt zurueck, ob es geklappt hat.
 
         Wirft NIE – ein fehlendes Lebenszeichen darf den Laeutebetrieb nicht
@@ -90,6 +90,10 @@ class Heartbeat:
             "rules": rules,
             "simulation": simulation,
             "device": device,
+            # Kann die Extension ihr Feedback per E-Mail schicken? Sie kann das
+            # nicht selbst beantworten: Die Zugangsdaten liegen in der Kategorie
+            # 'email', die normale Benutzer nicht lesen duerfen.
+            "mail": mail,
         }
         try:
             self._resolve()
