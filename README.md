@@ -65,7 +65,7 @@ extension/   ChurchTools-Extension (Vue 3 + Vite)
 gateway/     Python-Dienst (Automatik + MQTT)
 docs/        VOCO-MQTT-Protokoll.md · mockup/ (Design) · handbuch/ (HEW-Handbücher)
 ANLEITUNG.md Schritt-für-Schritt-Anleitung
-.github/scripts/  release.sh (Release je Versionsgruppe) · changelog.sh
+.github/scripts/  release.sh (Release je Version) · changelog.sh
 ```
 
 ## Changelog-Zeile je Commit

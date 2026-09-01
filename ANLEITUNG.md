@@ -78,18 +78,17 @@ GitHub baut die Extension automatisch. So kommt ihr an die ZIP:
 
 Immer die aktuelle Fassung, der Link ändert sich nie:
 
-<https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/download/latest/glockensteuerung.zip>
+<https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest/download/glockensteuerung.zip>
 
 Herunterladen und **unverändert** in ChurchTools hochladen – kein Entpacken. Der
-Link zeigt immer auf den letzten Stand von `main`; welche Version das gerade ist,
-steht im Release **„Aktueller Build (main)"**. Diesen Link kann man sich merken
-oder weitergeben.
+Link zeigt immer auf das neueste Release; welche Version das ist, steht dort im
+Titel. Diesen Link kann man sich merken oder weitergeben.
 
 **Eine bestimmte Version (Archiv):**
 
-Unter **Releases** liegt je Versionsgruppe ein Eintrag („Release 26.5"), der alle
-Patch-Versionen dieser Gruppe als `glockensteuerung-vX.Y.Z.zip` sammelt. Nur
-nötig, wenn ihr gezielt eine ältere Fassung braucht.
+Unter **Releases** hat jede Version einen eigenen Eintrag („Version 26.6.1") mit
+ihrem Changelog und der Datei `glockensteuerung-vX.Y.Z.zip`. Nur nötig, wenn ihr
+gezielt eine ältere Fassung braucht.
 
 **Oder als schneller Test-Build (ohne Tag):**
 
