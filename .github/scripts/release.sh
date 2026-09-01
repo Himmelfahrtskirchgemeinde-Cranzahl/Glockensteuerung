@@ -28,8 +28,8 @@ INTRO="Automatisch gebaute ChurchTools-Extension. Die ZIP unten herunterladen un
 # ein neuer Abschnitt OBEN einfuegen, ohne die bisherigen zu verlieren.
 MARKER="<!-- changelog -->"
 
-ABSCHNITT="$(printf '## %s – %s\n\n%s' \
-  "${TAG}" "$(date -u +%d.%m.%Y)" \
+ABSCHNITT="$(printf '## %s\n\n%s' \
+  "${TAG}" \
   "$(bash "${HIER}/changelog.sh" "${TAG}")")"
 
 # Bestehendes Release dieser Gruppe ueber den Titel finden.
@@ -43,7 +43,7 @@ if [ -n "${EXIST_TAG}" ]; then
   echo "Release '${TITLE}' vorhanden (Tag ${EXIST_TAG}) -> auf ${TAG} umhaengen."
   OLD_BODY="$(gh release view "${EXIST_TAG}" --json body --jq .body 2>/dev/null || true)"
 
-  if printf '%s' "${OLD_BODY}" | grep -qF -- "## ${TAG} "; then
+  if printf '%s\n' "${OLD_BODY}" | grep -qxF -- "## ${TAG}"; then
     # Version schon eingetragen (Workflow lief erneut) - Text unveraendert lassen.
     echo "Version ${TAG} steht bereits in der Beschreibung."
     printf '%s' "${OLD_BODY}" > "${NOTES_FILE}"
