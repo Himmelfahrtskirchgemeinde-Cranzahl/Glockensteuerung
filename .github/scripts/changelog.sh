@@ -19,6 +19,11 @@
 # Commits ohne solche Zeile tauchen im Changelog nicht auf - das ist Absicht:
 # CI-Anpassungen, Refactorings und Tippfehler interessieren Anwender nicht.
 #
+# Wird eine Aenderung noch vor der Veroeffentlichung wieder verworfen, nimmt ein
+# spaeterer Commit ihre Zeile zurueck - Wort fuer Wort, nur unter anderem Namen:
+#
+#     Changelog-entfaellt: <Art> | <Bereich> | <derselbe Satz>
+#
 # Aufruf:  changelog.sh <tag> [<vorheriger-tag>]
 #          Ohne zweiten Parameter wird der vorherige Versions-Tag selbst gesucht.
 set -euo pipefail
@@ -36,12 +41,48 @@ fi
 
 if [ -n "${PREV}" ]; then RANGE="${PREV}..${TAG}"; else RANGE="${TAG}"; fi
 
+# Felder trimmen und einheitlich mit " | " zusammensetzen. Nur so laesst sich
+# ein Eintrag spaeter zuverlaessig wiederfinden - ob jemand "Verbesserung|Geraet"
+# oder "Verbesserung  |  Geraet" geschrieben hat, darf keine Rolle spielen.
+norm() {
+  awk -F'|' '{
+    art=$1; ber=$2; txt=$3; for (i=4; i<=NF; i++) txt = txt "|" $i;
+    gsub(/^[ \t]+|[ \t]+$/, "", art);
+    gsub(/^[ \t]+|[ \t]+$/, "", ber);
+    gsub(/^[ \t]+|[ \t]+$/, "", txt);
+    if (art == "" && ber == "" && txt == "") next;
+    print art " | " ber " | " txt
+  }'
+}
+
+sammle() {  # sammle <Trailer-Name>
+  git log --no-merges --format='%B' "${RANGE}" 2>/dev/null \
+    | grep -E "^[[:space:]]*$1:" \
+    | sed -E "s/^[[:space:]]*$1:[[:space:]]*//" \
+    | norm \
+    | sort -u || true
+}
+
 # Alle Changelog-Zeilen des Bereichs einsammeln. Doppelte entfernen: Ein Commit
 # kann ueber einen Merge zweimal in der Liste auftauchen.
-ENTRIES="$(git log --no-merges --format='%B' "${RANGE}" 2>/dev/null \
-  | grep -E '^[[:space:]]*Changelog:' \
-  | sed -E 's/^[[:space:]]*Changelog:[[:space:]]*//' \
-  | sort -u || true)"
+ENTRIES="$(sammle 'Changelog')"
+
+# Zurueckgezogene Eintraege abziehen.
+#
+# Wird eine Aenderung im selben Release-Zeitraum wieder verworfen oder ersetzt,
+# bliebe ihr Satz sonst im Changelog stehen und behauptete etwas Falsches - die
+# Zeile im alten Commit laesst sich ja nicht mehr aendern. Ein spaeterer Commit
+# nimmt sie mit derselben Zeile unter anderem Namen zurueck:
+#
+#     Changelog-entfaellt: <Art> | <Bereich> | <derselbe Satz>
+#
+# Nach der Veroeffentlichung wirkt das nicht mehr: Der naechste Release-Bereich
+# beginnt beim neuen Tag, beide Zeilen liegen dann dahinter.
+ZURUECK="$(sammle 'Changelog-entfaellt')"
+if [ -n "${ZURUECK}" ]; then
+  ENTRIES="$(printf '%s\n' "${ENTRIES}" \
+    | grep -vxF -f <(printf '%s\n' "${ZURUECK}") || true)"
+fi
 
 if [ -z "${ENTRIES}" ]; then
   echo "_Nur interne Anpassungen - fuer Anwender aendert sich nichts._"
