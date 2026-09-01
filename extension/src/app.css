@@ -269,7 +269,8 @@ button.ver:focus-visible { outline: 2px solid var(--gs-blue); outline-offset: 2p
      Hamburger sichtbar bleibt und dasselbe Antippen es wieder schließt. */
   .gs-subnav {
     position: fixed; top: 52px; left: 0; bottom: 0; z-index: 44;
-    width: min(280px, 82vw);
+    width: min(320px, 86vw);
+    padding: 10px 12px 28px;
     transform: translateX(-100%);
     transition: transform .22s ease;
     border-right: 1px solid var(--gs-border); border-bottom: none;
@@ -278,9 +279,19 @@ button.ver:focus-visible { outline: 2px solid var(--gs-blue); outline-offset: 2p
   }
   .gs-subnav.offen { transform: none; }
   .gs-navback { display: block; position: fixed; inset: 52px 0 0; z-index: 43; background: rgba(16, 24, 40, .38); }
-  /* Trefferflächen fürs Tippen – mit dem Standard-Innenabstand blieben die
-     Einträge unter 40px. */
-  .gs-subnav button { min-height: 44px; }
+  /* Ausgeklappt darf es luftig sein: Der Platz ist da, und getippt wird mit dem
+     Daumen, nicht mit dem Mauszeiger. Trefferfläche 48px. */
+  .gs-subnav button { min-height: 48px; padding: 12px; gap: 13px; font-size: 15px; }
+  .gs-subnav button svg { width: 20px; height: 20px; }
+  /* Die Gruppenüberschriften als richtige Überschriften statt als kleine graue
+     Versalien – in einem Menü dieser Größe tragen sie die Gliederung. Am
+     Schreibtisch, wo die Leiste schmal danebensteht, bleiben sie dezent. */
+  .gs-subnav .lbl {
+    font-size: 14.5px; font-weight: 700; text-transform: none;
+    letter-spacing: 0; color: var(--gs-head); padding: 18px 12px 6px;
+  }
+  .gs-subnav .cnt { font-size: 12.5px; }
+  .gs-subfoot { padding: 18px 12px 2px; font-size: 12px; }
 
   .gs-content { padding: 14px 12px 40px; }
   .gs-head { padding: 13px 14px; }
