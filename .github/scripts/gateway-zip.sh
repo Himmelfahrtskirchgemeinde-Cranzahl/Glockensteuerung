@@ -17,6 +17,9 @@
 # der Gemeinde auf. Zugangsdaten stehen ohnehin nie in einem Modul, sondern in
 # der .env; dass keine mitreist, prueft das Skript am Ende ausdruecklich nach.
 #
+# Im Archiv liegt ein Ordner 'gateway' - so heisst er auch im Repository. Wer
+# beides nebeneinander benutzt, findet sich damit ohne Nachdenken zurecht.
+#
 # Aufruf:  gateway-zip.sh [<version>] <zielverzeichnis>
 #          Ohne Version wird sie wie bei der Extension aus 'git describe' geholt.
 set -euo pipefail
@@ -38,7 +41,7 @@ BEIGABEN=(requirements.txt README.md .env.example)
 
 ARBEIT="$(mktemp -d)"
 trap 'rm -rf "${ARBEIT}"' EXIT
-INNEN="${ARBEIT}/glockensteuerung-gateway"
+INNEN="${ARBEIT}/gateway"
 mkdir -p "${INNEN}"
 
 # Nur die oberste Ebene: Unterordner des Arbeitsplatzes (.venv, __pycache__)
@@ -81,6 +84,6 @@ mkdir -p "${ZIEL}"
 ZIEL="$(cd "${ZIEL}" && pwd)"
 ARCHIV="${ZIEL}/glockensteuerung-gateway-v${VERSION}.zip"
 rm -f "${ARCHIV}"
-( cd "${ARBEIT}" && zip -q -r "${ARCHIV}" glockensteuerung-gateway )
+( cd "${ARBEIT}" && zip -q -r "${ARCHIV}" gateway )
 
 echo "${ARCHIV}"

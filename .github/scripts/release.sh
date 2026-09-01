@@ -13,11 +13,14 @@
 # Also bekommt jede Version ihr eigenes Release. Das ist ohnehin die Form, auf
 # die GitHub mit dieser Einstellung hinauswill.
 #
-# Jedes Release traegt zu jedem Archiv ZWEI Dateien:
-#   glockensteuerung-v<version>.zip           das Archiv dieser Version
-#   glockensteuerung.zip                      derselbe Inhalt unter festem Namen
-#   glockensteuerung-gateway-v<version>.zip   der Dienst fuer den eigenen Rechner
-#   glockensteuerung-gateway.zip              derselbe Inhalt unter festem Namen
+# Jedes Release traegt genau zwei Dateien, beide unter festem Namen:
+#   glockensteuerung.zip           die Erweiterung fuer ChurchTools
+#   glockensteuerung-gateway.zip   der Dienst fuer den eigenen Rechner
+#
+# Ohne Versionsnummer im Dateinamen: Das Release heisst "Version 26.6.7", damit
+# ist die Zuordnung eindeutig. Zwei Dateien mit demselben Inhalt und nur anderem
+# Namen danebenzulegen, brachte niemandem etwas. Die gebauten Archive tragen die
+# Nummer weiterhin - dort, als Bauergebnis, ist sie nuetzlich.
 #
 # Der feste Name macht den Dauerlink moeglich, ohne je ein Release nachtraeglich
 # anfassen zu muessen: GitHub liefert unter
@@ -71,16 +74,17 @@ fi
   bash "${HIER}/changelog.sh" "${TAG}"
 } > "${NOTES_FILE}"
 
-# Zu jedem Archiv eine feste Kopie daneben legen. Ohne sie gaebe es keinen Link
-# zum Weitergeben - der Name der versionierten ZIP wechselt ja mit jeder Version.
+# Die Versionsnummer aus dem Dateinamen nehmen: Nur unter festem Namen bleibt der
+# Dauerlink gueltig, und welche Version darin steckt, sagt der Titel des Release.
 # Aus 'glockensteuerung-gateway-v26.6.7.zip' wird 'glockensteuerung-gateway.zip'.
 DATEIEN=()
 for z in "${ZIPS[@]}"; do
   [ -f "${z}" ] || continue
-  DATEIEN+=("${z}")
   basis="$(basename "${z}")"
   fest="$(printf '%s' "${basis}" | sed -E 's/-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+-g[0-9a-f]+)?\.zip$/.zip/')"
-  if [ "${fest}" != "${basis}" ]; then
+  if [ "${fest}" = "${basis}" ]; then
+    DATEIEN+=("${z}")          # traegt schon einen festen Namen
+  else
     cp "${z}" "${ARBEIT}/${fest}"
     DATEIEN+=("${ARBEIT}/${fest}")
   fi
