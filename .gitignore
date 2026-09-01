@@ -31,3 +31,7 @@ releases/
 # Gateway-Laufzeitstatus
 state.json
 gateway/state.json
+
+# Vom Dienst nachgeladenes Zwischenzertifikat (siehe gateway/tls.py) - es
+# entsteht auf jedem Rechner neu und gehoert nicht ins Repository.
+gateway/zwischenzertifikat.pem

@@ -87,7 +87,7 @@ class EmailNotifier:
             msg["Date"] = formatdate(localtime=True)
             msg.set_content(body)
             if self.use_ssl:
-                with smtplib.SMTP_SSL(self.host, self.port, context=tls.context(), timeout=20) as s:
+                with smtplib.SMTP_SSL(self.host, self.port, context=tls.context_fuer(self.host, self.port), timeout=20) as s:
                     self._login_send(s, msg)
             else:
                 with smtplib.SMTP(self.host, self.port, timeout=20) as s:
