@@ -37,7 +37,16 @@ export interface MappingRule {
     id: string;             // lokale UUID
     name: string;           // sprechender Name der Regel
     calendarId: number | null;   // optional: nur dieser Kalender
-    category: string | null;     // optional: nur diese Veranstaltungsart/Kategorie
+    /**
+     * Optional: nur Termine mit GENAU diesem Titel. Verglichen wird der Titel
+     * des Kalender-Termins, nicht mehr die Veranstaltungsart: Eine Art laesst
+     * sich einem Termin gar nicht direkt zuweisen – sie haengt an einer
+     * verknuepften Veranstaltung, die es in der Praxis meist nicht gibt.
+     * Der Titel steht dagegen immer am Termin.
+     */
+    title: string | null;
+    /** Altfeld (Veranstaltungsart). Wird beim Laden nach `title` uebernommen. */
+    category?: string | null;
     pgsName: string;        // Anzeigename des Sofort-PGS, der ausgeloest wird
     leadMinutes: number;    // Vorlauf: X Minuten vor Terminbeginn ausloesen
     active: boolean;
@@ -100,7 +109,7 @@ export class ConfigStore {
         // Es gehört NICHT in eine separat berechtigte „Gerät"-Kategorie – sonst sieht
         // ein reiner Betrachter das Gerät als nicht eingerichtet.
         await this.loadFrom('steuerung', 'device', (d) => { cfg.device = d as DeviceConfig; });
-        await this.loadFrom('regeln', 'rules', (d) => { cfg.rules = (d as MappingRule[]) ?? []; });
+        await this.loadFrom('regeln', 'rules', (d) => { cfg.rules = migrateRules(d as MappingRule[]); });
         await this.loadFrom('steuerung', 'control', (d) => {
             const c = (d ?? {}) as Partial<{ simulate: boolean; durations: Record<string, number> }>;
             this.control = { simulate: c.simulate ?? true, durations: c.durations ?? {} };
@@ -173,9 +182,23 @@ export function newRule(): MappingRule {
         id: Math.random().toString(36).slice(2),
         name: 'Neue Regel',
         calendarId: null,
-        category: null,
+        title: null,
         pgsName: '',
         leadMinutes: 15,
         active: true,
     };
+}
+
+/**
+ * Uebernimmt gespeicherte Regeln, die noch das Altfeld `category`
+ * (Veranstaltungsart) tragen: Der dort eingetragene Text wird als Termin-Titel
+ * weiterverwendet. In der Praxis stand dort ohnehin derselbe Text, der auch im
+ * Termin steht („Gottesdienst"). Beim naechsten Speichern verschwindet das
+ * Altfeld von selbst.
+ */
+function migrateRules(rules: MappingRule[] | null | undefined): MappingRule[] {
+    return (rules ?? []).map((r) => {
+        const { category, ...rest } = r;
+        return { ...rest, title: r.title ?? category ?? null };
+    });
 }

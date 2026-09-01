@@ -63,8 +63,9 @@ der Gateway erwartet (`VOCO_EXT_KEY`).
 - **Status:** Gerät online?, Liste der startbaren Sofort-PGS.
 - **Manuell auslösen/stoppen** (mit Sicherheitsabfrage – löst echtes Läuten aus).
 - **Gerät konfigurieren:** Seriennummer, Geräte-Passwort, Broker-URL.
-- **Automatik-Regeln:** je Regel Kalender und/oder Veranstaltungsart → PGS +
-  Vorlaufzeit. Gespeichert im ChurchTools-KV-Store (`custommodules`).
+- **Automatik-Regeln:** je Regel Kalender und/oder Termin-Titel (exakter
+  Vergleich) → PGS + Vorlaufzeit. Gespeichert im ChurchTools-KV-Store
+  (`custommodules`).
 
 ## 🔐 Sicherheit & Berechtigungen
 
