@@ -21,9 +21,12 @@ Basiert auf dem offiziellen
 
 ## ZIP für ChurchTools bekommen
 
-- **Empfohlen – Release:** Einen Versions-Tag (`v*`) pushen; der Workflow hängt
-  die **fertige, direkt installierbare ZIP** an ein **Release**. Dort liegt sie
-  als **einzelne Datei** – herunterladen und **unverändert** hochladen.
+- **Empfohlen – fester Link:** [`glockensteuerung.zip`](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/download/latest/glockensteuerung.zip)
+  im Release „Aktueller Build (main)". Der Dateiname enthält **keine** Version,
+  deshalb bleibt der Link dauerhaft gültig und zeigt immer auf den letzten
+  `main`-Stand. Herunterladen und **unverändert** hochladen.
+- **Bestimmte Version:** Die Releases je Versionsgruppe („Release 26.5")
+  sammeln die versionierten `glockensteuerung-vX.Y.Z.zip` als Archiv.
 - **Actions-Artifact:** Repo-Tab **Actions** → Workflow „ChurchTools-Extension
   bauen (ZIP)" → **Run workflow**; ZIP unter *Artifacts*.
   > ⚠️ **Wichtig:** GitHub verpackt jedes Artifact **noch einmal** in eine ZIP →
