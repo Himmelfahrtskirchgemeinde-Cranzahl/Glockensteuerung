@@ -22,8 +22,15 @@
 const REPO = 'Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung';
 const RELEASES_API = `https://api.github.com/repos/${REPO}/releases/latest`;
 
-/** Fester Download-Link – ändert sich nie (siehe .github/workflows). */
-export const DOWNLOAD_URL = `https://github.com/${REPO}/releases/download/latest/glockensteuerung.zip`;
+/**
+ * Fester Download-Link – ändert sich nie.
+ *
+ * `/releases/latest/download/<datei>` ist ein Weg, den GitHub selbst anbietet:
+ * Er liefert immer die gleichnamige Datei des neuesten Releases. Jedes Release
+ * trägt dafür neben der versionierten ZIP eine `glockensteuerung.zip` unter
+ * festem Namen (siehe .github/scripts/release.sh).
+ */
+export const DOWNLOAD_URL = `https://github.com/${REPO}/releases/latest/download/glockensteuerung.zip`;
 
 /** Übersicht aller Releases – Rückfallweg, wenn der Changelog nicht ladbar ist. */
 export const RELEASES_URL = `https://github.com/${REPO}/releases`;
