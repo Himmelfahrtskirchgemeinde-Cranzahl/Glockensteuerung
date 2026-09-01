@@ -7,9 +7,15 @@
 #
 #     Changelog: <Art> | <Bereich> | <Satz fuer Anwender>
 #
-#   <Art>     Verbesserung | Fehler | Loeschung      (auch mit Umlaut/Plural)
-#   <Bereich> frei, z. B. Allgemein, Steuerung, Automatik, Geraet, Gateway
+#   <Art>     Verbesserung | Fehler | Löschung      (auch ohne Umlaut/im Plural)
+#   <Bereich> frei, z. B. Allgemein, Steuerung, Automatik, Gerät, Gateway
 #   <Satz>    ein ganzer Satz in Anwendersprache, nicht der Commit-Betreff
+#
+# Der Satz und der Bereich werden gelesen, nicht ausgefuehrt: Sie gehoeren in
+# richtiges Deutsch, mit Umlauten und Anfuehrungszeichen. Quelltext und
+# Konsolenausgaben bleiben dagegen bewusst bei ASCII - die Windows-Konsole
+# verschluckt sich je nach Zeichensatz an Umlauten, eine Release-Beschreibung
+# auf github.com nicht.
 #
 # Warum ueberhaupt so? Commit-Betreffe beschreiben die AENDERUNG AM CODE
 # ("Termin-Titel exakt vergleichen statt Veranstaltungsart"). Eine Release-Notiz
@@ -27,6 +33,19 @@
 # Aufruf:  changelog.sh <tag> [<vorheriger-tag>]
 #          Ohne zweiten Parameter wird der vorherige Versions-Tag selbst gesucht.
 set -euo pipefail
+
+# Umlaute muessen unversehrt durch grep, sed, awk und sort kommen. Ohne
+# UTF-8-Locale arbeiten die Werkzeuge byteweise; das geht fuer den Text gut,
+# 'tolower' auf der Art ("Löschung") aber nur zufaellig. Eine vorhandene Locale
+# wird deshalb gesetzt - und keine erfunden, sonst warnt jedes Werkzeug.
+if [ -z "${LC_ALL:-}" ]; then
+  for kandidat in C.UTF-8 C.utf8 en_US.UTF-8 de_DE.UTF-8; do
+    if locale -a 2>/dev/null | grep -qix -- "${kandidat}"; then
+      export LC_ALL="${kandidat}"
+      break
+    fi
+  done
+fi
 
 TAG="${1:?Aufruf: changelog.sh <tag> [<vorheriger-tag>]}"
 PREV="${2:-}"
