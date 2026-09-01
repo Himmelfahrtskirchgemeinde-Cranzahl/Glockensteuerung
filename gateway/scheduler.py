@@ -10,6 +10,7 @@ Ablauf:
   - bereits ausgeloeste Termine werden gemerkt (state.json), kein Doppel-Laeuten
   - alle 2 min ein Lebenszeichen nach ChurchTools schreiben, damit die Extension
     warnen kann, wenn dieser Dienst nicht laeuft
+  - den Postausgang der Extension abarbeiten (Feedback, Stoerungsmeldungen)
 
 Start:  python scheduler.py         (laeuft dauerhaft)
         python scheduler.py --dry-run   (plant, loest aber NICHT aus)
@@ -27,12 +28,14 @@ from churchtools import ChurchTools
 from config import EXT_KEY, GatewayConfig, Rule, load_dotenv, load_from_churchtools
 from heartbeat import Heartbeat, mask_serial
 from notify import EmailNotifier
+import outbox
 from voco_mqtt import Voco, decode_name
 
 STATE_FILE = os.environ.get("VOCO_STATE_FILE", "state.json")
 HORIZON_HOURS = 26          # so weit im Voraus planen
 CONFIG_REFRESH_S = 300      # Konfig/Termine alle 5 min neu laden
 TICK_S = 20                 # so oft pruefen, ob etwas ansteht
+OUTBOX_S = 60               # so oft den Postausgang der Extension abarbeiten
 FIRE_WINDOW_S = 150         # Toleranz: bis 2,5 min nach Soll noch ausloesen
 HEARTBEAT_S = 120           # so oft ein Lebenszeichen nach ChurchTools schreiben
 
@@ -177,6 +180,8 @@ def main():
 
     ct = ChurchTools(base, token)
     cfg = load_from_churchtools(ct)
+    # Zugangsdaten aus der Extension haben Vorrang vor der .env.
+    notifier.uebernehmen(cfg.email)
     if not cfg.device:
         raise SystemExit("Kein Geraet konfiguriert (Extension oder .env: VOCO_SERIAL/VOCO_DEVICE_PW)")
 
@@ -200,6 +205,7 @@ def main():
     # Gottesdienst ungelaeutet bleibt. 0.0 = gleich beim Start einmal senden.
     beat = Heartbeat(ct, EXT_KEY)
     last_beat = 0.0
+    last_outbox = 0.0
 
     try:
         while True:
@@ -209,9 +215,21 @@ def main():
                 beat.send(rules=len([r for r in cfg.rules if r.active and r.pgs_name]),
                           simulation=dry,
                           device=mask_serial(cfg.device.serial))
+
+            # Was die Extension in den Postausgang gestellt hat, verschicken.
+            # Nicht bei jedem Tick: Es sind zwei Abfragen, und niemand wartet
+            # auf die Sekunde.
+            if now - last_outbox > OUTBOX_S:
+                last_outbox = now
+                try:
+                    outbox.verarbeiten(ct, cfg, notifier)
+                except Exception as e:
+                    # Ein klemmender Postausgang darf das Laeuten nicht anhalten.
+                    log.warning("Postausgang konnte nicht verarbeitet werden: %s", e)
             if now - last_refresh > CONFIG_REFRESH_S:
                 try:
                     cfg = load_from_churchtools(ct)
+                    notifier.uebernehmen(cfg.email)
                     plan = build_schedule(ct, cfg)
                     voco.request_list()
                     last_refresh = now

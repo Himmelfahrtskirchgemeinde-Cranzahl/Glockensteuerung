@@ -1,8 +1,12 @@
 """
 E-Mail-Benachrichtigung bei Fehlern (automatisches Log-System).
 
-Sendet bei Fehlern eine E-Mail an EMAIL_TO (Standard: josua.hess@icloud.com).
-Konfiguration per .env (SMTP eines beliebigen Postausgangs):
+Sendet bei Fehlern eine E-Mail an EMAIL_TO und verschickt, was die Extension in
+den Postausgang gestellt hat (siehe outbox.py).
+
+Die Zugangsdaten kommen bevorzugt aus der Extension (Kategorie 'email'), damit
+sie sich ohne Zugriff auf den Server aendern lassen. Fehlt dort ein Host, gilt
+die .env:
     SMTP_HOST, SMTP_PORT (Standard 587), SMTP_USER, SMTP_PASS
     SMTP_TLS=1 (STARTTLS, Standard) oder SMTP_SSL=1 (Port 465)
     EMAIL_FROM (Standard = SMTP_USER), EMAIL_TO (Standard josua.hess@icloud.com)
@@ -36,21 +40,43 @@ class EmailNotifier:
         self.min_interval = int(os.environ.get("EMAIL_MIN_INTERVAL", "3600"))  # Spam-Sperre je Betreff
         self._last: dict[str, float] = {}
         self._warned = False
+        # Stoerungsmeldungen ueberhaupt verschicken? Aus der Extension steuerbar.
+        self.send_errors = True
 
     @property
     def enabled(self) -> bool:
         return bool(self.host)
 
-    def notify(self, subject: str, body: str, dedup_key: str | None = None):
+    def uebernehmen(self, cfg) -> None:
+        """Zugangsdaten aus der Extension uebernehmen (Kategorie 'email').
+
+        Sie haben Vorrang vor der .env, damit sich der Postausgang aendern
+        laesst, ohne an den Server zu muessen. Fehlt dort ein Host, bleibt es
+        bei dem, was in der .env steht.
+        """
+        if cfg is None or not getattr(cfg, "host", ""):
+            return
+        self.host = cfg.host
+        self.port = cfg.port or 587
+        self.user = cfg.user
+        self.password = cfg.password
+        self.use_ssl = cfg.security == "ssl"
+        self.use_tls = not self.use_ssl
+        self.mail_from = cfg.mail_from or cfg.user or "voco-gateway@localhost"
+        self.mail_to = cfg.mail_to or self.mail_to
+        self.send_errors = cfg.send_errors
+
+    def notify(self, subject: str, body: str, dedup_key: str | None = None) -> bool:
+        """Verschickt eine E-Mail. Gibt zurueck, ob sie rausging."""
         if not self.enabled:
             if not self._warned:
-                log.info("E-Mail-Benachrichtigung nicht konfiguriert (SMTP_HOST fehlt) – Fehler nur im Log.")
+                log.info("E-Mail-Versand nicht eingerichtet (kein Postausgang) – Meldungen nur im Log.")
                 self._warned = True
-            return
+            return False
         key = dedup_key or subject
         now = time.time()
         if now - self._last.get(key, 0) < self.min_interval:
-            return  # kürzlich schon gemeldet
+            return False  # kürzlich schon gemeldet
         self._last[key] = now
         try:
             msg = EmailMessage()
@@ -67,9 +93,11 @@ class EmailNotifier:
                     if self.use_tls:
                         s.starttls(context=ssl.create_default_context())
                     self._login_send(s, msg)
-            log.info("Fehler-E-Mail an %s gesendet: %s", self.mail_to, subject)
+            log.info("E-Mail an %s gesendet: %s", self.mail_to, subject)
+            return True
         except Exception as e:
             log.warning("E-Mail-Versand fehlgeschlagen: %s", e)
+            return False
 
     def _login_send(self, s: smtplib.SMTP, msg: EmailMessage):
         if self.user:
@@ -83,6 +111,8 @@ class EmailNotifier:
         class _H(logging.Handler):
             def emit(self, record: logging.LogRecord):
                 try:
+                    if not notifier.send_errors:
+                        return
                     body = self.format(record)
                     notifier.notify(record.getMessage()[:120], body, dedup_key=record.getMessage()[:60])
                 except Exception:
