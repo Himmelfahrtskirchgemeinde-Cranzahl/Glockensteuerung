@@ -655,14 +655,14 @@ async function loadNextRingings() {
         <span v-if="!loading && !bootError" class="gs-pill" :class="simulate ? 'blue' : 'warn'">
           {{ simulate ? 'Simulation' : 'SCHARF' }}
         </span>
-        <span v-if="online === true" class="gs-pill ok"><span class="dot"></span> Gerät online</span>
+        <span v-if="online === true" class="gs-pill ok"><span class="dot"></span> <span class="ptxt">Gerät </span>online</span>
         <span v-else-if="online === false" class="gs-pill warn"><span class="dot"></span> offline</span>
         <span v-else class="gs-pill muted"><span class="dot"></span> verbinde …</span>
         <button class="gs-btn gs-ghost" @click="requestSync">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>Aktualisieren</button>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg><span class="btxt">Aktualisieren</span></button>
         <span class="gs-vdiv"></span>
         <button class="gs-btn gs-ghost" @click="showFeedback = true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></svg>Feedback<span v-if="errorCount" class="gs-badge">{{ errorCount }}</span></button>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></svg><span class="btxt">Feedback</span><span v-if="errorCount" class="gs-badge">{{ errorCount }}</span></button>
     </header>
 
     <div class="gs-main">
@@ -765,7 +765,7 @@ async function loadNextRingings() {
             <!-- Nächste automatische Läutungen (nur Anzeige, aus Regeln × Terminen) -->
             <section class="gs-card">
               <div class="gs-head"><h2>Nächste automatische Läutungen</h2><span class="gs-spacer"></span>
-                <button class="gs-btn gs-ghost sm" @click="loadNextRingings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>Aktualisieren</button></div>
+                <button class="gs-btn gs-ghost sm" @click="loadNextRingings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg><span class="btxt">Aktualisieren</span></button></div>
               <div class="gs-body">
                 <p v-if="nextRingings.length === 0 && !ringingHint" class="gs-empty">(keine anstehenden Läutungen aus den Regeln in den nächsten 30 Tagen)</p>
                 <p v-else-if="ringingHint" class="gs-readonly" style="margin-bottom:0">
