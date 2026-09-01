@@ -101,6 +101,8 @@ WantedBy=multi-user.target
 | `churchtools.py` | ChurchTools-API-Client (Kalender-Termine) |
 | `config.py` | lädt Gerät + Regeln aus ChurchTools (oder .env) |
 | `voco_mqtt.py` | MQTT-Client + CLI (`list`/`status`/`start`/`stop`) |
+| `tls.py` | Wurzelzertifikate für MQTT und E-Mail |
+| `diagnose.py` | prüft, warum eine verschlüsselte Verbindung scheitert |
 
 ## Wenn die Verbindung am Zertifikat scheitert
 
@@ -111,22 +113,41 @@ ssl.SSLCertVerificationError: [SSL: CERTIFICATE_VERIFY_FAILED]
 certificate verify failed: unable to get local issuer certificate
 ```
 
-Grund ist nicht das Geraet, sondern die Python-Installation: Sie bringt keine
-Wurzelzertifikate mit und benutzt auch nicht den Windows-Zertifikatsspeicher.
-Der Dienst gibt deshalb das Bundle von `certifi` ausdruecklich mit; es wird mit
-den Abhaengigkeiten installiert. Bleibt der Fehler:
+Dahinter stecken zwei verschiedene Ursachen, die dieselbe Meldung erzeugen.
+Welche es ist, sagt die Diagnose:
+
+```
+python -m diagnose
+```
+
+Sie nennt die benutzten Zertifikatsquellen und vor allem, **wer das Zertifikat
+des Brokers ausgestellt hat**. Zugangsdaten braucht sie keine.
+
+**Aussteller ist eine öffentliche Stelle** (Let's Encrypt, DigiCert, Sectigo …):
+Dann fehlen nur Wurzelzertifikate. Python bringt unter Windows keine mit. Der
+Dienst nutzt deshalb das Bundle von `certifi`, das mit den Abhängigkeiten
+installiert wird. Bleibt der Fehler:
 
 ```
 pip install --upgrade certifi
 ```
 
-Hinter einem Firmen-Proxy mit eigener Zertifizierungsstelle deren Bundle
-eintragen - geprueft wird weiterhin, nur eben gegen diese Stelle:
+**Aussteller ist ein Virenscanner, eine Firewall oder die eigene Firma:** Dann
+wird die Verbindung aufgebrochen und im laufenden Betrieb neu ausgestellt.
+`certifi` kann davon nichts wissen — und wird es auch nie. Deren Zertifikat
+exportieren (Windows-Zertifikatsspeicher, „Vertrauenswürdige
+Stammzertifizierungsstellen", Format Base-64/PEM) und den Pfad eintragen:
 
 ```
 VOCO_CA_BUNDLE=C:\Pfad\zur\firmen-ca.pem
 ```
 
-Die Pruefung abzuschalten ist nicht vorgesehen: Ueber diese Verbindung laeuft
-das Laeuten, sie gehoert abgesichert.
+Geprüft wird dann gegen den Systemspeicher, `certifi` **und** diese Stelle — die
+Prüfung bleibt also vollständig erhalten. Sie abzuschalten ist nicht vorgesehen:
+Über diese Verbindung läuft das Läuten, sie gehört abgesichert. Ein Gateway, das
+jedes Zertifikat annimmt, ließe sich mit einem untergeschobenen Broker
+fernsteuern.
+
+Meldet die Diagnose stattdessen, dass gar keine Verbindung zustande kommt, ist
+es kein Zertifikatsproblem: Dann sperrt eine Firewall den Port.
 
