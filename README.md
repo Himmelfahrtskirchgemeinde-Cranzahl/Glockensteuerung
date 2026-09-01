@@ -65,6 +65,36 @@ extension/   ChurchTools-Extension (Vue 3 + Vite)
 gateway/     Python-Dienst (Automatik + MQTT)
 docs/        VOCO-MQTT-Protokoll.md · mockup/ (Design) · handbuch/ (HEW-Handbücher)
 ANLEITUNG.md Schritt-für-Schritt-Anleitung
+.github/scripts/  release.sh (Release je Versionsgruppe) · changelog.sh
+```
+
+## Changelog-Zeile je Commit
+
+Die Release-Beschreibungen werden automatisch gebaut. Damit dort Sätze stehen,
+die eine Gemeinde versteht – und nicht Commit-Betreffe –, bekommt jeder Commit
+mit sichtbarer Wirkung am Ende eine Zeile:
+
+```
+Changelog: <Art> | <Bereich> | <Satz für Anwender>
+```
+
+- **Art:** `Verbesserung`, `Fehler` oder `Löschung`
+- **Bereich:** frei, z. B. `Allgemein`, `Steuerung`, `Automatik`, `Gerät`,
+  `Gateway`, `Installation`
+- **Satz:** was sich für die Anwender ändert, nicht was am Code geschah
+
+Beispiel:
+
+```
+Changelog: Fehler | Gateway | Serientermine wurden mit dem Serienbeginn geplant und lösten deshalb nie aus.
+```
+
+Mehrere Zeilen je Commit sind erlaubt. Commits ohne solche Zeile – CI-Anpassungen,
+Refactorings – tauchen im Changelog nicht auf; das ist Absicht. Vor dem Öffnen
+eines Pull Requests lässt sich der Changelog vorab ansehen:
+
+```bash
+.github/scripts/changelog.sh HEAD origin/main
 ```
 
 ## 🔐 Sicherheit
