@@ -101,3 +101,32 @@ WantedBy=multi-user.target
 | `churchtools.py` | ChurchTools-API-Client (Kalender-Termine) |
 | `config.py` | lädt Gerät + Regeln aus ChurchTools (oder .env) |
 | `voco_mqtt.py` | MQTT-Client + CLI (`list`/`status`/`start`/`stop`) |
+
+## Wenn die Verbindung am Zertifikat scheitert
+
+Unter Windows meldet Python beim Verbindungsaufbau haeufig:
+
+```
+ssl.SSLCertVerificationError: [SSL: CERTIFICATE_VERIFY_FAILED]
+certificate verify failed: unable to get local issuer certificate
+```
+
+Grund ist nicht das Geraet, sondern die Python-Installation: Sie bringt keine
+Wurzelzertifikate mit und benutzt auch nicht den Windows-Zertifikatsspeicher.
+Der Dienst gibt deshalb das Bundle von `certifi` ausdruecklich mit; es wird mit
+den Abhaengigkeiten installiert. Bleibt der Fehler:
+
+```
+pip install --upgrade certifi
+```
+
+Hinter einem Firmen-Proxy mit eigener Zertifizierungsstelle deren Bundle
+eintragen - geprueft wird weiterhin, nur eben gegen diese Stelle:
+
+```
+VOCO_CA_BUNDLE=C:\Pfad\zur\firmen-ca.pem
+```
+
+Die Pruefung abzuschalten ist nicht vorgesehen: Ueber diese Verbindung laeuft
+das Laeuten, sie gehoert abgesichert.
+
