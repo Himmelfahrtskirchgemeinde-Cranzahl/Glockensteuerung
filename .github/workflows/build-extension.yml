@@ -1,15 +1,22 @@
-name: ChurchTools-Extension bauen (ZIP)
+name: Erweiterung und Gateway bauen (ZIP)
 
-# Baut die Extension und stellt eine installierbare ZIP bereit:
-#  - bei jedem Push, der extension/ aendert
+# Baut beide Archive und stellt sie bereit:
+#  - bei jedem Push, der etwas am Veroeffentlichten aendert
 #  - manuell ueber den "Run workflow"-Knopf (Tab "Actions")
 #  - bei einem Versions-Tag (v*) zusaetzlich als Release-Download
+#
+# Die Liste unten muss ALLES nennen, was in einem Archiv landet oder das Release
+# formt. Sonst passiert, was mit dem Gateway passiert ist: Der Merge aenderte nur
+# gateway/, der Lauf blieb aus, es entstand keine neue Version - und die
+# Verbesserung erreichte niemanden, obwohl sie im Hauptzweig lag.
 on:
   workflow_dispatch:
   push:
     branches: ['**']
     paths:
       - 'extension/**'
+      - 'gateway/**'
+      - '.github/scripts/**'
       - '.github/workflows/build-extension.yml'
     tags:
       - 'v*'
