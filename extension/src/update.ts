@@ -96,6 +96,27 @@ export function isFresh(check: UpdateCheck | null, now: number = Date.now()): bo
 }
 
 /**
+ * Muss neu bei GitHub gefragt werden?
+ *
+ * Das Alter allein genügt nicht. Wird die Erweiterung aktualisiert, ist der
+ * gespeicherte Stand sofort falsch – er nennt dann eine ältere Fassung als die
+ * installierte und trägt deren Changelog. Bis er nach einem Tag verfällt, zeigt
+ * das Fenster „Was ist neu" die Neuerungen einer Version, die längst installiert
+ * ist. Genau das war zu sehen: Version 26.6.6 lief, das Fenster zeigte den
+ * Changelog von 26.6.2.
+ *
+ * Eine installierte Fassung, die NEUER ist als die zuletzt gesehene
+ * Veröffentlichung, kann es nicht geben – dieser Fall ist also ein sicheres
+ * Zeichen, dass der Stand überholt ist.
+ */
+export function isStale(check: UpdateCheck | null, current: string,
+                        now: number = Date.now()): boolean {
+    if (!check?.notes) return true;
+    if (!isFresh(check, now)) return true;
+    return isNewer(current, check.latest);
+}
+
+/**
  * Neueste veröffentlichte Version bei GitHub erfragen.
  * Gibt null zurück, wenn das nicht klappt – die Prüfung ist Beiwerk und darf
  * die Bedienung nie stören (kein Netz, Rate-Limit, Repo umbenannt).
@@ -131,7 +152,16 @@ export function parseChangelog(md: string): ChangelogZeile[] {
     let text = String(md ?? '');
     // Die Einleitung („Automatisch gebaute …") interessiert im Dialog nicht.
     const i = text.indexOf(MARKER);
-    if (i >= 0) text = text.slice(i + MARKER.length);
+    if (i >= 0) {
+        text = text.slice(i + MARKER.length);
+    } else {
+        // Ältere Veröffentlichungen tragen die Marke noch nicht. Dann beginnt
+        // der Changelog bei der ersten Überschrift; alles davor ist Einleitung.
+        // Fehlt auch die, bleibt der Text vollständig – lieber zu viel zeigen
+        // als versehentlich alles wegzuschneiden.
+        const h = text.search(/^#{2,3}\s+/m);
+        if (h > 0) text = text.slice(h);
+    }
 
     const raus: ChangelogZeile[] = [];
     for (const roh of text.split(/\r?\n/)) {
