@@ -7,7 +7,7 @@ import { VocoMqtt, decodeName } from './voco/mqtt';
 import { reportError, submitFeedback, maskSerial, APP_VERSION, FEEDBACK_URL } from './feedback';
 import type { ReportContext, FeedbackFields } from './feedback';
 import { loadRights } from './perms';
-import { fetchLatest, isFresh, isNewer, parseChangelog, DOWNLOAD_URL, RELEASES_URL } from './update';
+import { fetchLatest, isStale, isNewer, parseChangelog, DOWNLOAD_URL, RELEASES_URL } from './update';
 import type { UpdateCheck } from './update';
 import type { Rights } from './perms';
 import { fitInfo } from './utils/fit-height';
@@ -199,7 +199,7 @@ async function checkForUpdate() {
         // Bei GitHub nachfragen darf nur, wer die Erweiterung auch aktualisieren
         // kann – das hält die 60 Abfragen je Stunde und IP frei.
         if (!rights.value.manageExt) return;
-        if (isFresh(gespeichert) && gespeichert?.notes) return;
+        if (!isStale(gespeichert, APP_VERSION)) return;
 
         const frisch = await fetchLatest();
         if (!frisch) return;
@@ -212,16 +212,22 @@ async function checkForUpdate() {
     }
 }
 
+/** In diesem Seitenaufruf schon bei GitHub gefragt? Höchstens einmal. */
+const changelogGeholt = ref(false);
+
 /**
  * Changelog-Fenster öffnen.
  *
- * Liegt noch kein Changelog vor – etwa weil noch nie ein Berechtigter das Modul
- * geöffnet hat –, wird er hier einmalig geholt. Das ist ein Klick, kein
- * Seitenaufruf, fällt beim Rate-Limit also kaum ins Gewicht.
+ * Taugt der gespeicherte Stand nicht – er fehlt, ist über einen Tag alt oder
+ * nennt eine ältere Fassung als die installierte –, wird er hier geholt. Das
+ * ist ein Klick, kein Seitenaufruf, und höchstens einer je Aufruf der Seite:
+ * unauthentifiziert erlaubt GitHub nur 60 Abfragen je Stunde und IP.
  */
 async function openChangelog() {
     showChangelog.value = true;
-    if (updateCheck.value?.notes || changelogLaedt.value) return;
+    if (changelogLaedt.value || changelogGeholt.value) return;
+    if (!isStale(updateCheck.value, APP_VERSION)) return;
+    changelogGeholt.value = true;
     changelogLaedt.value = true;
     try {
         const frisch = await fetchLatest();
