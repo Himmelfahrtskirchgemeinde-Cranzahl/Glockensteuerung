@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { churchtoolsClient } from '@churchtools/churchtools-client';
 import { ConfigStore, newRule } from './config';
-import type { CatKey, DeviceConfig, MappingRule } from './config';
+import type { CatKey, DeviceConfig, GatewayStatus, MappingRule } from './config';
 import { VocoMqtt, decodeName } from './voco/mqtt';
 import { reportError, submitFeedback, maskSerial, APP_VERSION, FEEDBACK_URL } from './feedback';
 import type { ReportContext, FeedbackFields } from './feedback';
@@ -52,6 +52,36 @@ const device = ref<DeviceConfig>({ serial: '', devicePw: '', brokerUrl: 'wss://h
 const rules = ref<MappingRule[]>([]);
 const calendars = ref<{ id: number; name: string }[]>([]);
 const nextRingings = ref<Array<{ when: Date; program: string; source: string }>>([]);
+/** Letztes Lebenszeichen des Gateway-Dienstes (schreibt er alle 2 Minuten). */
+const gatewayStatus = ref<GatewayStatus | null>(null);
+/** Ab wann gilt der Dienst als weg? Er meldet sich alle 2 min – 10 min sind großzügig. */
+const GATEWAY_STALE_MIN = 10;
+/** So oft das Lebenszeichen nachgeladen wird (der Dienst schreibt alle 2 min). */
+const GATEWAY_POLL_MS = 120000;
+let gatewayTimer: number | undefined;
+/** Minuten seit dem letzten Lebenszeichen; null = noch nie eines gesehen. */
+const gatewayAgeMin = computed<number | null>(() => {
+    const at = gatewayStatus.value?.at;
+    if (!at) return null;
+    const t = new Date(at).getTime();
+    if (!Number.isFinite(t)) return null;
+    return Math.max(0, (now.value - t) / 60000);
+});
+/** Gibt es überhaupt Automatik, die ausfallen könnte? Ohne aktive Regel läutet
+ *  nichts von allein – das ist dann so gewollt und keine Störung. */
+const hasAutomation = computed(() => rules.value.some((r) => r.active && r.pgsName));
+/** Kein Lebenszeichen oder zu altes -> Automatik läuft nicht. */
+const gatewayDown = computed(() =>
+    hasAutomation.value && (gatewayAgeMin.value === null || gatewayAgeMin.value > GATEWAY_STALE_MIN),
+);
+/** Erklärt, seit wann der Dienst fehlt. */
+const gatewayDownText = computed(() => {
+    const age = gatewayAgeMin.value;
+    if (age === null) return 'Es ist noch nie ein Lebenszeichen eingegangen.';
+    if (age < 90) return `Letztes Lebenszeichen vor ${Math.round(age)} Minuten.`;
+    const h = Math.round(age / 60);
+    return h < 48 ? `Letztes Lebenszeichen vor ${h} Stunden.` : `Letztes Lebenszeichen vor ${Math.round(h / 24)} Tagen.`;
+});
 /** Erklärt, WARUM die Vorschau leer ist (Ladefehler, keine Treffer, Schreibweise). */
 const ringingHint = ref('');
 type LogDir = 'in' | 'out' | 'sim' | 'info';
@@ -123,8 +153,19 @@ onMounted(() => {
 
 onUnmounted(() => {
     clearInterval(clockTimer);
+    clearInterval(gatewayTimer);
     voco?.disconnect();
 });
+
+/** Holt das Lebenszeichen erneut. Fehler bleiben still: Der alte Wert altert
+ *  dann weiter, und genau das soll das Banner ja anzeigen. */
+async function refreshGatewayStatus() {
+    try {
+        gatewayStatus.value = await store.loadGatewayStatus();
+    } catch {
+        /* kein Leserecht oder Netz weg – alter Stand bleibt stehen */
+    }
+}
 
 async function boot() {
     try {
@@ -147,6 +188,10 @@ async function boot() {
         if (cfg.device) device.value = { brokerUrl: 'wss://hew-voco.de:8084/mqtt', ...cfg.device };
         rules.value = cfg.rules;
         durations.value = cfg.durations ?? {};
+        gatewayStatus.value = cfg.gateway ?? null;
+        // Regelmaessig nachladen – sonst altert der einmal geladene Wert vor sich
+        // hin und das Warnbanner erschiene allein deshalb, weil die Seite offen ist.
+        gatewayTimer = window.setInterval(refreshGatewayStatus, GATEWAY_POLL_MS);
         // Gemerkter Status gilt nur für Berechtigte; alle anderen bleiben in Simulation.
         simulate.value = rights.value.manageExt ? (cfg.simulate ?? true) : true;
         try { calendars.value = await churchtoolsClient.get<{ id: number; name: string }[]>('/calendars'); } catch { calendars.value = []; }
@@ -490,6 +535,14 @@ async function loadNextRingings() {
           <template v-else>
           <!-- ▸ Steuerung -->
           <template v-if="view === 'steuerung' && canView('steuerung')">
+            <!-- Automatik-Dienst weg? Dann laeutet nichts von allein - das muss man sehen. -->
+            <div v-if="gatewayDown" class="gs-banner gw-down">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+              <div class="txt">
+                <b>Automatik-Dienst nicht erreichbar</b><br>
+                <small>Es wird zurzeit <b>nicht automatisch geläutet</b>. Manuelles Läuten über die Knöpfe funktioniert weiterhin. {{ gatewayDownText }}</small>
+              </div>
+            </div>
             <div class="gs-banner" :class="simulate ? 'sim-on' : 'sim-off'">
               <span class="ic">
                 <svg v-if="simulate" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 7.5 8 9 4.5-1.5 8-4 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg>

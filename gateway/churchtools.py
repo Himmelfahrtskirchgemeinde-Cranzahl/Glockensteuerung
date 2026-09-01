@@ -24,7 +24,25 @@ class ChurchTools:
     def get(self, path: str, **params):
         r = self.s.get(self.api + path, params=params, timeout=self.timeout)
         r.raise_for_status()
-        j = r.json()
+        return self._unwrap(r)
+
+    def post(self, path: str, json: dict | None = None):
+        r = self.s.post(self.api + path, json=json, timeout=self.timeout)
+        r.raise_for_status()
+        return self._unwrap(r)
+
+    def put(self, path: str, json: dict | None = None):
+        r = self.s.put(self.api + path, json=json, timeout=self.timeout)
+        r.raise_for_status()
+        return self._unwrap(r)
+
+    @staticmethod
+    def _unwrap(r):
+        """ChurchTools verpackt Nutzdaten in {"data": …} – auspacken, wenn da."""
+        try:
+            j = r.json()
+        except ValueError:
+            return None          # z. B. 204 ohne Inhalt
         return j.get("data", j) if isinstance(j, dict) else j
 
     # --- Kalender / Termine ---
