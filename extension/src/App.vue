@@ -21,6 +21,8 @@ let voco: VocoMqtt | undefined;
 
 type View = 'steuerung' | 'log' | 'regeln' | 'geraet' | 'email';
 const view = ref<View>('steuerung');
+/** Menü auf schmalen Schirmen ausgeklappt? Am Schreibtisch ohne Bedeutung. */
+const navOffen = ref(false);
 
 const rights = ref<Rights>({ isAdmin: false, manageExt: false, viewCats: [], editCats: [] });
 const catIds = ref<Partial<Record<CatKey, number>>>({});
@@ -647,6 +649,14 @@ async function loadNextRingings() {
     <template v-else>
     <!-- Kopfleiste (voll breit, fix) -->
     <header class="gs-mhead">
+        <!-- Nur auf schmalen Schirmen sichtbar (siehe app.css): klappt die
+             Modul-Navigation als Menü aus, wie ChurchTools es selbst tut. -->
+        <button class="gs-burger" type="button" :class="{ offen: navOffen }"
+                :aria-expanded="navOffen" aria-controls="gs-nav"
+                :title="navOffen ? 'Menü schließen' : 'Menü öffnen'"
+                @click="navOffen = !navOffen">
+          <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
         <span class="mi">
           <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2M5 10a7 7 0 0 1 14 0c0 5 2 6 2 6H3s2-1 2-6Z"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>
         </span>
@@ -655,19 +665,23 @@ async function loadNextRingings() {
         <span v-if="!loading && !bootError" class="gs-pill" :class="simulate ? 'blue' : 'warn'">
           {{ simulate ? 'Simulation' : 'SCHARF' }}
         </span>
-        <span v-if="online === true" class="gs-pill ok"><span class="dot"></span> Gerät online</span>
+        <span v-if="online === true" class="gs-pill ok"><span class="dot"></span> <span class="ptxt">Gerät </span>online</span>
         <span v-else-if="online === false" class="gs-pill warn"><span class="dot"></span> offline</span>
         <span v-else class="gs-pill muted"><span class="dot"></span> verbinde …</span>
         <button class="gs-btn gs-ghost" @click="requestSync">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>Aktualisieren</button>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg><span class="btxt">Aktualisieren</span></button>
         <span class="gs-vdiv"></span>
         <button class="gs-btn gs-ghost" @click="showFeedback = true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></svg>Feedback<span v-if="errorCount" class="gs-badge">{{ errorCount }}</span></button>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></svg><span class="btxt">Feedback</span><span v-if="errorCount" class="gs-badge">{{ errorCount }}</span></button>
     </header>
 
     <div class="gs-main">
-      <!-- Linke Modul-Navigation (durchgehend) -->
-      <nav v-if="!loading && !bootError" class="gs-subnav">
+      <!-- Abdunklung: fängt den Klick daneben ab und schließt das Menü. -->
+      <div v-if="navOffen" class="gs-navback" @click="navOffen = false"></div>
+      <!-- Linke Modul-Navigation. Auf schmalen Schirmen ein ausklappbares Menü;
+           ein Klick auf einen Eintrag schließt es wieder. -->
+      <nav v-if="!loading && !bootError" id="gs-nav" class="gs-subnav"
+           :class="{ offen: navOffen }" @click="navOffen = false">
           <div v-if="showLaeuten" class="lbl">Läuten</div>
           <button v-if="canView('steuerung')" :class="{ active: view === 'steuerung' }" @click="view = 'steuerung'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2M5 10a7 7 0 0 1 14 0c0 5 2 6 2 6H3s2-1 2-6Z"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>Steuerung</button>
@@ -765,7 +779,7 @@ async function loadNextRingings() {
             <!-- Nächste automatische Läutungen (nur Anzeige, aus Regeln × Terminen) -->
             <section class="gs-card">
               <div class="gs-head"><h2>Nächste automatische Läutungen</h2><span class="gs-spacer"></span>
-                <button class="gs-btn gs-ghost sm" @click="loadNextRingings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>Aktualisieren</button></div>
+                <button class="gs-btn gs-ghost sm" @click="loadNextRingings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg><span class="btxt">Aktualisieren</span></button></div>
               <div class="gs-body">
                 <p v-if="nextRingings.length === 0 && !ringingHint" class="gs-empty">(keine anstehenden Läutungen aus den Regeln in den nächsten 30 Tagen)</p>
                 <p v-else-if="ringingHint" class="gs-readonly" style="margin-bottom:0">
