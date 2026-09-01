@@ -19,22 +19,9 @@ import logging
 
 log = logging.getLogger("voco-gateway")
 
+from kv import schluessel_von
+
 VALUE_KEY = "outbox"
-
-
-def _key_of(v: dict) -> str:
-    """Schluessel eines KV-Eintrags - je nach API-Version flach oder in 'value'."""
-    if v.get("key"):
-        return str(v["key"])
-    raw = v.get("value")
-    if isinstance(raw, str):
-        try:
-            return str(json.loads(raw).get("key", ""))
-        except Exception:
-            return ""
-    if isinstance(raw, dict):
-        return str(raw.get("key", ""))
-    return ""
 
 
 def _data_of(v: dict):
@@ -67,7 +54,7 @@ def verarbeiten(ct, cfg, notifier) -> int:
     except Exception:
         return 0  # kein Leserecht o. Ae.
 
-    eintrag = next((v for v in werte if _key_of(v) == VALUE_KEY), None)
+    eintrag = next((v for v in werte if schluessel_von(v) == VALUE_KEY), None)
     if not eintrag:
         return 0
     jobs = _data_of(eintrag)
