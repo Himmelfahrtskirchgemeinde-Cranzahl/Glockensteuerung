@@ -214,7 +214,8 @@ def main():
                 last_beat = now
                 beat.send(rules=len([r for r in cfg.rules if r.active and r.pgs_name]),
                           simulation=dry,
-                          device=mask_serial(cfg.device.serial))
+                          device=mask_serial(cfg.device.serial),
+                          mail=notifier.enabled and bool(cfg.email and cfg.email.send_feedback))
 
             # Was die Extension in den Postausgang gestellt hat, verschicken.
             # Nicht bei jedem Tick: Es sind zwei Abfragen, und niemand wartet

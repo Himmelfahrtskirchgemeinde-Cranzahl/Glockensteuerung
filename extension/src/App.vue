@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { churchtoolsClient } from '@churchtools/churchtools-client';
-import { ConfigStore, newRule } from './config';
-import type { CatKey, DeviceConfig, GatewayStatus, MappingRule } from './config';
+import { ConfigStore, newRule, newEmailConfig } from './config';
+import type { CatKey, DeviceConfig, EmailConfig, GatewayStatus, MappingRule } from './config';
 import { VocoMqtt, decodeName } from './voco/mqtt';
 import { reportError, submitFeedback, maskSerial, APP_VERSION, FEEDBACK_URL } from './feedback';
 import type { ReportContext, FeedbackFields } from './feedback';
@@ -19,7 +19,7 @@ const baseUrl = window.settings?.base_url ?? import.meta.env.VITE_BASE_URL;
 const store = new ConfigStore();
 let voco: VocoMqtt | undefined;
 
-type View = 'steuerung' | 'log' | 'regeln' | 'geraet';
+type View = 'steuerung' | 'log' | 'regeln' | 'geraet' | 'email';
 const view = ref<View>('steuerung');
 
 const rights = ref<Rights>({ isAdmin: false, manageExt: false, viewCats: [], editCats: [] });
@@ -39,7 +39,8 @@ const canEdit = (cat: CatKey): boolean => {
 const showLaeuten = computed(() => canView('steuerung') || canView('log'));
 const showEinstellungen = computed(() => canView('regeln') || rights.value.manageExt);
 /** Sichtbarkeit einer Ansicht: „geraet" nur für „Erweiterung verwalten". */
-const canSeeView = (v: View): boolean => (v === 'geraet' ? rights.value.manageExt : canView(v));
+const canSeeView = (v: View): boolean =>
+    (v === 'geraet' || v === 'email' ? rights.value.manageExt : canView(v));
 const allCatalogNames = computed(() => [...catalog.value.sPGS, ...catalog.value.melodies, ...catalog.value.programsteps]);
 const simulate = ref(true);
 const online = ref<boolean | null>(null);
@@ -53,6 +54,9 @@ let clockTimer: number | undefined;
 const device = ref<DeviceConfig>({ serial: '', devicePw: '', brokerUrl: 'wss://hew-voco.de:8084/mqtt' });
 const rules = ref<MappingRule[]>([]);
 const calendars = ref<{ id: number; name: string }[]>([]);
+/** Zugang zum Postausgang. Nur für „Erweiterung verwalten" sichtbar. */
+const email = ref<EmailConfig>(newEmailConfig());
+const emailGeladen = ref(false);
 const nextRingings = ref<Array<{ when: Date; program: string; source: string }>>([]);
 /** Letztes Lebenszeichen des Gateway-Dienstes (schreibt er alle 2 Minuten). */
 const gatewayStatus = ref<GatewayStatus | null>(null);
@@ -286,7 +290,7 @@ async function boot() {
 }
 
 function pickDefaultView() {
-    const order: View[] = ['steuerung', 'log', 'regeln', 'geraet'];
+    const order: View[] = ['steuerung', 'log', 'regeln', 'geraet', 'email'];
     if (!canSeeView(view.value)) {
         const first = order.find((v) => canSeeView(v));
         if (first) view.value = first;
@@ -393,6 +397,49 @@ function stopAll() {
     else if (confirm('Wirklich ALLES stoppen?')) voco?.stopAll();
 }
 
+/**
+ * Zugang zum Postausgang laden. Erst beim Öffnen der Seite, nicht beim Start:
+ * Die Kategorie „email" ist für die meisten nicht lesbar, und ein unnötiger
+ * Fehlversuch bei jedem Seitenaufruf hilft niemandem.
+ */
+async function loadEmail() {
+    if (emailGeladen.value) return;
+    emailGeladen.value = true;
+    try {
+        const cfg = await store.loadEmail();
+        if (cfg) email.value = { ...newEmailConfig(), ...cfg };
+    } catch (e) {
+        handleError('loadEmail', e);
+    }
+}
+
+async function saveEmail() {
+    try {
+        await store.saveEmail(email.value);
+        toast('Postausgang gespeichert. Der Gateway übernimmt ihn beim nächsten Durchlauf.');
+    } catch (e) { handleError('saveEmail', e); }
+}
+
+/**
+ * Testnachricht in den Postausgang stellen.
+ *
+ * Verschickt wird sie vom Gateway – die Extension kann das nicht. Deshalb
+ * bestätigt der Knopf auch nur das Einstellen, nicht den Versand; ob die Mail
+ * ankam, zeigt das Postfach.
+ */
+async function testMail() {
+    try {
+        await store.queueMail({
+            id: Math.random().toString(36).slice(2),
+            subject: 'Testnachricht der Glockensteuerung',
+            body: 'Wenn diese Nachricht ankommt, ist der Postausgang richtig eingerichtet.\n\n'
+                + `Gesendet aus Version ${APP_VERSION}.`,
+            at: new Date().toISOString(),
+        });
+        toast('Testnachricht eingestellt – der Gateway verschickt sie binnen einer Minute.');
+    } catch (e) { handleError('testMail', e); }
+}
+
 async function saveDevice() {
     try {
         await store.saveDevice(device.value);
@@ -417,11 +464,43 @@ function calId(rule: MappingRule, ev: Event) {
     rule.calendarId = v ? Number(v) : null;
 }
 
+/**
+ * Feedback abschicken.
+ *
+ * Erster Weg ist der Postausgang: Die Nachricht wird eingestellt, der Gateway
+ * verschickt sie. Ob das überhaupt geht, sagt sein Lebenszeichen (`mail`) –
+ * die Extension kann es nicht selbst beantworten, weil die Zugangsdaten in
+ * einer Kategorie liegen, die normale Benutzer nicht lesen dürfen.
+ *
+ * Ist kein Postausgang eingerichtet oder klemmt das Einstellen, bleibt es beim
+ * bisherigen Weg: zentraler Endpunkt, sonst das E-Mail-Programm.
+ */
 async function sendFeedback() {
     if (!fb.value.message.trim()) { toast('Bitte eine Nachricht eingeben.'); return; }
-    const res = await submitFeedback(fb.value, ctx());
+    const felder = fb.value;
     showFeedback.value = false;
     fb.value = { name: '', email: '', category: 'Fehler / etwas funktioniert nicht', message: '' };
+
+    if (gatewayStatus.value?.mail) {
+        try {
+            const c = ctx();
+            await store.queueMail({
+                id: Math.random().toString(36).slice(2),
+                subject: `Glockensteuerung – ${felder.category || 'Feedback'}`,
+                body: `${felder.message}\n\n— — —\n`
+                    + `Von: ${felder.name || '(ohne Namen)'} <${felder.email || 'keine Adresse'}>\n`
+                    + `Instanz: ${c.instance}\nGerät: ${c.device}\nVersion: ${c.version}\n`
+                    + `Gerät online: ${c.online}\n\nLetzte Ereignisse:\n${c.logTail.join('\n')}`,
+                at: new Date().toISOString(),
+            });
+            toast('Danke! Die Nachricht wird gleich verschickt.');
+            return;
+        } catch {
+            // Kein Schreibrecht o. Ä. – unten geht es auf dem alten Weg weiter.
+        }
+    }
+
+    const res = await submitFeedback(felder, ctx());
     if (res.sent) toast('Danke! Feedback wurde gesendet.');
     else if (res.mailto) { toast('E-Mail-Programm wird geöffnet …'); window.location.href = res.mailto; }
     else toast('Konnte nicht senden.');
@@ -599,6 +678,8 @@ async function loadNextRingings() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>Automatik-Regeln<span v-if="rules.length" class="cnt">{{ rules.length }}</span></button>
           <button v-if="rights.manageExt" :class="{ active: view === 'geraet' }" @click="view = 'geraet'">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 5V3m8 2V3M4 10h16"/></svg>Gerät</button>
+          <button v-if="rights.manageExt" :class="{ active: view === 'email' }" @click="view = 'email'; loadEmail()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>E-Mail-Versand</button>
 
           <div class="gs-subfoot">
             <button class="ver" type="button" @click="openChangelog"
@@ -789,6 +870,45 @@ async function loadNextRingings() {
               </div>
               <p class="gs-note"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Seriennummer + Passwort erlauben das Läuten – Modulzugriff einschränken. Verbinden &amp; Status lesen ist ungefährlich.</p>
               <div class="gs-foot" style="justify-content:flex-start"><button class="gs-btn gs-primary" @click="saveDevice">Gerät speichern &amp; verbinden</button></div>
+            </div>
+          </section>
+
+          <!-- ▸ E-Mail-Versand -->
+          <section v-else-if="view === 'email' && rights.manageExt" class="gs-card">
+            <div class="gs-head"><h2>E-Mail-Versand</h2></div>
+            <div class="gs-body">
+              <p class="gs-readonly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><span>Verschickt wird vom <b>Gateway-Dienst</b>, nicht aus dem Browser: Eine Webseite kann kein SMTP sprechen. Die Extension stellt Nachrichten nur ein – der Dienst holt sie binnen einer Minute ab. Läuft er nicht, geht nichts raus.</span></p>
+
+              <div class="gs-fields">
+                <label>Postausgang (Server)</label><input type="text" v-model="email.host" placeholder="smtp.example.de">
+                <label>Port</label><input type="number" v-model.number="email.port" min="1" max="65535">
+                <label>Verschlüsselung</label>
+                <select v-model="email.security">
+                  <option value="starttls">STARTTLS (üblich, Port 587)</option>
+                  <option value="ssl">SSL/TLS (Port 465)</option>
+                </select>
+                <label>Benutzername</label><input type="text" v-model="email.user" placeholder="postausgang@example.de" autocomplete="off">
+                <label>Passwort</label><input type="password" v-model="email.password" placeholder="geheim" autocomplete="new-password">
+                <label>Absender</label><input type="email" v-model="email.from" placeholder="(wie Benutzername)">
+                <label>Empfänger</label><input type="email" v-model="email.to" placeholder="wer die Nachrichten bekommt">
+              </div>
+
+              <p style="color:var(--gs-dim);font-size:13.5px;margin:18px 0 8px"><b>Wann verschickt wird</b></p>
+              <label class="gs-switch" style="display:flex;gap:9px;margin-bottom:8px">
+                <button class="gs-toggle" :class="{ off: !email.sendFeedback }" @click="email.sendFeedback = !email.sendFeedback"></button>
+                <span>Feedback-Formular per E-Mail senden <small style="color:var(--gs-faint);font-weight:400">– sonst öffnet sich das E-Mail-Programm</small></span>
+              </label>
+              <label class="gs-switch" style="display:flex;gap:9px">
+                <button class="gs-toggle" :class="{ off: !email.sendErrors }" @click="email.sendErrors = !email.sendErrors"></button>
+                <span>Störungen und Fehler melden</span>
+              </label>
+
+              <p class="gs-note"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span>Das Passwort liegt in der eigenen Kategorie <b>„E-Mail-Versand"</b> – <b>nicht</b> in „Steuerung", die jeder mit Modulzugriff lesen darf. Bitte in der Rechteverwaltung prüfen, dass nur Verwalter Leserechte darauf haben.</span></p>
+
+              <div class="gs-foot" style="justify-content:flex-start;gap:10px">
+                <button class="gs-btn gs-primary" @click="saveEmail">Speichern</button>
+                <button class="gs-btn gs-ghost" @click="testMail" :disabled="!email.host">Testnachricht senden</button>
+              </div>
             </div>
           </section>
 
