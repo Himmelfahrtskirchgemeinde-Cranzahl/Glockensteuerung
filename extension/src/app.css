@@ -263,12 +263,18 @@ button.ver:focus-visible { outline: 2px solid var(--gs-blue); outline-offset: 2p
   .gs-mhead .gs-pill { font-size: 12px; padding: 4px 9px; gap: 5px; }
   .gs-vdiv { display: none; }
 
-  .gs-main { flex-direction: column; }
+  /* Bezugsrahmen für das Menü: der Bereich UNTER der eigenen Kopfleiste. */
+  .gs-main { flex-direction: column; position: relative; }
 
-  /* Das Menü liegt über dem Inhalt und beginnt UNTER der Kopfleiste, damit der
-     Hamburger sichtbar bleibt und dasselbe Antippen es wieder schließt. */
+  /* Das Menü liegt über dem Inhalt und beginnt unter der Kopfleiste, damit der
+     Hamburger sichtbar bleibt und dasselbe Antippen es wieder schließt.
+     Bewusst `absolute` im Modulbereich und NICHT `fixed`: Die Erweiterung läuft
+     innerhalb der ChurchTools-Seite, nicht in einem eigenen Fenster. `fixed`
+     bezieht sich auf den Bildschirm – das Menü begann dann 52px unter dessen
+     Oberkante und legte sich über den ChurchTools-Kopf und die eigene
+     Kopfleiste, statt darunter zu beginnen. */
   .gs-subnav {
-    position: fixed; top: 52px; left: 0; bottom: 0; z-index: 44;
+    position: absolute; top: 0; left: 0; bottom: 0; z-index: 44;
     width: min(320px, 86vw);
     padding: 10px 12px 28px;
     transform: translateX(-100%);
@@ -278,7 +284,7 @@ button.ver:focus-visible { outline: 2px solid var(--gs-blue); outline-offset: 2p
     overflow-y: auto;
   }
   .gs-subnav.offen { transform: none; }
-  .gs-navback { display: block; position: fixed; inset: 52px 0 0; z-index: 43; background: rgba(16, 24, 40, .38); }
+  .gs-navback { display: block; position: absolute; inset: 0; z-index: 43; background: rgba(16, 24, 40, .38); }
   /* Ausgeklappt darf es luftig sein: Der Platz ist da, und getippt wird mit dem
      Daumen, nicht mit dem Mauszeiger. Trefferfläche 48px. */
   .gs-subnav button { min-height: 48px; padding: 12px; gap: 13px; font-size: 15px; }
