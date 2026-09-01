@@ -90,11 +90,12 @@ class Voco:
                                  clean_session=True)
         self.c.ws_set_options(path=ws_path)
         self.c.username_pw_set(user, pw)
-        # Wurzelzertifikate ausdruecklich mitgeben: Ohne sie schlaegt der
-        # Verbindungsaufbau unter Windows fehl ("unable to get local issuer
-        # certificate"), weil Python dort keine mitbringt und den
-        # Windows-Zertifikatsspeicher nicht benutzt. Siehe tls.py.
-        self.c.tls_set(ca_certs=tls.ca_bundle(), cert_reqs=ssl.CERT_REQUIRED)
+        # Fertigen Kontext uebergeben statt eines einzelnen Bundle-Pfades:
+        # 'tls_set(ca_certs=...)' laedt NUR diese eine Datei und schliesst den
+        # Zertifikatsspeicher des Systems aus - dann scheitert der Aufbau, sobald
+        # ein Virenscanner oder Firmen-Proxy die Verbindung aufbricht. Siehe
+        # tls.py.
+        self.c.tls_set_context(tls.context())
         self.c.on_connect = self._on_connect
         self.c.on_message = self._on_message
 
@@ -105,11 +106,17 @@ class Voco:
             # Haeufigster Stolperstein unter Windows - die blosse
             # OpenSSL-Meldung hilft dabei niemandem weiter.
             raise RuntimeError(
-                f"Das Zertifikat von {self.host} konnte nicht geprueft werden ({e}). "
-                "Meist fehlen dem System die Wurzelzertifikate: "
-                "'pip install --upgrade certifi' im venv installiert sie. "
-                "Hinter einem Firmen-Proxy mit eigener Zertifizierungsstelle "
-                "deren Bundle in VOCO_CA_BUNDLE eintragen."
+                f"Das Zertifikat von {self.host} konnte nicht geprueft werden ({e}).\n"
+                f"Geprueft wurde gegen: {', '.join(tls.quellen())}.\n"
+                "Was jetzt hilft, der Reihe nach:\n"
+                "  1. 'python -m diagnose' im gateway-Ordner ausfuehren - das sagt, "
+                "wer das Zertifikat ausgestellt hat.\n"
+                "  2. Nennt die Ausgabe einen Virenscanner, eine Firewall oder die "
+                "eigene Firma als Aussteller, wird die Verbindung aufgebrochen. Dann "
+                "deren Zertifikat als Datei exportieren und den Pfad in "
+                "VOCO_CA_BUNDLE eintragen.\n"
+                "  3. 'pip install --upgrade certifi' bringt die oeffentlichen "
+                "Wurzelzertifikate auf den neuesten Stand."
             ) from e
         self.c.loop_start()
         t0 = time.time()
