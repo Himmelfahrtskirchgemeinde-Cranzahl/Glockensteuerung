@@ -328,11 +328,17 @@ const fmtTime = (d: Date) => d.toLocaleTimeString('de-DE', { hour: '2-digit', mi
  *
  * Nutzt bewusst DIESELBE Zuordnung wie der Gateway (gateway/scheduler.py,
  * `rule_matches`), damit die Vorschau nicht etwas anderes zeigt als real läutet:
- *  - Regel OHNE Veranstaltungsart → Kalender-Termine, es zählt nur der Kalender.
- *  - Regel MIT Veranstaltungsart  → ChurchTools-Veranstaltungen, deren Art
- *    EXAKT übereinstimmt (früher wurde hier der Termin-TITEL als Teilstring
- *    verglichen – dadurch matchte „Festgottesdienst" auch die Regel
- *    „Gottesdienst" und der Termin erschien doppelt).
+ *  - Regel OHNE Titel → alle Termine der gewählten Kalender.
+ *  - Regel MIT Titel  → nur Termine, deren Titel EXAKT übereinstimmt.
+ *
+ * Verglichen wird der TERMIN-TITEL, nicht die Veranstaltungsart: Eine Art lässt
+ * sich einem Termin gar nicht zuweisen – sie hängt an einer verknüpften
+ * Veranstaltung, die es in der Praxis meist nicht gibt. Dann fand die Vorschau
+ * nie etwas. Der Titel steht dagegen immer am Termin.
+ *
+ * „Exakt" heißt: „Gottesdienst" trifft NUR „Gottesdienst" – nicht zusätzlich
+ * „Festgottesdienst", nur weil das Wort darin vorkommt. Groß-/Kleinschreibung
+ * und Leerzeichen am Rand werden ignoriert.
  *
  * Rein anzeigend – das echte Auslösen macht der Gateway.
  */
@@ -357,10 +363,6 @@ async function loadNextRingings() {
     for (const id of calIds) p.append('calendar_ids[]', String(id));
     p.set('from', from);
     p.set('to', to);
-    // Die verknüpfte Veranstaltung mitladen – sie trägt die Veranstaltungsart.
-    // EINE Abfrage über Termine ist verlässlicher als /events: Der Termin hat
-    // IMMER seinen Kalender, eine Veranstaltung nicht zwingend.
-    p.append('include[]', 'event');
 
     let items: any[] = [];
     try {
@@ -373,7 +375,7 @@ async function loadNextRingings() {
     }
 
     const out: Array<{ when: Date; program: string; source: string }> = [];
-    const seenCats = new Set<string>();
+    const seenTitles = new Set<string>();
     let appointments = 0;
 
     const add = (r: MappingRule, start: Date, source: string) => {
@@ -384,29 +386,23 @@ async function loadNextRingings() {
 
     for (const it of items) {
         const base = it?.appointment?.base ?? it?.base ?? it;
+        // Bei Serienterminen trägt `base` das Datum des SERIENBEGINNS – das
+        // Datum dieses Vorkommens steht in `calculated`. Immer erst dort schauen.
         const calc = it?.appointment?.calculated ?? it?.calculated;
         const startStr = calc?.startDate ?? base?.startDate;
         if (!startStr) continue;
         appointments++;
         const start = new Date(startStr);
-        const calId: number | undefined = base?.calendar?.id;
+        const calendarId: number | undefined = base?.calendar?.id;
         const calName: string = base?.calendar?.name ?? '';
-        const title: string = base?.title ?? base?.caption ?? '';
-        // Verknüpfte Veranstaltung – Feldname je nach ChurchTools-Version.
-        const ev = it?.event ?? it?.appointment?.event ?? base?.event;
-        const cat = ev?.eventCategory ?? ev?.category;
-        const catName: string = String((typeof cat === 'object' ? cat?.name : cat) ?? '').trim();
-        if (catName) seenCats.add(catName);
+        const title: string = String(base?.title ?? base?.caption ?? '').trim();
+        if (title) seenTitles.add(title);
 
         for (const r of active) {
-            if (r.calendarId && r.calendarId !== calId) continue;
-            if (r.category) {
-                // Exakt vergleichen: „Festgottesdienst" ist NICHT „Gottesdienst".
-                if (catName.toLowerCase() !== r.category.trim().toLowerCase()) continue;
-                add(r, start, `Veranstaltung „${catName}" · ${fmtTime(start)} ${title}`.trim());
-            } else {
-                add(r, start, `Kalender „${calName}" · ${fmtTime(start)} ${title}`.trim());
-            }
+            if (r.calendarId && r.calendarId !== calendarId) continue;
+            // Exakt vergleichen: „Festgottesdienst" ist NICHT „Gottesdienst".
+            if (r.title && title.toLowerCase() !== r.title.trim().toLowerCase()) continue;
+            add(r, start, `${title || '(ohne Titel)'} · Beginn ${fmtTime(start)} · Kalender „${calName}"`);
         }
     }
 
@@ -415,15 +411,15 @@ async function loadNextRingings() {
 
     // Leere Liste nie unerklärt lassen – sonst sucht man den Fehler im Nichts.
     if (!out.length) {
-        const wanted = [...new Set(active.filter((r) => r.category).map((r) => r.category!.trim()))];
+        const wanted = [...new Set(active.filter((r) => r.title).map((r) => r.title!.trim()))];
+        const vorhanden = [...seenTitles].slice(0, 12).join(', ')
+            + (seenTitles.size > 12 ? ` … (+${seenTitles.size - 12})` : '');
         if (!appointments) {
             ringingHint.value = 'Im Zeitraum (30 Tage) liegen keine Termine in den gewählten Kalendern.';
         } else if (!wanted.length) {
             ringingHint.value = `${appointments} Termin(e) gefunden, aber alle liegen in der Vergangenheit oder in anderen Kalendern.`;
-        } else if (!seenCats.size) {
-            ringingHint.value = `${appointments} Termin(e) gefunden, aber keiner hat eine verknüpfte Veranstaltung mit Veranstaltungsart. Gesucht: ${wanted.join(', ')}.`;
         } else {
-            ringingHint.value = `Keine Übereinstimmung. Gesucht: ${wanted.join(', ')} – im Zeitraum vorhanden: ${[...seenCats].join(', ')}. Die Schreibweise muss exakt passen.`;
+            ringingHint.value = `Keine Übereinstimmung. Gesucht (exakt): ${wanted.join(', ')} – im Zeitraum vorhanden: ${vorhanden}. Die Schreibweise muss genau passen.`;
         }
         pushLog('Nächste Läutungen – ' + ringingHint.value, 'info');
     }
@@ -564,7 +560,7 @@ async function loadNextRingings() {
                     </tbody>
                   </table>
                 </div>
-                <p class="gs-note" style="color:var(--gs-dim)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><span>Vorschau aus ChurchTools (Zeit = Beginn − Vorlauf). Regeln <b>mit</b> Veranstaltungsart greifen nur bei <b>Veranstaltungen</b>, deren Art <b>exakt</b> übereinstimmt; Regeln <b>ohne</b> Veranstaltungsart greifen bei allen Terminen des Kalenders. Das tatsächliche Auslösen übernimmt der Gateway-Dienst.</span></p>
+                <p class="gs-note" style="color:var(--gs-dim)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><span>Vorschau aus ChurchTools (Zeit = Beginn − Vorlauf). Regeln <b>mit</b> Termin-Titel greifen nur bei Terminen, deren Titel <b>exakt</b> übereinstimmt – „Gottesdienst" trifft also nicht auch „Festgottesdienst". Regeln <b>ohne</b> Titel greifen bei allen Terminen des Kalenders. Das tatsächliche Auslösen übernimmt der Gateway-Dienst.</span></p>
               </div>
             </section>
 
@@ -606,7 +602,7 @@ async function loadNextRingings() {
               <span v-if="!canEdit('regeln')" class="gs-pill muted">nur lesen</span>
               <button v-else class="gs-btn gs-ghost sm" @click="addRule"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Regel hinzufügen</button></div>
             <div class="gs-body">
-              <p style="color:var(--gs-dim);font-size:13.5px;margin:0 0 14px">Vom Gateway-Dienst für automatisches Läuten genutzt (Termin → Programm).</p>
+              <p style="color:var(--gs-dim);font-size:13.5px;margin:0 0 14px">Vom Gateway-Dienst für automatisches Läuten genutzt (Termin → Programm). Der <b>Termin-Titel</b> muss <b>exakt</b> so lauten wie im Kalender – leer lassen heißt „jeder Termin des Kalenders".</p>
               <p v-if="!canEdit('regeln')" class="gs-readonly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Zum Ändern brauchst du das Recht „Daten in Kategorie bearbeiten" für „Automatik-Regeln". Ein Admin vergibt es in der Rechteverwaltung unter „Glockensteuerung".</p>
               <p v-if="rules.length === 0" class="gs-empty">(noch keine Regeln)</p>
               <div v-for="(rule, i) in rules" :key="rule.id" class="gs-rule">
@@ -616,7 +612,7 @@ async function loadNextRingings() {
                   <option value="">(jeder Kalender)</option>
                   <option v-for="c in calendars" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
-                <label>Veranstaltungsart</label><input type="text" v-model="rule.category" placeholder="(egal) z. B. Gottesdienst" :disabled="!canEdit('regeln')">
+                <label>Termin-Titel</label><input type="text" v-model="rule.title" placeholder="(egal) z. B. Gottesdienst" :disabled="!canEdit('regeln')">
                 <label>Läuteprogramm</label>
                 <select v-model="rule.pgsName" :disabled="!canEdit('regeln')">
                   <option value="">(bitte wählen)</option>

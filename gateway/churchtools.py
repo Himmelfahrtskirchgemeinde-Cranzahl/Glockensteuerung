@@ -51,14 +51,6 @@ class ChurchTools:
                     pass
         return [_norm_appointment(a) for a in raw if a]
 
-    def events(self, frm: dt.date, to: dt.date):
-        """Veranstaltungen (Events-Modul) im Zeitraum."""
-        try:
-            raw = self.get("/events", **{"from": frm.isoformat(), "to": to.isoformat()})
-        except Exception:
-            raw = []
-        return [_norm_event(e) for e in raw if e]
-
 
 def _parse_dt(s):
     if not s:
@@ -70,27 +62,25 @@ def _parse_dt(s):
 
 
 def _norm_appointment(a: dict) -> dict:
-    # Appointments koennen verschachtelt sein (a["base"]) oder flach
-    base = a.get("base", a)
+    """Normalisiert EIN Termin-Vorkommen aus /calendars/appointments.
+
+    Die API liefert je Vorkommen {"appointment": {"base": …, "calculated": …}}.
+    Aeltere/abweichende Antworten sind flach oder haben "base" direkt – alle
+    drei Formen werden hier abgedeckt (die Extension tut dasselbe).
+    """
+    inner = a.get("appointment") if isinstance(a.get("appointment"), dict) else a
+    base = inner.get("base") if isinstance(inner.get("base"), dict) else inner
+    calc = inner.get("calculated") if isinstance(inner.get("calculated"), dict) else {}
     cal = base.get("calendar") or a.get("calendar") or {}
+    # Bei SERIENTERMINEN traegt base.startDate den Beginn der SERIE (oft Jahre
+    # her) – das Datum dieses Vorkommens steht in calculated.startDate. Erst
+    # dort nachsehen, sonst faellt jeder Serientermin aus dem Zeitfenster und
+    # wird nie ausgeloest.
+    start = _parse_dt(calc.get("startDate") or base.get("startDate"))
     return {
         "kind": "appointment",
         "id": str(base.get("id") or a.get("id") or ""),
-        "title": base.get("title") or base.get("caption") or "",
-        "start": _parse_dt(base.get("startDate") or a.get("startDate") or a.get("calculatedStartDate")),
+        "title": (base.get("title") or base.get("caption") or "").strip(),
+        "start": start,
         "calendarId": (cal.get("id") if isinstance(cal, dict) else cal),
-        "category": None,
-    }
-
-
-def _norm_event(e: dict) -> dict:
-    cal = e.get("calendar") or {}
-    cat = e.get("eventCategory") or e.get("category") or {}
-    return {
-        "kind": "event",
-        "id": str(e.get("id") or ""),
-        "title": e.get("name") or e.get("title") or "",
-        "start": _parse_dt(e.get("startDate")),
-        "calendarId": (cal.get("id") if isinstance(cal, dict) else cal),
-        "category": (cat.get("name") if isinstance(cat, dict) else cat) or None,
     }
