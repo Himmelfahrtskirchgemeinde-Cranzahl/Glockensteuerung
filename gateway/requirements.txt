@@ -1,2 +1,5 @@
 paho-mqtt>=2.0
 requests>=2.28
+# Wurzelzertifikate. Kommt zwar mit 'requests', wird aber auch direkt fuer MQTT
+# und SMTP gebraucht - unter Windows bringt Python selbst keine mit.
+certifi>=2024.2.2
