@@ -21,6 +21,7 @@ Beispiele:
     python voco_mqtt.py stop ALL --yes
 """
 import argparse
+import logging
 import os
 import ssl
 
@@ -32,6 +33,8 @@ try:
     import paho.mqtt.client as mqtt
 except ImportError:
     sys.exit("Fehlt: paho-mqtt  ->  pip install paho-mqtt")
+
+log = logging.getLogger("voco-gateway")
 
 # Optionales .env-Laden (ohne Zusatzpaket)
 def load_dotenv(path=".env"):
@@ -97,7 +100,12 @@ class Voco:
         # tls.py.
         self.c.tls_set_context(tls.context_fuer(self.host, self.port))
         self.c.on_connect = self._on_connect
+        self.c.on_disconnect = self._on_disconnect
         self.c.on_message = self._on_message
+        # Wird vom Dienst gesetzt, um Verbindungswechsel zu protokollieren.
+        # Standardmaessig passiert nichts - das Kommandozeilenwerkzeug braucht
+        # kein Protokoll in ChurchTools.
+        self.on_zustand = None
 
     def connect(self, timeout=10):
         try:
@@ -138,6 +146,26 @@ class Voco:
     # 'properties' herein, was *a auffaengt. rc und flags werden nicht benutzt.
     def _on_connect(self, client, userdata, flags, rc, *a):
         client.subscribe(self.base + "/#")
+        self._melde_zustand(True)
+
+    # Auch hier passt die Signatur fuer beide Callback-Fassungen: Version 2
+    # reicht zusaetzlich Flags und Properties herein, die *a auffaengt.
+    def _on_disconnect(self, client, userdata, rc, *a):
+        self._melde_zustand(False)
+
+    def _melde_zustand(self, verbunden: bool) -> None:
+        """Verbindungswechsel weitermelden - ohne den MQTT-Faden zu gefaehrden.
+
+        Der Rueckruf laeuft im Netzwerk-Faden von paho. Eine Ausnahme darin
+        wuerde dort landen, wo sie niemand faengt; im schlimmsten Fall steht
+        danach die Verbindung still. Deshalb hier abgefangen.
+        """
+        if not self.on_zustand:
+            return
+        try:
+            self.on_zustand(verbunden)
+        except Exception as e:
+            log.warning("Zustandsmeldung fehlgeschlagen: %s", e)
 
     def _on_message(self, client, userdata, msg):
         topic = msg.topic[len(self.base):]  # fuehrendes Basis-Topic abschneiden
