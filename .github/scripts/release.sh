@@ -13,9 +13,11 @@
 # Also bekommt jede Version ihr eigenes Release. Das ist ohnehin die Form, auf
 # die GitHub mit dieser Einstellung hinauswill.
 #
-# Jedes Release traegt ZWEI Dateien:
-#   glockensteuerung-v<version>.zip   das Archiv dieser Version
-#   glockensteuerung.zip              derselbe Inhalt unter festem Namen
+# Jedes Release traegt zu jedem Archiv ZWEI Dateien:
+#   glockensteuerung-v<version>.zip           das Archiv dieser Version
+#   glockensteuerung.zip                      derselbe Inhalt unter festem Namen
+#   glockensteuerung-gateway-v<version>.zip   der Dienst fuer den eigenen Rechner
+#   glockensteuerung-gateway.zip              derselbe Inhalt unter festem Namen
 #
 # Der feste Name macht den Dauerlink moeglich, ohne je ein Release nachtraeglich
 # anfassen zu muessen: GitHub liefert unter
@@ -50,11 +52,17 @@ if [ -z "${REPO}" ]; then
 fi
 
 {
-  printf 'Automatisch gebaute ChurchTools-Extension. Die ZIP unten herunterladen und\n'
-  printf '**unveraendert** in ChurchTools hochladen (kein Entpacken noetig).\n\n'
+  printf 'Automatisch gebauter Stand. Unten liegen zwei Archive:\n\n'
+  printf '* **glockensteuerung.zip** - die Erweiterung. Unveraendert in ChurchTools\n'
+  printf '  hochladen, kein Entpacken noetig.\n'
+  printf '* **glockensteuerung-gateway.zip** - der Dienst, der automatisch laeutet.\n'
+  printf '  Auf dem Rechner entpacken, der dauerhaft laeuft (siehe README darin).\n\n'
   if [ -n "${REPO}" ]; then
-    printf 'Dauerlink zur jeweils neuesten Fassung (bleibt immer gleich):\n'
-    printf 'https://github.com/%s/releases/latest/download/glockensteuerung.zip\n\n' "${REPO}"
+    printf 'Dauerlinks zur jeweils neuesten Fassung (bleiben immer gleich):\n\n'
+    printf '* Erweiterung fuer ChurchTools:\n'
+    printf '  https://github.com/%s/releases/latest/download/glockensteuerung.zip\n' "${REPO}"
+    printf '* Gateway-Dienst fuer den eigenen Rechner:\n'
+    printf '  https://github.com/%s/releases/latest/download/glockensteuerung-gateway.zip\n\n' "${REPO}"
   fi
   # Ab hier beginnt der Changelog. Die Extension zeigt beim Klick auf die
   # Versionsnummer nur den Teil hinter dieser Marke - Einleitung und Dauerlink
@@ -63,13 +71,20 @@ fi
   bash "${HIER}/changelog.sh" "${TAG}"
 } > "${NOTES_FILE}"
 
-# Feste Kopie daneben legen. Ohne sie gaebe es keinen Link zum Weitergeben - der
-# Name der versionierten ZIP wechselt ja mit jeder Version.
-DATEIEN=("${ZIPS[@]}")
-if [ "${#ZIPS[@]}" -gt 0 ] && [ -f "${ZIPS[0]}" ]; then
-  cp "${ZIPS[0]}" "${ARBEIT}/glockensteuerung.zip"
-  DATEIEN+=("${ARBEIT}/glockensteuerung.zip")
-fi
+# Zu jedem Archiv eine feste Kopie daneben legen. Ohne sie gaebe es keinen Link
+# zum Weitergeben - der Name der versionierten ZIP wechselt ja mit jeder Version.
+# Aus 'glockensteuerung-gateway-v26.6.7.zip' wird 'glockensteuerung-gateway.zip'.
+DATEIEN=()
+for z in "${ZIPS[@]}"; do
+  [ -f "${z}" ] || continue
+  DATEIEN+=("${z}")
+  basis="$(basename "${z}")"
+  fest="$(printf '%s' "${basis}" | sed -E 's/-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+-g[0-9a-f]+)?\.zip$/.zip/')"
+  if [ "${fest}" != "${basis}" ]; then
+    cp "${z}" "${ARBEIT}/${fest}"
+    DATEIEN+=("${ARBEIT}/${fest}")
+  fi
+done
 
 # Ein bestehendes Release ist unveraenderlich - bei einem erneuten Lauf desselben
 # Tags bleibt es unangetastet, statt mit einem Fehler abzubrechen.

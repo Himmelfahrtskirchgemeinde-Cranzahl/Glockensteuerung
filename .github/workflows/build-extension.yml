@@ -85,12 +85,19 @@ jobs:
       - name: Bauen und ZIP packen
         run: npm run deploy   # = build + scripts/package.js -> releases/*.zip
 
+      - name: Gateway als ZIP packen
+        # Landet neben der Extension-ZIP, damit beide denselben Weg nehmen:
+        # Artifact, Release, Dauerlink. Die Versionsnummer holt sich das Skript
+        # aus 'git describe' - dieselbe Quelle wie scripts/package.js.
+        run: bash ../.github/scripts/gateway-zip.sh releases
+
       - name: ZIP als Download bereitstellen (Artifact)
         uses: actions/upload-artifact@v4
         with:
           name: glockensteuerung-extension
           path: extension/releases/*.zip
           if-no-files-found: error
+        # Enthaelt beide Archive: die Erweiterung und den Gateway-Dienst.
 
       - name: Bei Versions-Tag ein Release mit der ZIP erstellen
         if: startsWith(github.ref, 'refs/tags/v')
