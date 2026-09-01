@@ -149,14 +149,25 @@ Unter **„Automatik-Regeln"** je Anlass eine Regel:
 |---|---|
 | **Name** | frei, z. B. „Sonntagsgottesdienst" |
 | **Kalender** | optional: nur Termine dieses Kalenders |
-| **Veranstaltungsart** | optional: nur diese Kategorie (z. B. „Beerdigung") |
+| **Termin-Titel** | optional: nur Termine mit **exakt** diesem Titel (z. B. „Gottesdienst") |
 | **Läuteprogramm** | Name des Sofort-PGS, der ausgelöst wird |
 | **Vorlauf (Min.)** | wie viele Minuten **vor** Terminbeginn geläutet wird |
 | **Aktiv** | Regel ein/aus |
 
-Kalender **und** Veranstaltungsart lassen sich kombinieren (beides gesetzt =
-beide Bedingungen müssen zutreffen; nichts gesetzt = jeder Termin). **Regeln
+Kalender **und** Termin-Titel lassen sich kombinieren (beides gesetzt = beide
+Bedingungen müssen zutreffen; nichts gesetzt = jeder Termin). **Regeln
 speichern.**
+
+Der Titel wird **exakt** verglichen – Groß-/Kleinschreibung und Leerzeichen am
+Rand spielen keine Rolle, der Rest muss aber Zeichen für Zeichen stimmen. „Gottesdienst"
+trifft deshalb **nur** Termine, die genau so heißen, und **nicht** zusätzlich
+„Festgottesdienst". Für beide Anlässe legt man also zwei Regeln an.
+
+> Früher stand hier die **Veranstaltungsart**. Die hängt in ChurchTools aber
+> nicht am Termin, sondern an einer verknüpften Veranstaltung, und ist dort
+> meist gar nicht gepflegt – solche Regeln griffen deshalb nie. Bestehende
+> Regeln übernehmen den alten Eintrag automatisch als Termin-Titel; bitte
+> einmal prüfen, ob er mit dem Titel im Kalender übereinstimmt.
 
 ---
 
@@ -308,7 +319,7 @@ Angehängt werden nur technische Angaben (Instanz-Host, Version, letzte Ereignis
 |---|---|
 | „Gerät offline" in der Extension | Seriennummer/Passwort falsch, oder VOCO gerade nicht mit dem HEW-Broker verbunden (Internet am Gerät prüfen). |
 | Keine Programme in der Liste | Am Gerät sind (noch) keine **Sofort-PGS** angelegt. |
-| `--dry-run` zeigt keine Auslösungen | Regeln passen nicht (Kalender-ID/Veranstaltungsart), oder im Zeitraum liegen keine Termine. Kalender/Kategorie-Schreibweise prüfen. |
+| `--dry-run` zeigt keine Auslösungen | Der Gateway schreibt den Grund ins Log: keine Termine im Zeitraum, oder kein Titel passt exakt (er nennt dann Gesuchtes **und** Vorhandenes). Danach Schreibweise bzw. Kalender der Regel korrigieren. |
 | ChurchTools-Login schlägt fehl | `CT_BASE_URL`/`CT_LOGIN_TOKEN` prüfen; Benutzer braucht Leserechte. |
 | Extension lädt lokal nicht (`npm run dev`) | CORS in ChurchTools erlauben: System-Einstellungen → Integrationen → API → CORS → Origin `http://localhost:5173`. |
 | Endpunkte/Feldnamen weichen ab | ChurchTools-API-Versionen unterscheiden sich – gegen `https://<gemeinde>.church.tools/api` (Swagger) prüfen; ggf. `gateway/churchtools.py` anpassen. |
