@@ -15,15 +15,64 @@ export interface VocoConfig {
     brokerPass?: string;   // Standard: vocoWeb
 }
 
-// Sonderzeichen-Mapping (Steuerbyte -> Zeichen) nur fuer ANZEIGE
+/**
+ * Sonderzeichen-Mapping (Steuerbyte -> Zeichen), nur für die ANZEIGE.
+ *
+ * Die Folge ist lückenlos: 0x24 bis 0x2B, also `$ % & ' ( ) * +`. Hier standen
+ * für ö und ü einmal 0x30 und 0x31 – das sind aber die Ziffern **0 und 1**.
+ * Genau daran scheiterte die Anzeige: Aus „TESTLÄUTEN - 1 min." wurde
+ * „TESTLÄUTEN - ü min.". Die Verwechslung ist leicht zu erklären: Die Werte
+ * stehen im Original dezimal (36…43), und wer sie als 24, 25, … 29, 30, 31
+ * weiterzählt, trifft bei den letzten beiden statt 0x2A/0x2B die Ziffern.
+ */
 const DECODE: Record<number, string> = {
     0x24: ':', 0x25: 'ß', 0x26: 'Ä', 0x27: 'Ö',
-    0x28: 'Ü', 0x29: 'ä', 0x30: 'ö', 0x31: 'ü',
+    0x28: 'Ü', 0x29: 'ä', 0x2a: 'ö', 0x2b: 'ü',
 };
+
+/**
+ * Macht aus einer Bytefolge Text – ohne dabei Umlaute zu verlieren.
+ *
+ * Die Anlage schickt ihre Namen als rohe Bytes, und welchen Zeichensatz sie
+ * dabei benutzt, hängt vom Gerät ab. Deshalb wird nicht geraten: Ergibt die
+ * Folge gültiges UTF-8 mit Zeichen jenseits von ASCII, ist sie UTF-8 – anders
+ * kommt so eine Folge praktisch nicht zustande. Sonst bleibt es bei Latin-1,
+ * wie es hereinkam.
+ *
+ * Wichtig ist die Reihenfolge: Gelesen wird zuerst Latin-1 (ein Byte = ein
+ * Zeichen), denn die Längenangaben im Listenformat zählen Bytes. Erst der
+ * fertig geschnittene Name wird hier zurechtgerückt.
+ */
+function alsText(latin1: string): string {
+    // Reines ASCII? Dann gibt es nichts zu entscheiden.
+    if (!/[\u0080-\u00ff]/.test(latin1)) return latin1;
+    try {
+        const bytes = Uint8Array.from(latin1, (c) => c.charCodeAt(0) & 0xff);
+        return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    } catch {
+        return latin1;   // kein UTF-8 – war also schon richtig
+    }
+}
 
 export function decodeName(raw: string): string {
     let out = '';
-    for (const ch of raw) out += DECODE[ch.charCodeAt(0)] ?? ch;
+    for (const ch of alsText(raw)) out += DECODE[ch.charCodeAt(0)] ?? ch;
+    return out;
+}
+
+/**
+ * Rohe Nutzdaten als Text, ein Byte je Zeichen (Latin-1).
+ *
+ * Bewusst von Hand statt über `payload.toString('latin1')`: Im Browser ist
+ * `Buffer` nachgebaut, und ob der Nachbau diesen Zeichensatz beherrscht, ist
+ * nicht garantiert. Fiele er auf UTF-8 zurück, wären Umlaute schon hier
+ * zerstört – und die Längenangaben im Listenformat gingen mit ihnen kaputt,
+ * weil UTF-8 für ein Zeichen zwei Bytes braucht. Dann stünde nicht nur ein
+ * falscher Buchstabe da, sondern die halbe Liste wäre verschoben.
+ */
+export function binaerText(payload: Uint8Array | { length: number; [i: number]: number }): string {
+    let out = '';
+    for (let i = 0; i < payload.length; i++) out += String.fromCharCode(payload[i] & 0xff);
     return out;
 }
 
@@ -139,7 +188,7 @@ export class VocoMqtt {
                 else this.log('Verbindung unterbrochen – verbinde neu …', 'info');
             });
             c.on('offline', () => { if (settled) this.log('Verbindung unterbrochen – verbinde neu …', 'info'); });
-            c.on('message', (topic, payload) => this.onMessage(topic, payload.toString('latin1')));
+            c.on('message', (topic, payload) => this.onMessage(topic, binaerText(payload)));
         });
     }
 
@@ -189,7 +238,11 @@ export class VocoMqtt {
         // Hinweis zur Kennzeichnung: Gerätestatus, Listen, Katalog und Echos sind
         // laufende INFOS (ℹ). Als „Antwort" (◀) gilt nur echtes Läuten – das wird
         // in App.vue aus der Änderung der laufenden Programme abgeleitet.
-        const short = payload.length > 80 ? payload.slice(0, 80) + '…' : payload;
+        // Fuer die Anzeige im Ereignis-Log zurechtgerueckt - sonst stuenden dort
+        // die rohen Bytes. Das Parsen weiter unten arbeitet weiter mit `payload`,
+        // weil die Laengenangaben Bytes zaehlen.
+        const lesbar = decodeName(payload);
+        const short = lesbar.length > 80 ? lesbar.slice(0, 80) + '…' : lesbar;
         if (sub === '/connection') {
             this.status.online = payload === '1';
             this.log(`Gerät meldet: ${payload === '1' ? 'online' : 'offline'}`, 'info');

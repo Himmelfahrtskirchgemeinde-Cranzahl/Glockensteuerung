@@ -42,12 +42,35 @@ log = logging.getLogger("voco-gateway")
 # neben dem Programm, nicht im Arbeitsverzeichnis (siehe pfade.py).
 load_dotenv()
 
-# Sonderzeichen-Mapping (Steuerbyte -> Zeichen), nur fuer die ANZEIGE
+# Sonderzeichen-Mapping (Steuerbyte -> Zeichen), nur fuer die ANZEIGE.
+#
+# Die Folge ist lueckenlos: 0x24 bis 0x2B. Fuer oe und ue standen hier einmal
+# 0x30 und 0x31 - das sind aber die ZIFFERN 0 und 1. Aus "TESTLAEUTEN - 1 min."
+# wurde damit "TESTLAEUTEN - ue min.". Die Verwechslung ist leicht zu erklaeren:
+# Im Original stehen die Werte dezimal (36...43); wer sie als 24, 25, ... 29,
+# 30, 31 weiterzaehlt, trifft bei den letzten beiden statt 0x2A/0x2B die Ziffern.
 DECODE = {0x24: ":", 0x25: "ß", 0x26: "Ä", 0x27: "Ö",
-          0x28: "Ü", 0x29: "ä", 0x30: "ö", 0x31: "ü"}
+          0x28: "Ü", 0x29: "ä", 0x2A: "ö", 0x2B: "ü"}
+
+
+def _als_text(roh: str) -> str:
+    """Umlaute richtigstellen, falls die Anlage UTF-8 spricht.
+
+    Gelesen wird zuerst latin-1 (ein Byte = ein Zeichen), weil die
+    Laengenangaben im Listenformat Bytes zaehlen. Ergibt dieselbe Bytefolge
+    gueltiges UTF-8 mit Zeichen jenseits von ASCII, war sie UTF-8 - anders
+    kommt so eine Folge praktisch nicht zustande.
+    """
+    if all(ord(c) < 0x80 for c in roh):
+        return roh
+    try:
+        return roh.encode("latin-1").decode("utf-8")
+    except Exception:
+        return roh
+
 
 def decode_name(raw: str) -> str:
-    return "".join(DECODE.get(ord(c), c) for c in raw)
+    return "".join(DECODE.get(ord(c), c) for c in _als_text(raw))
 
 
 class Voco:

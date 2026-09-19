@@ -25,73 +25,17 @@ permissions:
   contents: write   # noetig, um bei Tags ein Release zu erstellen
 
 jobs:
-  # Die fertige Programmdatei fuer Windows. Sie muss auf einem Windows-Laeufer
-  # entstehen - eine EXE laesst sich unter Linux nicht bauen. Der Dienst enthaelt
-  # alles: Python, paho, requests, certifi und pywin32. Auf dem Rechner der
-  # Gemeinde ist dann nichts mehr zu installieren.
-  programmdatei:
-    name: Windows-Programmdatei bauen
-    runs-on: windows-latest
-    # Scheitert der Windows-Lauf, soll trotzdem ein Release entstehen - dann
-    # eben nur mit den Archiven. Ein Fehler hier darf nicht alles aufhalten.
-    continue-on-error: true
-    steps:
-      - name: Code auschecken
-        uses: actions/checkout@v4
-
-      - name: Python einrichten
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Abhaengigkeiten installieren
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r gateway/requirements.txt pyinstaller
-
-      - name: Programmdatei bauen
-        # --onefile: eine einzige Datei, die sich irgendwohin legen laesst.
-        # Die verdeckten Importe sind noetig, weil diese Module erst zur
-        # Laufzeit geladen werden (im Menue) bzw. von pywin32 gebraucht werden -
-        # PyInstaller saehe sie sonst nicht und liesse sie weg.
-        run: >
-          pyinstaller --onefile --clean
-          --name Glockensteuerung-Gateway
-          --paths gateway
-          --hidden-import diagnose
-          --hidden-import einrichtung
-          --hidden-import win32timezone
-          --hidden-import servicemanager
-          gateway/dienst.py
-
-      - name: Kurz gegenpruefen, dass sie laeuft
-        # Ein Build, der zwar durchlaeuft, aber beim ersten Start ueber einen
-        # fehlenden Import stolpert, faellt sonst erst auf dem Rechner der
-        # Gemeinde auf.
-        run: ./dist/Glockensteuerung-Gateway.exe --status
-
-      - name: Programmdatei bereitstellen
-        uses: actions/upload-artifact@v4
-        with:
-          name: glockensteuerung-gateway-exe
-          path: dist/Glockensteuerung-Gateway.exe
-          if-no-files-found: error
-
-  build:
-    needs: programmdatei
-    # Auch dann weiterbauen, wenn die Programmdatei nicht zustande kam.
-    if: always()
+  # Erst die Versionsnummer, dann bauen. Frueher entstand sie mitten im
+  # Extension-Job - die Programmdatei fuer Windows wurde da schon gebaut und
+  # trug deshalb die Nummer der VORIGEN Version.
+  version:
+    name: Versionsnummer festlegen
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: extension
-    env:
-      # Modul-Key der Extension (muss zum Gateway VOCO_EXT_KEY passen)
-      VITE_KEY: glockensteuerung
-      # Zentraler Feedback-/Fehler-Endpunkt (optional): als Repository-Variable
-      # anlegen (Settings -> Secrets and variables -> Actions -> Variables ->
-      # VITE_FEEDBACK_URL). Leer = Feedback per mailto, keine Auto-Fehlermeldung.
-      VITE_FEEDBACK_URL: ${{ vars.VITE_FEEDBACK_URL }}
+    outputs:
+      # Nur auf main gesetzt: der neu vergebene Tag (loest das Release aus).
+      tag: ${{ steps.bump.outputs.tag }}
+      # Immer gesetzt: die Nummer, mit der gebaut wird.
+      version: ${{ steps.bump.outputs.version }}
     steps:
       - name: Code auschecken
         uses: actions/checkout@v4
@@ -100,12 +44,18 @@ jobs:
 
       - name: Auto-Version (Patch-Tag) bei Merge auf main
         id: bump
-        if: github.ref == 'refs/heads/main'
         # Erhöht den Patch des letzten v-Tags (v0.4.0 -> v0.4.1) und setzt den Tag
         # VOR dem Build, damit `git describe` (package.js) die neue Version nimmt.
         # Fuer eine groessere Version einfach manuell einen Tag pushen (z. B.
         # v0.5.0) – der Auto-Bump zaehlt danach ab dort weiter.
         run: |
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            # Auf einem Zweig wird nichts getaggt - gebaut wird mit dem Stand,
+            # den `git describe` hergibt.
+            VER="$(git describe --tags --always --match 'v*' 2>/dev/null | sed 's/^v//')"
+            echo "version=${VER:-0.0.0}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # Hauptversion = zweistellige Jahreszahl (2026 -> 26, 2027 -> 27).
           # Wird automatisch aus dem aktuellen Datum abgeleitet: Der erste Merge
           # im neuen Jahr startet von selbst bei v27.0.0.
@@ -140,6 +90,88 @@ jobs:
           git tag "$NEXT"
           git push origin "$NEXT"
           echo "tag=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "version=${MA}.${MI}.${PA}" >> "$GITHUB_OUTPUT"
+
+  # Die fertige Programmdatei fuer Windows. Sie muss auf einem Windows-Laeufer
+  # entstehen - eine EXE laesst sich unter Linux nicht bauen. Der Dienst enthaelt
+  # alles: Python, paho, requests, certifi und pywin32. Auf dem Rechner der
+  # Gemeinde ist dann nichts mehr zu installieren.
+  programmdatei:
+    name: Windows-Programmdatei bauen
+    needs: version
+    runs-on: windows-latest
+    # Scheitert der Windows-Lauf, soll trotzdem ein Release entstehen - dann
+    # eben nur mit den Archiven. Ein Fehler hier darf nicht alles aufhalten.
+    continue-on-error: true
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Abhaengigkeiten installieren
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r gateway/requirements.txt pyinstaller
+
+      - name: Versionsnummer einbacken
+        # Ohne das wuesste die fertige Datei nicht, welcher Stand in ihr steckt:
+        # Die Datei VERSION lag bisher im Quelltext-Archiv, das es nicht mehr
+        # gibt. '--status' soll die Nummer aber nennen koennen.
+        shell: bash
+        run: printf 'VERSION = "%s"\n' "${{ needs.version.outputs.version }}" > gateway/version.py
+
+      - name: Programmdatei bauen
+        # --onefile: eine einzige Datei, die sich irgendwohin legen laesst.
+        # Die verdeckten Importe sind noetig, weil diese Module erst zur
+        # Laufzeit geladen werden (im Menue) bzw. von pywin32 gebraucht werden -
+        # PyInstaller saehe sie sonst nicht und liesse sie weg.
+        run: >
+          pyinstaller --onefile --clean
+          --name Glockensteuerung-Gateway
+          --paths gateway
+          --hidden-import diagnose
+          --hidden-import einrichtung
+          --hidden-import win32timezone
+          --hidden-import servicemanager
+          gateway/dienst.py
+
+      - name: Kurz gegenpruefen, dass sie laeuft
+        # Ein Build, der zwar durchlaeuft, aber beim ersten Start ueber einen
+        # fehlenden Import stolpert, faellt sonst erst auf dem Rechner der
+        # Gemeinde auf.
+        run: ./dist/Glockensteuerung-Gateway.exe --status
+
+      - name: Programmdatei bereitstellen
+        uses: actions/upload-artifact@v4
+        with:
+          name: glockensteuerung-gateway-exe
+          path: dist/Glockensteuerung-Gateway.exe
+          if-no-files-found: error
+
+  build:
+    needs: [version, programmdatei]
+    # Auch dann weiterbauen, wenn die Programmdatei nicht zustande kam.
+    if: always()
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extension
+    env:
+      # Modul-Key der Extension (muss zum Gateway VOCO_EXT_KEY passen)
+      VITE_KEY: glockensteuerung
+      # Zentraler Feedback-/Fehler-Endpunkt (optional): als Repository-Variable
+      # anlegen (Settings -> Secrets and variables -> Actions -> Variables ->
+      # VITE_FEEDBACK_URL). Leer = Feedback per mailto, keine Auto-Fehlermeldung.
+      VITE_FEEDBACK_URL: ${{ vars.VITE_FEEDBACK_URL }}
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # volle History + Tags, damit `git describe` die Version findet
 
       - name: Node einrichten
         uses: actions/setup-node@v4
@@ -160,12 +192,6 @@ jobs:
         with:
           name: glockensteuerung-gateway-exe
           path: extension/releases
-
-      - name: Gateway als ZIP packen
-        # Landet neben der Extension-ZIP, damit beide denselben Weg nehmen:
-        # Artifact, Release, Dauerlink. Die Versionsnummer holt sich das Skript
-        # aus 'git describe' - dieselbe Quelle wie scripts/package.js.
-        run: bash ../.github/scripts/gateway-zip.sh releases
 
       - name: ZIP als Download bereitstellen (Artifact)
         uses: actions/upload-artifact@v4
@@ -191,7 +217,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # Der per GITHUB_TOKEN gepushte Tag loest keinen weiteren Workflow aus,
         # daher wird das Release hier direkt erstellt/erweitert.
-        run: bash ../.github/scripts/release.sh "${{ steps.bump.outputs.tag }}" releases/*.zip releases/*.exe
+        run: bash ../.github/scripts/release.sh "${{ needs.version.outputs.tag }}" releases/*.zip releases/*.exe
 
       # Das rollierende "latest"-Release ist entfallen: Es lebte davon, seine ZIP
       # bei jedem Merge zu ersetzen - mit unveraenderlichen Releases geht das

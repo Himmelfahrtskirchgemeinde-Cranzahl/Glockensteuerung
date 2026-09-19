@@ -49,13 +49,29 @@ Zum Einrichten und Testen, ohne dass wirklich geläutet wird:
   `python scheduler.py --dry-run`) – oder dauerhaft `VOCO_SIMULATION=1`, was die
   Einrichtung beim ersten Mal von selbst vorschlägt.
 
+## Download (bleibt immer gleich)
+
+Diese drei Links liefern stets die **neueste** veröffentlichte Fassung – sie
+ändern sich nie, auch nicht mit der Version:
+
+| Was | Link |
+|---|---|
+| Erweiterung für ChurchTools | [`glockensteuerung.zip`](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest/download/glockensteuerung.zip) |
+| Gateway-Dienst für Windows (fertig gebaut) | [`Glockensteuerung-Gateway.exe`](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest/download/Glockensteuerung-Gateway.exe) |
+| Gateway-Dienst als Quelltext (Linux, eigenes Python) | „Source code" im [neuesten Release](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest) – der Ordner `gateway/` steckt darin |
+
+Welche Version dahintersteckt, sagt der Titel des
+[neuesten Releases](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest).
+
 ## Schnellstart
 
 1. **Extension bauen:** GitHub-Actions-Workflow „ChurchTools-Extension bauen“
    ausführen (liefert die ZIP), oder lokal `cd extension && npm run deploy`.
 2. **In ChurchTools hochladen:** Admin → Erweiterungen → ZIP installieren.
 3. **Gerät + Regeln** im Modul „Glockensteuerung“ eintragen (Simulation an lassen).
-4. **Gateway** auf einem Dauer-Rechner einrichten, mit `--dry-run` testen.
+4. **Gateway** auf einem Dauer-Rechner einrichten: unter Windows die
+   Programmdatei oben herunterladen, neben die `.env` legen, Doppelklick, „1“.
+   Vorher mit `--testlauf` prüfen, ohne dass etwas läutet.
 5. Passt alles: Simulation aus → scharf.
 
 → Details: **[`ANLEITUNG.md`](ANLEITUNG.md)**
