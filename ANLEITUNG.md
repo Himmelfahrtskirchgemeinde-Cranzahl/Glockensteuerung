@@ -214,8 +214,14 @@ Kommandozeile, ohne Aufgabenplanung.
 2. **Ablegen:** in einen eigenen Ordner, zum Beispiel
    `C:\Automationen\Glockensteuerung\gateway`. Wohin, ist frei – der Dienst
    merkt sich den Ort.
-3. **Doppelklick** und **1** wählen: *Einrichten: Zugangsdaten abfragen und
-   Dienst anlegen*.
+3. **Doppelklick** und **1** wählen: *Installieren*.
+
+Dabei entsteht alles Weitere von selbst: der Ordner (falls nötig), die
+Programmdatei darin, die `.env` mit den Zugangsdaten, der Windows-Dienst und
+eine Verknüpfung **„Glockensteuerung"** im Startmenü – darüber sind
+Einstellungen, Status und Protokoll später jederzeit erreichbar.
+
+
 
 Gefragt wird dabei nur nach zwei Dingen:
 
@@ -242,6 +248,9 @@ Was dann von selbst passiert:
 
 - Der Dienst startet **beim Hochfahren des Rechners**, ohne dass sich jemand
   anmeldet.
+- Er läuft weiter, wenn der Rechner **gesperrt** wird (Win+L), sich jemand
+  **abmeldet**, ein **anderer Benutzer** sich anmeldet oder ein neuer Benutzer
+  angelegt wird – er hängt an keiner Anmeldung.
 - Windows startet ihn nach einem Absturz **selbst neu**.
 - Verbindungen, die abreißen, baut er **eigenständig wieder auf**.
 - Er schreibt mit, was passiert – `gateway.log` neben der Programmdatei.
@@ -421,7 +430,8 @@ Angehängt werden nur technische Angaben (Instanz-Host, Version, letzte Ereignis
 | „Gerät offline" in der Extension | Seriennummer/Passwort falsch, oder VOCO gerade nicht mit dem HEW-Broker verbunden (Internet am Gerät prüfen). |
 | „Automatik nicht erreichbar" in der Extension | Der Gateway meldet sich nicht mehr. Unter Windows: `Glockensteuerung-Gateway.exe --status` – dort steht, ob der Dienst läuft und was zuletzt im Protokoll stand. |
 | Der Dienst lief, tat aber nichts | Bis Version 26.7 beendete er sich stillschweigend, sobald die ChurchTools-Sitzung ablief oder beim Hochfahren noch kein Netz da war. Ab 26.8 meldet er sich selbst neu an und versucht es weiter – die neue Fassung installieren. |
-| Es läutet doppelt | Es läuft noch ein zweiter Gateway, meist ein alter Eintrag in der Aufgabenplanung. `--status` nennt solche Einträge; `--installieren` schaltet sie ab. |
+| Es läutet doppelt | Es läuft noch ein zweiter Gateway, meist ein alter Eintrag in der Aufgabenplanung. `--status` nennt solche Einträge; `--installieren` schaltet sie ab. Seit 26.10 zieht sich ein zweiter Gateway von selbst zurück und schreibt den Grund ins Protokoll. |
+| Zeitweise wird gar nicht geläutet | Der Rechner geht schlafen – währenddessen läuft der Dienst nicht. `--status` weist darauf hin; abschalten beim Einrichten oder in den Energieoptionen („Energiesparmodus: Niemals"). |
 | Windows meldet „Der Computer wurde durch Windows geschützt" | Die Programmdatei ist nicht signiert. *Weitere Informationen → Trotzdem ausführen*. |
 | Keine Programme in der Liste | Am Gerät sind (noch) keine **Sofort-PGS** angelegt. |
 | Der Testlauf (`--testlauf`, Menüpunkt 4) zeigt keine Auslösungen | Der Gateway schreibt den Grund ins Log: keine Termine im Zeitraum, oder kein Titel passt exakt (er nennt dann Gesuchtes **und** Vorhandenes). Danach Schreibweise bzw. Kalender der Regel korrigieren. |
