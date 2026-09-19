@@ -26,8 +26,16 @@ export interface VocoConfig {
  * weiterzählt, trifft bei den letzten beiden statt 0x2A/0x2B die Ziffern.
  */
 const DECODE: Record<number, string> = {
+    // Die belegte Folge aus dem Quelltext der Hersteller-App.
     0x24: ':', 0x25: 'ß', 0x26: 'Ä', 0x27: 'Ö',
     0x28: 'Ü', 0x29: 'ä', 0x2a: 'ö', 0x2b: 'ü',
+    // Dieselben acht Zeichen ein zweites Mal, zwölf Stellen tiefer. Die Anlage
+    // benutzt in der Praxis DIESE: „TESTLÄUTEN" kam als TESTL + 0x1A + UTEN an.
+    // Das Ä an dritter Stelle ist damit gemessen; die übrigen sieben folgen der
+    // bekannten Reihenfolge derselben Zeichen. Sie zuzuordnen ist gefahrlos:
+    // 0x18–0x1F sind Steuerzeichen, die in einem Programmnamen nie vorkommen.
+    0x18: ':', 0x19: 'ß', 0x1a: 'Ä', 0x1b: 'Ö',
+    0x1c: 'Ü', 0x1d: 'ä', 0x1e: 'ö', 0x1f: 'ü',
 };
 
 /**

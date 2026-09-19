@@ -50,7 +50,15 @@ load_dotenv()
 # Im Original stehen die Werte dezimal (36...43); wer sie als 24, 25, ... 29,
 # 30, 31 weiterzaehlt, trifft bei den letzten beiden statt 0x2A/0x2B die Ziffern.
 DECODE = {0x24: ":", 0x25: "ß", 0x26: "Ä", 0x27: "Ö",
-          0x28: "Ü", 0x29: "ä", 0x2A: "ö", 0x2B: "ü"}
+          0x28: "Ü", 0x29: "ä", 0x2A: "ö", 0x2B: "ü",
+          # Dieselben acht Zeichen ein zweites Mal, zwoelf Stellen tiefer. Die
+          # Anlage benutzt in der Praxis DIESE: "TESTLAEUTEN" kam als
+          # TESTL + 0x1A + UTEN an. Das Ae an dritter Stelle ist damit gemessen;
+          # die uebrigen sieben folgen der bekannten Reihenfolge. Sie
+          # zuzuordnen ist gefahrlos: 0x18-0x1F sind Steuerzeichen, die in
+          # einem Programmnamen nie vorkommen.
+          0x18: ":", 0x19: "ß", 0x1A: "Ä", 0x1B: "Ö",
+          0x1C: "Ü", 0x1D: "ä", 0x1E: "ö", 0x1F: "ü"}
 
 
 def _als_text(roh: str) -> str:
