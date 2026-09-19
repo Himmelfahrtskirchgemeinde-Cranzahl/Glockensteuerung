@@ -185,6 +185,12 @@ nächsten zehn Minuten erwartet ist.
 > will, braucht einen Wächter außerhalb – etwa eine Überwachung, die den
 > Rechner anpingt.
 
+> **Im Ereignis-Log steht, welche Fassung läuft.** Jede Startmeldung nennt sie
+> („Automatik-Dienst 26.10.0 gestartet …"), und hat sich der Dienst
+> zwischendurch selbst aktualisiert, steht das als eigene Zeile davor:
+> „Automatik-Dienst aktualisiert: 26.10.0 → 26.10.1." Ohne sie bliebe die
+> Selbstaktualisierung völlig unsichtbar.
+
 > Dasselbe gilt für den **Wiederanlauf** nach einer Störung. Reißt eine
 > Verbindung ab, wartet der Dienst 15 Sekunden bis 5 Minuten und nimmt einen
 > neuen Anlauf — gemeldet würde ein Ausfall aber schon nach zwei Minuten.

@@ -14,6 +14,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 
+import pfade
 from kv import KV
 
 log = logging.getLogger("voco-gateway")
@@ -31,6 +32,20 @@ class Heartbeat:
         # zwei Minuten dieselbe Zeile ins Log (und der Notifier mailt sie).
         self._failing = False
 
+    def vorige_version(self) -> str:
+        """Welche Fassung zuletzt ein Lebenszeichen geschrieben hat.
+
+        Damit erkennt der Dienst beim Start, dass er nach einer
+        Aktualisierung eine andere ist als zuvor - und kann es melden. Ein
+        eigener Merkposten waere dafuer nicht noetig: Es steht ohnehin im
+        Lebenszeichen.
+        """
+        try:
+            daten = self.kv.lesen(SCHLUESSEL) or {}
+            return str(daten.get("version") or "")
+        except Exception:
+            return ""
+
     def send(self, *, rules: int, simulation: bool, device: str, mail: bool = False,
              mail_fehler: bool = False,
              update_bis: dt.datetime | None = None,
@@ -42,6 +57,10 @@ class Heartbeat:
         """
         payload = {
             "at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+            # Welche Fassung gerade laeuft. Steht hier, damit es in der
+            # Erweiterung ablesbar ist - und damit der Dienst beim naechsten
+            # Start merkt, dass er eine andere ist als zuvor.
+            "version": pfade.version(),
             "rules": rules,
             "simulation": simulation,
             "device": device,

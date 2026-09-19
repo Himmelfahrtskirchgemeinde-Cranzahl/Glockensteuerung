@@ -292,10 +292,22 @@ def einmal_laufen(dry: bool, notifier: EmailNotifier, erster_start: bool) -> Non
     # Log im Browser vergisst beim Schliessen alles.
     ereignisse = Ereignisse(ct, EXT_KEY)
     waechter = Zustandswaechter(ereignisse)
-    ereignisse.melde("an", ("Automatik-Dienst gestartet und mit ChurchTools verbunden."
+    # Mit welcher Fassung? Das gehoert in die Startmeldung: Wer im Ereignis-Log
+    # nachsieht, warum sich etwas geaendert hat, will nicht erst auf dem
+    # Rechner der Gemeinde nachschauen muessen, welche Fassung dort laeuft.
+    fassung = pfade.version()
+    # Und wenn es eine andere ist als beim letzten Lebenszeichen, hat sich der
+    # Dienst zwischendurch selbst aktualisiert. Das ist eine eigene Meldung
+    # wert - sonst bleibt die Selbstaktualisierung voellig unsichtbar.
+    beat = Heartbeat(ct, EXT_KEY)
+    vorher = beat.vorige_version()
+    if vorher and vorher != fassung:
+        ereignisse.melde("info", f"Automatik-Dienst aktualisiert: {vorher} → {fassung}.")
+    ereignisse.melde("an", (f"Automatik-Dienst {fassung} gestartet und mit "
+                            "ChurchTools verbunden."
                             if erster_start else
-                            "Automatik-Dienst nach einer Störung neu gestartet, "
-                            "Verbindung zu ChurchTools steht wieder.")
+                            f"Automatik-Dienst {fassung} nach einer Störung neu "
+                            "gestartet, Verbindung zu ChurchTools steht wieder.")
                      + (" Simulation: es wird nichts ausgelöst." if dry else ""))
     # Ab hier landen auch Warnungen und Fehler des Dienstes im Ereignis-Log.
     # Ohne das fand man in ChurchTools einen Dienst, der "nicht erreichbar" war,
@@ -323,9 +335,9 @@ def einmal_laufen(dry: bool, notifier: EmailNotifier, erster_start: bool) -> Non
     # Lebenszeichen: Ohne das sieht in der Extension niemand, ob dieser Dienst
     # ueberhaupt laeuft - ein stiller Ausfall faellt sonst erst auf, wenn ein
     # Gottesdienst ungelaeutet bleibt. 0.0 = gleich beim Start einmal senden.
-    beat = Heartbeat(ct, EXT_KEY)
-    # Auch die Dienstschleife braucht ihn: Wenn hier eine Stoerung hochgeht,
-    # soll sie melden koennen, dass der Dienst lebt und neu aufbaut.
+    # Auch die Dienstschleife braucht das Lebenszeichen: Wenn hier eine
+    # Stoerung hochgeht, soll sie melden koennen, dass der Dienst lebt und
+    # neu aufbaut. (Aufgebaut wurde es schon oben, fuer den Versionsvergleich.)
     global LETZTER_BEAT, LETZTER_STAND
     LETZTER_BEAT = beat
     last_beat = 0.0

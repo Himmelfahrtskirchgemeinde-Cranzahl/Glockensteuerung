@@ -122,6 +122,8 @@ export interface GatewayStatus {
     rules?: number;          // wie viele Regeln der Dienst geladen hat
     simulation?: boolean;    // laeuft der Dienst im Simulationsmodus?
     device?: string | null;  // Seriennummer, die er nutzt
+    /** Welche Fassung des Gateways gerade läuft (z. B. „26.10.0"). */
+    version?: string;
     /**
      * Kann Feedback per E-Mail rausgehen? Der Gateway beantwortet das, weil die
      * Extension es nicht kann: Die Zugangsdaten liegen in der Kategorie „email",

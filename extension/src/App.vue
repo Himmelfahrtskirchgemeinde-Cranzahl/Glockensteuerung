@@ -157,6 +157,7 @@ const gatewayPillTitel = computed(() => {
     if (gatewayDown.value) return `Die Automatik meldet sich nicht. ${gatewayDownText.value}`;
     const s = gatewayStatus.value;
     const teile = [gatewayDownText.value];
+    if (s?.version) teile.push(`Fassung ${s.version}.`);
     if (s?.rules != null) teile.push(`${s.rules} aktive Regel(n).`);
     if (s?.simulation) teile.push('Der Dienst läuft in Simulation – er löst nichts aus.');
     return teile.join(' ');
