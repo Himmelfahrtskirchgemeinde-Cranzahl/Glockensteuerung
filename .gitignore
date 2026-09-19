@@ -37,3 +37,4 @@ gateway/state.json
 gateway/zwischenzertifikat.pem
 gateway/gateway.log
 gateway/state.json
+gateway/version.py

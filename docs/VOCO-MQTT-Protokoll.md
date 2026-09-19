@@ -62,7 +62,17 @@ Alle als MQTT-`publish`, `retained=false`, an `hew/voco/<SERIAL><DEVPW>` + Subto
 ## Kodierungs-Eigenheit (Sonderzeichen)
 
 PGS-Namen können Steuerbytes statt Umlauten enthalten (Mapping aus dem JS):
-`0x24→:`, `0x25→ß`, `0x26→Ä`, `0x27→Ö`, `0x28→Ü`, `0x29→ä`, `0x30→ö`, `0x31→ü`.
+`0x24→:`, `0x25→ß`, `0x26→Ä`, `0x27→Ö`, `0x28→Ü`, `0x29→ä`, `0x2A→ö`, `0x2B→ü`.
+
+> Hier stand bis Version 26.8 `0x30→ö`, `0x31→ü` – das sind aber die **Ziffern
+> 0 und 1**, und Programmnamen enthalten Ziffern („… - 1 min."). Die Folge ist
+> lückenlos von `0x24` bis `0x2B`; dezimal sind das 36 bis 43. Wer sie als
+> 24, 25, … 29, 30, 31 weiterzählt, trifft bei den letzten beiden daneben.
+
+Die Namen kommen als rohe Bytes. Gelesen werden sie **Byte für Byte**
+(Latin-1), weil die Längenangaben im Listenformat Bytes zählen – erst der
+fertig geschnittene Name wird als UTF-8 gelesen, falls er gültiges UTF-8
+ergibt.
 → **Zum Anzeigen** dekodieren, **zum Senden** den **rohen** Namen (wie empfangen)
 unverändert verwenden. Der Referenz-Client macht genau das.
 
