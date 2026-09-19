@@ -104,6 +104,12 @@ export interface MailJob {
     body: string;
     /** Wann eingestellt (ISO). Der Gateway raeumt Altes weg. */
     at: string;
+    /**
+     * Eilt: Der Gateway setzt dann die Kopfzeilen für hohe Priorität und
+     * umgeht seine Spam-Sperre. Gedacht für das eine, was keinen Aufschub
+     * duldet — dass die Automatik steht.
+     */
+    dringend?: boolean;
 }
 
 /** Lebenszeichen des Gateway-Dienstes (vom Gateway geschrieben, hier nur gelesen). */
@@ -375,9 +381,19 @@ export class ConfigStore {
      * Es bleiben hoechstens die letzten 20 Nachrichten stehen, damit der Wert
      * nicht unbegrenzt waechst.
      */
-    async queueMail(job: MailJob): Promise<void> {
+    async queueMail(job: MailJob, nurEinmalInnerhalbMs = 0): Promise<boolean> {
         const bisher = await this.loadOutbox();
+        // Entprellung über den Postausgang selbst, nicht über den Browser:
+        // Sonst schickte jede geöffnete Seite dieselbe Störungsmeldung. Was
+        // schon eingestellt ist, sieht jede von ihnen.
+        if (nurEinmalInnerhalbMs > 0) {
+            const grenze = Date.now() - nurEinmalInnerhalbMs;
+            const schonDa = bisher.some((j) => j.subject === job.subject
+                && new Date(j.at).getTime() >= grenze);
+            if (schonDa) return false;
+        }
         await this.upsert('steuerung', 'outbox', [...bisher, job].slice(-20));
+        return true;
     }
 
     saveDevice(device: DeviceConfig) { return this.upsert('steuerung', 'device', device); }
