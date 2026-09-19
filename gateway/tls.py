@@ -177,7 +177,10 @@ def hole_aussteller(urls, timeout: float = 15.0) -> str | None:
         if not str(url).lower().startswith(("http://", "https://")):
             continue
         try:
-            with urllib.request.urlopen(url, timeout=timeout) as antwort:
+            # Auch hier der eigene Kontext: Die Adresse kann https sein, und
+            # dann gilt dasselbe wie ueberall sonst.
+            with urllib.request.urlopen(url, timeout=timeout,
+                                        context=context()) as antwort:
                 daten = antwort.read(200_000)
         except Exception as e:
             log.warning("Ausstellerzertifikat unter %s nicht ladbar: %s", url, e)

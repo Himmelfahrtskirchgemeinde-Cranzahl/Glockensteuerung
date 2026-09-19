@@ -31,6 +31,7 @@ import shutil
 import urllib.request
 
 import pfade
+import tls
 
 log = logging.getLogger("voco-gateway")
 
@@ -96,7 +97,8 @@ def neueste_fassung(zeitgrenze: float = 15.0) -> tuple[str, str, str] | None:
             RELEASES_API,
             headers={"Accept": "application/vnd.github+json",
                      "User-Agent": "Glockensteuerung-Gateway"})
-        with urllib.request.urlopen(anfrage, timeout=zeitgrenze) as antwort:
+        with urllib.request.urlopen(anfrage, timeout=zeitgrenze,
+                                    context=tls.context()) as antwort:
             daten = json.loads(antwort.read().decode("utf-8"))
     except Exception as e:
         log.info("Aktualisierungspruefung nicht moeglich: %s", e)
@@ -150,7 +152,8 @@ def herunterladen(url: str) -> str | None:
     try:
         anfrage = urllib.request.Request(
             url, headers={"User-Agent": "Glockensteuerung-Gateway"})
-        with urllib.request.urlopen(anfrage, timeout=ZEITGRENZE_S) as antwort:
+        with urllib.request.urlopen(anfrage, timeout=ZEITGRENZE_S,
+                                    context=tls.context()) as antwort:
             rohdaten = antwort.read()
     except Exception as e:
         log.warning("Neue Fassung konnte nicht geladen werden: %s", e)

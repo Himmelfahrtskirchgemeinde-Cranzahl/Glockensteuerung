@@ -299,6 +299,22 @@ installiert wird. Bleibt der Fehler:
 pip install --upgrade certifi
 ```
 
+> **Das gilt für jede Verbindung des Dienstes** – zur Anlage, zu ChurchTools,
+> zum Postausgang und zur Aktualisierungsprüfung bei GitHub. Alle benutzen
+> dieselben Quellen (Systemspeicher + `certifi` + ein eigenes Bundle).
+>
+> Die Aktualisierungsprüfung tat das bis Version 26.9.8.1 **nicht**: Sie fragte
+> ohne diese Quellen bei GitHub nach und scheiterte auf Rechnern, deren
+> Windows-Speicher die Wurzel nicht kennt – im Protokoll als
+>
+> ```
+> Aktualisierungspruefung nicht moeglich: <urlopen error [SSL:
+> CERTIFICATE_VERIFY_FAILED] ... unable to get local issuer certificate>
+> ```
+>
+> Der Dienst lief dabei normal weiter und läutete; er blieb nur auf seiner
+> Fassung stehen, weil er keine neue finden konnte.
+
 **Aussteller ist ein Virenscanner, eine Firewall oder die eigene Firma:** Dann
 wird die Verbindung aufgebrochen und im laufenden Betrieb neu ausgestellt.
 `certifi` kann davon nichts wissen — und wird es auch nie. Deren Zertifikat
