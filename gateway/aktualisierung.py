@@ -209,6 +209,14 @@ def neustart_anstossen() -> bool:
     """
     if os.name != "nt":
         return False
+    # Auch dieser Neustart ist gewollt - sonst meldete der Dienst sein eigenes
+    # Aktualisieren als Stoerung, weil der Befehl fuer ihn von aussen kommt
+    # (der Helfer ruft 'sc stop' auf, wie ein Mensch es auch taete).
+    try:
+        with open(pfade.wartungsmarke(), "w", encoding="utf-8") as f:
+            f.write("aktualisierung")
+    except Exception as e:
+        log.warning("Wartungsmarke liess sich nicht setzen: %s", e)
     import subprocess
     befehl = ("ping -n 6 127.0.0.1 >nul & "
               "sc stop Glockensteuerung >nul & "

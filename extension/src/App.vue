@@ -490,7 +490,11 @@ async function stoerungMelden(betreff: string, text: string, dringend = false) {
     // Ohne eingerichteten Postausgang gäbe es nichts zu verschicken. Ob es
     // einen gibt, weiß nur der Gateway — die Zugangsdaten darf die Seite nicht
     // lesen, deshalb steht die Antwort im Lebenszeichen.
-    if (!gatewayStatus.value?.mail) return;
+    //
+    // Gefragt ist hier der Schalter für STÖRUNGEN, nicht der fürs Feedback.
+    // Ältere Gateways melden ihn nicht; dann gilt wie bisher der andere.
+    const s = gatewayStatus.value;
+    if (!(s?.mailFehler ?? s?.mail)) return;
     try {
         const gestellt = await store.queueMail({
             id: `st-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,

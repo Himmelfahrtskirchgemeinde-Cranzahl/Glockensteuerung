@@ -135,25 +135,77 @@ def einrichten() -> int:
     return 0
 
 
+def warte_auf(ziel: str, sekunden: float = 30.0) -> bool:
+    """Wartet, bis der Dienst den Zustand erreicht. True, wenn er ihn erreicht.
+
+    Noetig, weil StopService und StartService zurueckkehren, sobald Windows den
+    Befehl ANGENOMMEN hat - nicht, wenn er ausgefuehrt ist. Wer direkt danach
+    starten will, trifft den Dienst mitten im Anhalten an, und der Start
+    scheitert. Genau daran lag es, dass ein Neustart zweimal noetig war.
+    """
+    import time
+    ende = time.time() + sekunden
+    while time.time() < ende:
+        if zustand() == ziel:
+            return True
+        time.sleep(0.5)
+    return zustand() == ziel
+
+
 def starten() -> int:
     import win32serviceutil
     try:
         win32serviceutil.StartService(NAME)
-        print("Dienst gestartet.")
-        return 0
     except Exception as e:
         print(f"Der Dienst konnte nicht gestartet werden: {e}")
         return 1
+    # Erst melden, wenn er wirklich laeuft - sonst steht "Dienst gestartet" da,
+    # waehrend der Start noch aussteht oder gleich wieder abbricht.
+    if warte_auf("laeuft"):
+        print("Dienst gestartet.")
+        return 0
+    print(f"Der Dienst wurde gestartet, laeuft aber (noch) nicht: {zustand()}.")
+    print("Was dabei schiefging, steht in gateway.log daneben.")
+    return 1
+
+
+# Windows-Fehler 1062: "Der Dienst wurde nicht gestartet." Wer anhalten will,
+# was ohnehin steht, hat sein Ziel bereits erreicht - das ist kein Fehler.
+NICHT_GESTARTET = 1062
+
+
+def _fehlernummer(e: Exception) -> int:
+    """Windows-Fehlernummer aus einer pywin32-Ausnahme, sonst 0."""
+    nr = getattr(e, "winerror", None)
+    if isinstance(nr, int):
+        return nr
+    args = getattr(e, "args", ())
+    return args[0] if args and isinstance(args[0], int) else 0
 
 
 def anhalten() -> int:
+    """Haelt den Dienst an. Ein bereits angehaltener Dienst ist kein Fehler."""
     import win32serviceutil
     try:
         win32serviceutil.StopService(NAME)
+        # Abwarten, bis er wirklich steht. Windows nimmt den Befehl sofort an,
+        # braucht danach aber noch einen Moment; wer gleich weitermacht (etwa
+        # die Programmdatei ersetzt oder neu startet), laeuft sonst ins Leere.
+        if not warte_auf("angehalten"):
+            print(f"Der Dienst haelt noch an (Zustand: {zustand()}).")
+            return 1
         print("Dienst angehalten.")
         return 0
     except Exception as e:
-        print(f"Der Dienst laeuft nicht oder liess sich nicht anhalten: {e}")
+        if _fehlernummer(e) == NICHT_GESTARTET:
+            # (Der Dienst stand schon - dann ist auch nichts abzuwarten.)
+            # Frueher stand hier "Der Dienst laeuft nicht ODER liess sich nicht
+            # anhalten" samt Windows-Fehlertext. Das las sich wie eine Stoerung,
+            # obwohl alles in Ordnung war - beim Neustart erschien es jedes Mal,
+            # wenn der Dienst vorher schon stand.
+            print("Der Dienst lief nicht - es gibt nichts anzuhalten.")
+            return 0
+        print(f"Der Dienst liess sich nicht anhalten: {e}")
         return 1
 
 

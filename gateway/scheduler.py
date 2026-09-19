@@ -65,6 +65,18 @@ HEARTBEAT_S = 30
 LETZTER_BEAT = None
 LETZTER_STAND: dict = {}
 
+# So lange gilt Schweigen nach einem geordneten Anhalten als erwartet. Wer den
+# Dienst anhaelt, tut das zum Ersetzen der Programmdatei oder fuer einen
+# Neustart - beides dauert Minuten. Ohne diese Frist meldete die Erweiterung
+# schon nach zwei Minuten einen Ausfall und schickte die dringende E-Mail,
+# waehrend jemand danebensass und genau das gerade selbst veranlasst hatte.
+# Bleibt der Dienst darueber hinaus weg, ist es ein Ausfall wie jeder andere.
+WARTUNGSFENSTER_S = 15 * 60
+# So lange gilt eine gesetzte Wartungsmarke. Lang genug fuer das Anhalten eines
+# Dienstes, kurz genug, dass eine vergessene Marke nicht spaeter ein echtes
+# Anhalten durch Windows verschluckt.
+WARTUNG_GILT_S = 120
+
 WIEDERANLAUF_MIN_S = 15
 WIEDERANLAUF_MAX_S = 300
 # Ab wann ein Lauf als "hat getragen" gilt und die Wartezeit wieder von vorn
@@ -359,6 +371,7 @@ def einmal_laufen(dry: bool, notifier: EmailNotifier, erster_start: bool) -> Non
                     "simulation": dry,
                     "device": mask_serial(cfg.device.serial if cfg.device else ""),
                     "mail": notifier.enabled and bool(cfg.email and cfg.email.send_feedback),
+                    "mail_fehler": notifier.enabled and bool(cfg.email and cfg.email.send_errors),
                 }
                 beat.send(**LETZTER_STAND)
 
@@ -460,6 +473,52 @@ def einmal_laufen(dry: bool, notifier: EmailNotifier, erster_start: bool) -> Non
         voco.on_zustand = None
         log.removeHandler(log_waechter)
         if beenden:
+            veranlasst = wartung_abholen()
+            # Nur wo der Dienst gleich wiederkommt, bleibt es still. Wird er
+            # dagegen angehalten und bleibt aus - ob von Hand (Menuepunkt 7)
+            # oder von Windows -, gehoert das gemeldet: Bis ihn jemand startet,
+            # laeutet nichts.
+            if veranlasst in ("neustart", "aktualisierung"):
+                # Jemand hat im Menue "anhalten" oder "neu starten" gewaehlt.
+                # Er weiss also Bescheid - eine Stoerungsmeldung waere hier
+                # nur Laerm. Genau so ging eine dringende E-Mail raus, waehrend
+                # der Tausch der Programmdatei lief.
+                pause_melden(WARTUNGSFENSTER_S, "Der Dienst wurde angehalten "
+                                                "(Wartung oder Neustart).")
+            else:
+                # Der Dienst bleibt aus. DAS muss auffallen, und zwar sofort.
+                # Die Erweiterung kann es nicht: Ihre Meldung liegt im
+                # Postausgang, bis der Dienst zurueckkommt - und wenn er nicht
+                # zurueckkommt, kommt auch die Meldung nie. Er lebt jetzt noch
+                # und kann selbst verschicken; das ist der letzte Augenblick,
+                # in dem das geht.
+                von_hand = veranlasst == "anhalten"
+                log.warning("Der Dienst wird angehalten (%s) und bleibt aus, "
+                            "bis ihn jemand startet.",
+                            "von Hand" if von_hand else "Befehl von Windows")
+                woher = (
+                    "Jemand hat ihn von Hand angehalten (Menuepunkt 7) - "
+                    "meist, um die Programmdatei zu ersetzen.\n\n"
+                    "Nach dem Tausch die neue Datei starten und Punkt 1 "
+                    "waehlen, dann laeuft die Automatik wieder."
+                    if von_hand else
+                    "Den Befehl hat Windows gegeben: ein Update, das "
+                    "Herunterfahren des Rechners, der Energiesparmodus oder "
+                    "ein anderes Programm.\n\n"
+                    "Was in der Ereignisanzeige von Windows steht, sagt, wer "
+                    "es war: Windows-Protokolle -> System -> Quelle "
+                    "'Service Control Manager'."
+                )
+                try:
+                    notifier.notify(
+                        "Die Automatik wurde angehalten",
+                        "Der Gateway-Dienst wird gerade angehalten.\n\n"
+                        + woher +
+                        "\n\nSolange er steht, wird zu den Terminen NICHT "
+                        "automatisch gelaeutet.",
+                        dringend=True)
+                except Exception as e:
+                    log.warning("Meldung ueber das Anhalten ging nicht raus: %s", e)
             # Deutlich sagen, WER beendet hat. "Auf Wunsch beendet" las sich wie
             # eine Entscheidung des Programms - dabei kommt der Befehl immer von
             # aussen: aus der Dienststeuerung von Windows (sc stop, services.msc,
@@ -471,6 +530,36 @@ def einmal_laufen(dry: bool, notifier: EmailNotifier, erster_start: bool) -> Non
             ereignisse.melde("info", "Automatik-Dienst wurde angehalten "
                                      "(Befehl von Windows).")
         voco.close()
+
+
+def wartung_abholen() -> str:
+    """Wer hat das Anhalten veranlasst? Die Marke gilt einmal und wird entfernt.
+
+    Gesetzt wird sie kurz vor dem Anhalten - vom Menue oder von der
+    Selbstaktualisierung - und sie sagt, worum es geht:
+
+      "neustart"        Menuepunkt 6. Der Dienst ist gleich wieder da.
+      "aktualisierung"  Selbstaktualisierung. Dasselbe, nur mit neuer Fassung.
+      "anhalten"        Menuepunkt 7. Er bleibt aus, bis ihn jemand startet.
+      ""                Keine Marke: Windows hat angehalten.
+
+    Sie verfaellt nach kurzer Zeit: Eine liegengebliebene duerfte ein echtes
+    Anhalten durch Windows nicht Stunden spaeter noch stumm schalten.
+    """
+    pfad = pfade.wartungsmarke()
+    try:
+        alter = time.time() - os.path.getmtime(pfad)
+        with open(pfad, encoding="utf-8") as f:
+            grund = f.read(40).strip()
+    except Exception:
+        return ""
+    try:
+        os.remove(pfad)
+    except Exception:
+        pass
+    if alter >= WARTUNG_GILT_S:
+        return ""
+    return grund or "anhalten"
 
 
 def pause_melden(warte_s: float, grund: str) -> None:
@@ -592,6 +681,7 @@ def aktualisierung_versuchen(voco, plan, ereignisse, beat, cfg, notifier, dry,
               simulation=dry,
               device=mask_serial(cfg.device.serial if cfg.device else ""),
               mail=notifier.enabled and bool(cfg.email and cfg.email.send_feedback),
+              mail_fehler=notifier.enabled and bool(cfg.email and cfg.email.send_errors),
               update_bis=dt.datetime.now(dt.timezone.utc)
               + dt.timedelta(minutes=UPDATE_FRIST_MIN))
     ereignisse.melde("info", f"Aktualisierung auf Fassung {version} eingespielt. "

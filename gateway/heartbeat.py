@@ -32,6 +32,7 @@ class Heartbeat:
         self._failing = False
 
     def send(self, *, rules: int, simulation: bool, device: str, mail: bool = False,
+             mail_fehler: bool = False,
              update_bis: dt.datetime | None = None,
              pause_bis: dt.datetime | None = None, grund: str = "") -> bool:
         """Schreibt einen Schlag. Gibt zurueck, ob es geklappt hat.
@@ -48,6 +49,11 @@ class Heartbeat:
             # nicht selbst beantworten: Die Zugangsdaten liegen in der Kategorie
             # 'email', die normale Benutzer nicht lesen duerfen.
             "mail": mail,
+            # Zweiter Schalter, getrennt vom ersten: Stoerungsmeldungen haengen
+            # nicht am Feedback-Formular. Wer "Feedback per E-Mail" abschaltet,
+            # aber "Stoerungen melden" anlaesst, bekam sonst keine - obwohl er
+            # sie eingeschaltet hatte.
+            "mailFehler": mail_fehler,
         }
         # Bis dahin ist Schweigen erwartet: Der Dienst startet gerade mit einer
         # neuen Fassung neu. Die Extension meldet in dieser Zeit keine Stoerung

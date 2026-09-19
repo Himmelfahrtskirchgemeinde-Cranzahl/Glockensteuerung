@@ -163,6 +163,27 @@ Der Neustart löst **keine Störungsmeldung** aus: Der Dienst kündigt ihn im
 Lebenszeichen an, und die Erweiterung weiß dadurch, dass Schweigen für die
 nächsten zehn Minuten erwartet ist.
 
+> **Wird der Dienst angehalten, hängt es davon ab, ob er wiederkommt.**
+>
+> | Auslöser | Meldung |
+> |---|---|
+> | **6 – Neustart** | keine: er ist Sekunden später wieder da |
+> | **Selbstaktualisierung** | keine: derselbe Fall, nur mit neuer Fassung |
+> | **7 – Anhalten** | **E-Mail** – er bleibt aus, bis ihn jemand startet |
+> | **Windows** (Update, Herunterfahren, Virenscanner) | **E-Mail** |
+>
+> Verschickt wird sie vom Dienst **selbst**, bevor er geht.
+>
+> Das ist der einzige Augenblick, in dem das überhaupt geht: Die Meldung der
+> Erweiterung liegt im Postausgang, bis der Dienst zurückkommt – **kommt er
+> nicht zurück, kommt auch die Meldung nie**. Ein Browser kann kein SMTP
+> sprechen; verschicken kann nur der Dienst.
+>
+> Was er nicht melden kann: einen Stromausfall oder einen abgestürzten
+> Rechner. Dann ist er weg, bevor er etwas tun könnte. Wer auch das bemerken
+> will, braucht einen Wächter außerhalb – etwa eine Überwachung, die den
+> Rechner anpingt.
+
 > Dasselbe gilt für den **Wiederanlauf** nach einer Störung. Reißt eine
 > Verbindung ab, wartet der Dienst 15 Sekunden bis 5 Minuten und nimmt einen
 > neuen Anlauf — gemeldet würde ein Ausfall aber schon nach zwei Minuten.

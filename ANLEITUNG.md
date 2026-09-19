@@ -361,6 +361,11 @@ Die bisherige Programmdatei bleibt als `.alt` liegen, bis die neue läuft.
 > die dringende E-Mail. So bleibt noch Zeit, von Hand zu läuten, wenn es kurz
 > vor einem Gottesdienst passiert.
 >
+> **Wird der Dienst angehalten und bleibt aus** – von Windows (Update,
+> Herunterfahren, Energiesparen) oder von Hand über Punkt 7 –, schickt er die
+> Meldung **selbst**, bevor er geht. Nur beim Neustart (Punkt 6) und bei der
+> Selbstaktualisierung bleibt es still: Da ist er Sekunden später wieder da.
+>
 > Bemerken kann das allerdings nur eine **geöffnete** Seite – die Erweiterung
 > läuft im Browser, nicht auf einem Server. Wer sichergehen will, lässt das
 > Modul auf dem Gemeindebüro-Rechner offen stehen. Unabhängig davon startet

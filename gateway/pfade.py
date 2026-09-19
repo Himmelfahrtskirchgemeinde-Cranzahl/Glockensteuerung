@@ -20,6 +20,11 @@ import sys
 ENV_DATEI = ".env"
 ZUSTAND_DATEI = "state.json"
 PROTOKOLL_DATEI = "gateway.log"
+# Kurzlebige Marke: Sie sagt dem Dienst, dass das Anhalten gewollt ist - jemand
+# hat im Menue "anhalten" oder "neu starten" gewaehlt. Ohne sie gilt jedes
+# Anhalten als unerwartet und wird gemeldet. Genau darauf kommt es an: Haelt
+# Windows den Dienst an (Update, Absturz, Herunterfahren), soll das auffallen.
+WARTUNG_DATEI = "wartung.marke"
 
 
 def programmordner() -> str:
@@ -94,6 +99,11 @@ def arbeitsordner() -> str:
         except Exception:
             continue
     return programmordner()
+
+
+def wartungsmarke() -> str:
+    """Pfad der Marke fuer ein gewolltes Anhalten - neben dem Programm."""
+    return os.path.join(arbeitsordner(), WARTUNG_DATEI)
 
 
 def zustandsdatei() -> str:

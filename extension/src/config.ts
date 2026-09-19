@@ -129,6 +129,15 @@ export interface GatewayStatus {
      */
     mail?: boolean;
     /**
+     * Dürfen Störungsmeldungen raus? Ein eigener Schalter, nicht derselbe.
+     *
+     * Vorher hing beides an `mail` – also am Feedback-Formular. Wer „Feedback
+     * per E-Mail" abschaltete, aber „Störungen melden" anließ, bekam keine
+     * Störungsmeldungen, obwohl er sie eingeschaltet hatte. Fehlt das Feld
+     * (älterer Gateway), gilt wie bisher `mail`.
+     */
+    mailFehler?: boolean;
+    /**
      * Bis wann ein Neustart erwartet ist (ISO).
      *
      * Der Dienst setzt das, bevor er sich für eine Aktualisierung beendet.

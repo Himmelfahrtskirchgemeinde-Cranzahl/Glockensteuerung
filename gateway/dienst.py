@@ -599,15 +599,51 @@ def entfernen() -> int:
     return 0
 
 
+def wartung_ankuendigen(grund: str) -> None:
+    """Sagt dem laufenden Dienst, wer ihn gleich anhaelt und warum.
+
+    Davon haengt ab, ob es eine Meldung gibt:
+
+      "neustart"  Menuepunkt 6 - er ist gleich wieder da, also still.
+      "anhalten"  Menuepunkt 7 - er bleibt aus, das gehoert gemeldet.
+
+    Ohne Marke gilt das Anhalten als Befehl von Windows und wird ebenfalls
+    gemeldet. Genau so soll es sein: Haelt Windows den Dienst an (Update,
+    Herunterfahren, Virenscanner), muss das auffallen.
+
+    Die Marke ist eine kleine Datei neben dem Programm; der Dienst holt sie
+    beim Beenden ab und entfernt sie dabei.
+    """
+    try:
+        with open(pfade.wartungsmarke(), "w", encoding="utf-8") as f:
+            f.write(grund)
+    except Exception as e:
+        # Kein Abbruch: Dann kommt eben eine Meldung zu viel.
+        print(f"Hinweis: Die Wartungsmarke liess sich nicht setzen ({e}).")
+        print("Es kann deshalb eine Stoerungsmeldung geben, obwohl alles in Ordnung ist.")
+
+
 def neustart() -> int:
     if not ist_admin():
         return als_admin_neu_starten(["--neustart"])
+    wartung_ankuendigen("neustart")
     if not windienst.VERFUEGBAR:
         _schtasks("/End", "/TN", AUFGABE)
         _schtasks("/Run", "/TN", AUFGABE)
         print("Aufgabe neu gestartet.")
         return 0
-    windienst.anhalten()
+    # Erst sagen, was ueberhaupt ansteht: Laeuft der Dienst gar nicht, wird er
+    # nur gestartet - und niemand raetselt, warum das Anhalten "nicht ging".
+    if windienst.zustand() == "laeuft":
+        print("Dienst wird angehalten ...")
+        if windienst.anhalten() != 0:
+            print()
+            print("Der Neustart wurde abgebrochen, weil sich der Dienst nicht")
+            print("anhalten liess. Er laeuft also weiter.")
+            return 1
+    else:
+        print("Der Dienst laeuft gerade nicht - er wird jetzt gestartet.")
+    print("Dienst wird gestartet ...")
     return windienst.starten()
 
 
@@ -620,6 +656,10 @@ def anhalten() -> int:
     """
     if not ist_admin():
         return als_admin_neu_starten(["--anhalten"])
+    # Bewusst "anhalten" und nicht schweigen: Der Dienst bleibt jetzt aus, bis
+    # ihn jemand startet. Daran soll eine Meldung erinnern - auch wenn man es
+    # selbst veranlasst hat und der Tausch der Programmdatei dazwischenkommt.
+    wartung_ankuendigen("anhalten")
     if not windienst.VERFUEGBAR:
         _schtasks("/End", "/TN", AUFGABE)
         print("Angehalten.")
