@@ -7,7 +7,8 @@ Sie braucht kein Python, keine virtuelle Umgebung, keine Pfadangaben und keine
 Aufgabenplanung:
 
     Doppelklick            -> kleines Menue (einrichten, Status, Protokoll)
-    --installieren         -> legt den Windows-Dienst an und startet ihn
+    --installieren         -> fragt die Zugangsdaten ab und legt den Dienst an
+    --einrichten           -> nur die Zugangsdaten (.env) aendern
     --entfernen            -> nimmt ihn wieder heraus
     --status               -> laeuft er? was steht im Protokoll?
     --neustart             -> Dienst anhalten und wieder starten
@@ -232,15 +233,33 @@ def aufgabe_einrichten() -> int:
 
 # --- Einrichten, entfernen, nachsehen -------------------------------------
 
-def _konfiguration_pruefen() -> None:
+def _konfiguration_sicherstellen() -> bool:
+    """Sorgt dafuer, dass Zugangsdaten da sind - notfalls durch Nachfragen.
+
+    Absichtlich VOR der Rechteerhoehung: Die Fragen beantwortet ein Mensch im
+    Fenster, das er gerade offen hat. Im erhoehten Fenster liegt die Datei dann
+    schon vor und es wird nicht erneut gefragt.
+    """
     env = pfade.env_datei()
     if env:
         print(f"Konfiguration gefunden: {env}")
-    else:
-        print("ACHTUNG: Neben dem Programm liegt keine .env mit den Zugangsdaten.")
-        print(f"         Erwartet wird sie hier: {os.path.join(pfade.programmordner(), '.env')}")
-        print("         Der Dienst wird trotzdem eingerichtet - er wartet dann,")
-        print("         bis die Datei da ist.")
+        return True
+    print("Neben dem Programm liegt noch keine Konfiguration.")
+    import einrichtung
+    return einrichtung.assistent()
+
+
+def einrichten() -> int:
+    """Nur die Zugangsdaten - ohne am Dienst etwas zu aendern."""
+    import einrichtung
+    if not einrichtung.assistent():
+        return 1
+    if ist_windows() and windienst.zustand() == "laeuft":
+        print()
+        print("Der Dienst laeuft bereits - damit er die neuen Angaben benutzt,")
+        print("wird er jetzt neu gestartet.")
+        neustart()
+    return 0
 
 
 def installieren() -> int:
@@ -248,10 +267,14 @@ def installieren() -> int:
         print("Diese Einrichtung gibt es nur fuer Windows. Unter Linux gehoert der "
               "Gateway in eine systemd-Unit (siehe README).")
         return 1
+
+    if not _konfiguration_sicherstellen():
+        print()
+        print("Ohne Zugangsdaten wird der Dienst nicht eingerichtet.")
+        return 1
+
     if not ist_admin():
         return als_admin_neu_starten(["--installieren"])
-
-    _konfiguration_pruefen()
     # Zuerst aufraeumen: Ein alter Eintrag wuerde denselben Gateway ein zweites
     # Mal starten, und dann laeutet es doppelt.
     aufgaben_aufraeumen()
@@ -346,13 +369,16 @@ def menue() -> int:
     print("=" * 56)
     if ist_windows():
         print(f"Dienst: {windienst.zustand()}")
-        print()
-    print(" 1  Dienst einrichten (startet kuenftig beim Hochfahren)")
-    print(" 2  Status und Protokoll ansehen")
-    print(" 3  Testlauf im Fenster (loest NICHTS aus)")
-    print(" 4  Verbindung pruefen (Zertifikate)")
-    print(" 5  Dienst neu starten")
-    print(" 6  Dienst wieder entfernen")
+    if not pfade.env_datei():
+        print("Noch nicht eingerichtet - dafuer ist Punkt 1 da.")
+    print()
+    print(" 1  Einrichten: Zugangsdaten abfragen und Dienst anlegen")
+    print(" 2  Nur die Zugangsdaten aendern")
+    print(" 3  Status und Protokoll ansehen")
+    print(" 4  Testlauf im Fenster (loest NICHTS aus)")
+    print(" 5  Verbindung pruefen (Zertifikate)")
+    print(" 6  Dienst neu starten")
+    print(" 7  Dienst wieder entfernen")
     print(" 0  Schliessen")
     print()
     try:
@@ -362,18 +388,20 @@ def menue() -> int:
     if wahl == "1":
         rc = installieren()
     elif wahl == "2":
-        rc = status()
+        rc = einrichten()
     elif wahl == "3":
+        rc = status()
+    elif wahl == "4":
         import scheduler
         scheduler.main(["--dry-run"])
         rc = 0
-    elif wahl == "4":
+    elif wahl == "5":
         import diagnose
         diagnose.main()
         rc = 0
-    elif wahl == "5":
-        rc = neustart()
     elif wahl == "6":
+        rc = neustart()
+    elif wahl == "7":
         rc = entfernen()
     else:
         return 0
@@ -391,6 +419,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="Nur fuer Windows: Start durch die Dienststeuerung")
     ap.add_argument("--dienst", action="store_true", help="Dauerbetrieb im Vordergrund")
     ap.add_argument("--installieren", action="store_true")
+    ap.add_argument("--einrichten", action="store_true",
+                    help="Nur die Zugangsdaten (.env) abfragen und speichern")
     ap.add_argument("--entfernen", action="store_true")
     ap.add_argument("--neustart", action="store_true")
     ap.add_argument("--status", action="store_true")
@@ -409,6 +439,8 @@ def main(argv: list[str] | None = None) -> int:
         scheduler.main([])
     elif args.installieren:
         rc = installieren()
+    elif args.einrichten:
+        rc = einrichten()
     elif args.entfernen:
         rc = entfernen()
     elif args.neustart:

@@ -1,5 +1,13 @@
 # Key-Value Store Guide
 
+> **Hinweis zu diesem Projekt (deutsch):** Diese Datei ist die allgemeine
+> Anleitung aus der ChurchTools-Boilerplate und beschreibt `src/utils/kv-store.ts`.
+> Wie die Glockensteuerung den Speicher tatsächlich benutzt – welche Kategorien
+> es gibt, was darin liegt und warum das Feld `value` ein JSON-**String** ist –
+> steht in [`../docs/ChurchTools-API.md`](../docs/ChurchTools-API.md). Wichtig
+> ist vor allem: Der Gateway liest und schreibt dieselben Daten (`gateway/kv.py`),
+> beide Seiten müssen sich an dasselbe Format halten.
+
 ChurchTools extensions can store persistent data using the ChurchTools key-value store. This guide explains how to use the storage utilities provided in `src/utils/kv-store.ts`.
 
 ## Overview

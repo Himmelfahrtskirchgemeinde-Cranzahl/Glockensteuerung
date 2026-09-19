@@ -9,17 +9,27 @@ vorhandener Dauer-PC. (Steuerung und ChurchTools laufen über das Internet.)
 
 > **📖 Komplette Einrichtung Schritt für Schritt: [`../ANLEITUNG.md`](../ANLEITUNG.md)**
 
-> **🛡️ Simulation:** `python scheduler.py --dry-run` plant und protokolliert,
+> **🛡️ Simulation:** `Glockensteuerung-Gateway.exe --testlauf` bzw.
+> `python scheduler.py --dry-run` plant und protokolliert,
 > löst aber **nicht** aus. Dauerhaft: `VOCO_SIMULATION=1` in der `.env`.
 
 ## Einrichtung
+
+**Windows:** gar nichts von Hand – die fertige Programmdatei fragt beim ersten
+Start nach Adresse und Token und legt die `.env` selbst an (siehe
+„Dauerbetrieb unter Windows" weiter unten).
+
+**Linux / eigener Python-Betrieb:**
 
 ```bash
 cd gateway
 python3 -m venv .venv && source .venv/bin/activate   # optional
 pip install -r requirements.txt
-cp .env.example .env      # und ausfüllen (CT_BASE_URL, CT_LOGIN_TOKEN)
+python dienst.py --einrichten    # fragt Adresse und Token ab, schreibt .env
 ```
+
+Wer die `.env` lieber selbst schreibt: `cp .env.example .env` und ausfüllen
+(`CT_BASE_URL`, `CT_LOGIN_TOKEN`).
 
 `CT_LOGIN_TOKEN` = Login-Token eines (technischen) ChurchTools-Benutzers.
 
@@ -67,8 +77,13 @@ Für den Rund-um-die-Uhr-Betrieb gibt es eine fertige Programmdatei:
 [neuesten Release](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest).
 Sie braucht kein Python und keine virtuelle Umgebung.
 
-1. Die EXE in den Ordner legen, in dem die `.env` liegt (die bleibt unverändert).
-2. Doppelklick → **1 (Dienst einrichten)** → die Windows-Abfrage bestätigen.
+1. Die EXE in einen eigenen Ordner legen. Liegt dort schon eine `.env`, bleibt
+   sie unverändert und wird benutzt.
+2. Doppelklick → **1 (Einrichten)**. Gibt es noch keine `.env`, fragt das
+   Programm nach der ChurchTools-Adresse und dem Login-Token, probiert beides
+   sofort aus und legt die Datei selbst an.
+3. Die Windows-Abfrage nach Administratorrechten bestätigen – die braucht es
+   für das Anlegen des Dienstes.
 
 Das war alles. Der Dienst steht danach in `services.msc` als
 **Glockensteuerung Gateway** und
@@ -82,6 +97,7 @@ Weitere Schalter derselben Datei:
 
 ```text
 Glockensteuerung-Gateway.exe --status      läuft er? was steht im Protokoll?
+Glockensteuerung-Gateway.exe --einrichten  Zugangsdaten ändern (.env)
 Glockensteuerung-Gateway.exe --neustart    anhalten und wieder starten
 Glockensteuerung-Gateway.exe --testlauf    läuft im Fenster, löst NICHTS aus
 Glockensteuerung-Gateway.exe --diagnose    prüft die Zertifikatskette
@@ -147,7 +163,7 @@ WantedBy=multi-user.target
 
 | Datei | Zweck |
 |---|---|
-| `scheduler.py` | Hauptdienst (Planung + Auslösung) |
+| `scheduler.py` | Hauptdienst (Planung + Auslösung, hält sich selbst am Leben) |
 | `churchtools.py` | ChurchTools-API-Client (Kalender-Termine) |
 | `config.py` | lädt Gerät + Regeln aus ChurchTools (oder .env) |
 | `voco_mqtt.py` | MQTT-Client + CLI (`list`/`status`/`start`/`stop`) |
@@ -156,6 +172,12 @@ WantedBy=multi-user.target
 | `dienst.py` | Bedienung: einrichten, Status, Protokoll (wird zur EXE gebaut) |
 | `windienst.py` | meldet den Gateway als Windows-Dienst an |
 | `pfade.py` | findet `.env`, Zustand und Protokoll neben dem Programm |
+| `einrichtung.py` | fragt Adresse und Token ab und schreibt die `.env` |
+| `kv.py` | gemeinsamer Zugriff auf den Speicher der Extension |
+| `heartbeat.py` | Lebenszeichen alle 2 Minuten nach ChurchTools |
+| `ereignisse.py` | hält Verbindungen und Ausfälle im Ereignis-Log fest |
+| `outbox.py` | arbeitet den Postausgang der Extension ab |
+| `notify.py` | verschickt Fehlermeldungen per E-Mail |
 
 ## Wenn die Verbindung am Zertifikat scheitert
 
