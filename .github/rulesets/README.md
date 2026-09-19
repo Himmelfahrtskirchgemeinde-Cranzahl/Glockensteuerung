@@ -34,15 +34,18 @@ setzen, das zugehörige Release hinge in der Luft.
 ## Bewusst nicht enthalten
 
 **Erforderliche Status-Checks.** Naheliegend wäre, den Check `build` zu
-verlangen. Das wäre hier aber eine Falle: Der Workflow
-`build-extension.yml` läuft nur bei Änderungen unter `extension/**`. Ein Pull
-Request, der ausschließlich den Gateway oder die Anleitung anfasst, bekäme
-deshalb nie einen `build`-Check — und bliebe mit dieser Regel dauerhaft
-blockiert, ohne dass etwas kaputt wäre.
+verlangen. Das wäre hier aber eine Falle: Der Workflow `build-extension.yml`
+läuft nur, wenn sich etwas am Veröffentlichten ändert — `extension/**`,
+`gateway/**`, `.github/scripts/**` oder der Workflow selbst. Ein Pull Request,
+der ausschließlich die Anleitung oder die Dokumentation anfasst, bekäme deshalb
+nie einen `build`-Check und bliebe mit dieser Regel dauerhaft blockiert, ohne
+dass etwas kaputt wäre.
 
 Wer die Regel dennoch möchte, muss zuerst den `paths`-Filter aus dem Workflow
 entfernen, damit der Check bei **jedem** Pull Request läuft. Erst dann ist sie
-gefahrlos.
+gefahrlos. Zu beachten ist dann noch, dass der Workflow aus drei Jobs besteht
+(`version`, `programmdatei`, `build`) — verlangt werden müsste der, der am Ende
+steht.
 
 ## Sich nicht aussperren
 
