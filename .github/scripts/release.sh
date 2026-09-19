@@ -65,7 +65,12 @@ DATEIEN=()
 for z in "${ZIPS[@]}"; do
   [ -f "${z}" ] || continue
   basis="$(basename "${z}")"
-  fest="$(printf '%s' "${basis}" | sed -E 's/-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+-g[0-9a-f]+)?\.zip$/.zip/')"
+  # Die vierte Stelle (Hotfix) MUSS im Muster stehen: Ohne sie griff die
+  # Umbenennung bei 'glockensteuerung-v26.9.4.1.zip' nicht, die Datei behielt
+  # ihren versionierten Namen - und der Dauerlink
+  # /releases/latest/download/glockensteuerung.zip lief ins Leere. Genau so ist
+  # es im Release 26.9.4.1 passiert.
+  fest="$(printf '%s' "${basis}" | sed -E 's/-v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9]+-g[0-9a-f]+)?\.zip$/.zip/')"
   if [ "${fest}" = "${basis}" ]; then
     DATEIEN+=("${z}")          # traegt schon einen festen Namen
   else
