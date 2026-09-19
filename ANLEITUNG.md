@@ -272,8 +272,18 @@ des Dienstes nötig. Danach steht er in `services.msc` als
 **Glockensteuerung Gateway**.
 
 > **„Der Computer wurde durch Windows geschützt"** erscheint beim ersten Start,
-> weil die Datei nicht mit einem gekauften Zertifikat signiert ist.
-> *Weitere Informationen → Trotzdem ausführen.*
+> weil die Datei noch nicht signiert ist.
+>
+> **Am besten gar nicht erst auslösen:** Nach dem Herunterladen, *bevor* du sie
+> startest, im Explorer **Rechtsklick auf die Datei → Eigenschaften** und unten
+> im Reiter *Allgemein* bei „Sicherheit: Die Datei stammt von einem anderen
+> Computer…" den Haken **„Zulassen"** setzen → *Übernehmen* → *OK*. Windows
+> merkt sich an der Datei, woher sie kam; mit dem Haken ist dieser Vermerk weg.
+>
+> **Falls sie doch kommt:** *Weitere Informationen → Trotzdem ausführen.*
+>
+> **Und dann nie wieder:** Das betrifft nur die Erstinstallation. Neue Fassungen
+> holt sich der Dienst selbst (3.5) – dabei erscheint keine solche Abfrage.
 
 Was dann von selbst passiert:
 
