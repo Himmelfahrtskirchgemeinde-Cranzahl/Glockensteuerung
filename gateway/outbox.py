@@ -67,9 +67,15 @@ def verarbeiten(ct, cfg, notifier) -> int:
             continue
         betreff = str(job.get("subject") or "Nachricht aus der Glockensteuerung")
         text = str(job.get("body") or "")
+        # Die Extension kann selbst keine Mail schicken - steht die Automatik,
+        # legt sie die Meldung hier ab. Verschickt wird sie also erst, wenn der
+        # Dienst wieder laeuft; genau dann ist sie aber am wichtigsten, denn
+        # niemand sonst haette gemerkt, dass er weg war.
+        dringend = bool(job.get("dringend"))
         # dedup_key je Nachricht, sonst greift die Spam-Sperre des Notifiers und
         # verschluckt zwei Rueckmeldungen mit gleichem Betreff.
-        if notifier.notify(betreff, text, dedup_key=f"outbox:{job.get('id')}"):
+        if notifier.notify(betreff, text, dedup_key=f"outbox:{job.get('id')}",
+                           dringend=dringend):
             gesendet += 1
 
     # Ausgang leeren - auch wenn einzelne Nachrichten nicht rausgingen. Sonst
