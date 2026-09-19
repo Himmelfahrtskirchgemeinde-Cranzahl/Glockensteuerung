@@ -258,7 +258,12 @@ async function logLeeren() {
 }
 
 async function handleError(where: string, err: unknown) {
-    pushLog('Fehler: ' + (err instanceof Error ? err.message : String(err)), 'info');
+    const text = err instanceof Error ? err.message : String(err);
+    pushLog('Fehler: ' + text, 'info');
+    // Auch per E-Mail, sofern ein Postausgang eingerichtet ist: Ein Fehler,
+    // den nur die geöffnete Seite sieht, erreicht niemanden.
+    void stoerungMelden(`Fehler in der Erweiterung (${where})`,
+        `${text}\n\nStelle: ${where}`);
     const sent = await reportError(where, err, ctx());
     if (!sent && !FEEDBACK_URL) errorCount.value++;
 }
@@ -376,6 +381,41 @@ async function openChangelog() {
  * gespeicherten Log; die Wechsel danach werden festgehalten.
  */
 let gatewayZuletztGesehen: boolean | null = null;
+
+/**
+ * Stellt eine Störungsmeldung in den Postausgang.
+ *
+ * Verschickt wird sie vom Gateway — die Seite kann das nicht, ein Browser
+ * spricht kein SMTP. Steht die Automatik, bleibt die Meldung liegen und geht
+ * raus, sobald der Dienst wieder läuft. Das klingt nach einer Schwäche, ist
+ * aber die Nachricht selbst: Dass er weg war, hätte sonst niemand gemerkt.
+ *
+ * Höchstens eine gleichartige Meldung je Stunde, und das über den Postausgang
+ * geprüft statt im Browser: Sonst schickte jede geöffnete Seite dieselbe.
+ */
+const MELDUNG_ABSTAND_MS = 3600_000;
+async function stoerungMelden(betreff: string, text: string, dringend = false) {
+    // Ohne eingerichteten Postausgang gäbe es nichts zu verschicken. Ob es
+    // einen gibt, weiß nur der Gateway — die Zugangsdaten darf die Seite nicht
+    // lesen, deshalb steht die Antwort im Lebenszeichen.
+    if (!gatewayStatus.value?.mail) return;
+    try {
+        const gestellt = await store.queueMail({
+            id: `st-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            subject: betreff,
+            body: `${text}\n\nVersion: ${APP_VERSION}\n`
+                + `Zeitpunkt: ${new Date().toLocaleString('de-DE')}`,
+            at: new Date().toISOString(),
+            dringend,
+        }, MELDUNG_ABSTAND_MS);
+        if (gestellt) {
+            pushLog(`Störungsmeldung an den Postausgang übergeben: ${betreff}`, 'out', true);
+        }
+    } catch {
+        // Bewusst still: Eine fehlgeschlagene Meldung darf keine neue Meldung
+        // auslösen — das wäre ein Kreis, der sich selbst am Leben hält.
+    }
+}
 function gatewayZustandMelden() {
     // Ohne Regeln und ohne je ein Lebenszeichen gibt es nichts zu melden.
     if (!hasAutomation.value && gatewayStatus.value === null) return;
@@ -392,6 +432,19 @@ function gatewayZustandMelden() {
     pushLog(steht
         ? `Automatik antwortet nicht mehr. ${gatewayDownText.value}`
         : 'Automatik meldet sich wieder.', steht ? 'gw' : 'in');
+    if (steht) {
+        void stoerungMelden(
+            'Die Automatik antwortet nicht mehr',
+            'Der Gateway-Dienst meldet sich nicht mehr. Solange das so bleibt, '
+            + 'wird zu den Terminen NICHT automatisch geläutet.\n\n'
+            + `${gatewayDownText.value}\n\n`
+            + 'Was zu tun ist: auf dem Rechner der Gemeinde die '
+            + 'Glockensteuerung-Gateway.exe öffnen und unter „Status" nachsehen, '
+            + 'ob der Dienst läuft.', true);
+    } else {
+        void stoerungMelden('Die Automatik meldet sich wieder',
+            'Der Gateway-Dienst antwortet wieder. Es wird wieder automatisch geläutet.');
+    }
 }
 
 /** Holt das Lebenszeichen erneut. Fehler bleiben still: Der alte Wert altert
