@@ -145,8 +145,9 @@ beantworten, wären eine sichere Fehlerquelle.
 
 Eine **Korrektur** ergänzt den Changelog der letzten Funktionsversion, eine
 **Neuerung** fängt ihn frisch an – das entscheidet `changelog.sh` selbst anhand
-der Art der Einträge. Gezeigt wird dabei **jede Version unter ihrer eigenen
-Nummer**, sodass zu sehen ist, was in welcher Fassung kam.
+der Art der Einträge. Kommen dadurch mehrere Fassungen zusammen, steht **jede
+unter ihrer eigenen Nummer**; bei einer einzelnen entfällt die Überschrift, denn
+welche das ist, sagt der Titel des Release.
 
 In der Release-Beschreibung steht nur der Changelog; was welche Datei tut,
 steht hier und nicht in jeder Version aufs Neue. Kommt eine Datei dazu oder

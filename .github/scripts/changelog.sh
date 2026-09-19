@@ -219,7 +219,9 @@ emit_group() {
 
   [ -n "${bereiche}" ] || return 0
 
-  printf '#### %s\n\n' "${ueberschrift}"
+  # Die Ebene richtet sich danach, ob darueber Versionsnummern stehen: So
+  # bleibt die Gliederung immer so flach wie moeglich.
+  printf '%s %s\n\n' "${GRUPPEN_EBENE:-###}" "${ueberschrift}"
   while IFS= read -r bereich; do
     [ -n "${bereich}" ] || continue
     printf '* **%s**\n' "${bereich}"
@@ -263,13 +265,30 @@ teil_hat_etwas() {  # teil_hat_etwas <teil>
 teil_ausgeben() {  # teil_ausgeben <teil> <ueberschrift>
   teil_hat_etwas "$1" || return 0
   printf '## %s\n\n' "$2"
-  local v
+
+  # Wie viele Versionen haben in diesem Teil etwas beizutragen? Nur wenn es
+  # mehr als eine ist - eine Korrektur hat also den Changelog der
+  # Funktionsversion mitgenommen -, gehoert die Nummer als Ueberschrift dazu.
+  # Bei einer einzelnen Version stuende sie nur im Weg: Welche das ist, sagt
+  # der Titel des Release.
+  local v anzahl=0
+  for v in "${VERSIONEN[@]:-}"; do
+    [ -n "${v}" ] || continue
+    ENTRIES="${JE_VERSION[$v]}"
+    [ -z "$(nur_teil "$1")" ] || anzahl=$((anzahl + 1))
+  done
+
   for v in "${VERSIONEN[@]:-}"; do
     [ -n "${v}" ] || continue
     ENTRIES="${JE_VERSION[$v]}"
     AKTUELL="$(nur_teil "$1")"
     [ -n "${AKTUELL}" ] || continue
-    printf '### Version %s\n\n' "${v#v}"
+    if [ "${anzahl}" -gt 1 ]; then
+      printf '### Version %s\n\n' "${v#v}"
+      GRUPPEN_EBENE="####"
+    else
+      GRUPPEN_EBENE="###"
+    fi
     alle_gruppen
   done
 }
