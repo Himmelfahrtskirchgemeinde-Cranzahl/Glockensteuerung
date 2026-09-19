@@ -43,6 +43,24 @@ AUFGABE = "Glockensteuerung Gateway"
 START_VERZOEGERUNG = "PT30S"
 
 
+def _eigene_module_schuetzen() -> None:
+    """Verhindert, dass alte Dateien neben der Programmdatei geladen werden.
+
+    Im Ordner koennen noch die Python-Dateien einer frueheren Installation
+    liegen (aus dem Archiv, das es bis 26.8 gab). Wuerde eine davon statt des
+    eingebauten Moduls geladen, liefe eine halb alte, halb neue Fassung - der
+    schlimmste denkbare Zustand, weil nichts davon sichtbar waere.
+
+    In der gebauten Programmdatei steckt ohnehin alles; der eigene Ordner hat
+    im Suchpfad deshalb nichts zu suchen.
+    """
+    if not getattr(sys, "frozen", False):
+        return
+    ordner = os.path.dirname(os.path.abspath(sys.executable))
+    sys.path[:] = [p for p in sys.path
+                   if os.path.abspath(p or ".") != ordner]
+
+
 def ist_windows() -> bool:
     return os.name == "nt"
 
@@ -56,8 +74,15 @@ def ist_admin() -> bool:
         return False
 
 
+# Wird beim Einrichten gesetzt, falls die Programmdatei an einen festen Ort
+# gebracht wurde. Eingetragen werden soll dann die Kopie, nicht das Original.
+_ZIELDATEI = ""
+
+
 def programmdatei() -> str:
     """Die EXE selbst - oder, wenn aus dem Quelltext gestartet, diese Datei."""
+    if _ZIELDATEI:
+        return _ZIELDATEI
     if getattr(sys, "frozen", False):
         return os.path.abspath(sys.executable)
     return os.path.abspath(__file__)
@@ -234,6 +259,181 @@ def aufgabe_einrichten() -> int:
 
 # --- Einrichten, entfernen, nachsehen -------------------------------------
 
+# Wohin der Dienst gehoert, wenn niemand etwas anderes sagt. Bewusst kurz und
+# auf der Systemplatte: Der Dienst laeuft als SYSTEM und muss den Ordner auch
+# dann erreichen, wenn niemand angemeldet ist.
+STANDARDORT = r"C:\Glockensteuerung"
+
+# Orte, an denen eine Programmdatei nicht dauerhaft liegen sollte. Aus dem
+# Download-Ordner wird aufgeraeumt, der Desktop wird umsortiert, und was im
+# Temp-Ordner liegt, loescht Windows selbst - der Dienst zeigte danach ins
+# Leere und schwiege.
+UNGEEIGNET = ("\\downloads", "\\download", "\\desktop", "\\temp",
+              "\\tmp", "\\onedrive", "\\papierkorb", "\\recycle")
+
+
+def _ort_taugt(ordner: str) -> bool:
+    # Bewusst nicht ueber os.path.normcase: Das tut ausserhalb von Windows
+    # NICHTS - die Pruefung liefe auf jedem anderen System ins Leere und waere
+    # dort auch nicht zu pruefen. Hier wird deshalb selbst vereinheitlicht.
+    kleines = os.path.abspath(ordner).replace("/", "\\").lower()
+    return not any(teil in kleines for teil in UNGEEIGNET)
+
+
+def _an_festen_ort_bringen() -> str:
+    """Sorgt dafuer, dass die Programmdatei dauerhaft liegt, wo sie hingehoert.
+
+    Der Pfad ist beim Einrichten die wichtigste Angabe: Er wird im Dienst
+    eingetragen. Liegt die Datei im Download-Ordner, zeigt der Eintrag dorthin -
+    und beim naechsten Aufraeumen schweigen die Glocken, ohne dass jemand einen
+    Zusammenhang sieht.
+
+    Gibt den Pfad der Programmdatei zurueck, die eingetragen werden soll.
+    """
+    eigene = programmdatei()
+    hier = os.path.dirname(eigene)
+
+    if not getattr(sys, "frozen", False):
+        return eigene          # aus dem Quelltext heraus wird nichts verschoben
+
+    print()
+    print(f"Programmdatei: {eigene}")
+    if _ort_taugt(hier):
+        print("Dieser Ordner wird im Dienst eingetragen.")
+        if not _ja("Soll sie woanders hin?", standard=False):
+            return eigene
+        ziel_vorgabe = hier
+    else:
+        print("Dieser Ordner taugt nicht auf Dauer: Aus Download-, Desktop- und")
+        print("Temp-Ordnern wird aufgeraeumt - der Dienst zeigte danach ins Leere.")
+        ziel_vorgabe = STANDARDORT
+
+    ziel = _frage("In welchen Ordner soll sie?", ziel_vorgabe)
+    if not ziel or os.path.normcase(os.path.abspath(ziel)) == os.path.normcase(hier):
+        return eigene
+
+    try:
+        os.makedirs(ziel, exist_ok=True)
+    except Exception as e:
+        print(f"Der Ordner liess sich nicht anlegen ({e}). Es bleibt beim bisherigen.")
+        return eigene
+
+    neu = os.path.join(ziel, os.path.basename(eigene))
+    import shutil
+    try:
+        if os.path.normcase(neu) != os.path.normcase(eigene):
+            shutil.copy2(eigene, neu)
+    except Exception as e:
+        print(f"Die Datei liess sich nicht kopieren ({e}). Es bleibt beim bisherigen Ordner.")
+        return eigene
+
+    # Was danebenliegt, gehoert mit: ohne .env keine Zugangsdaten, ohne
+    # state.json koennte ein gerade gelaeuteter Termin erneut ausloesen.
+    for name in (pfade.ENV_DATEI, pfade.ZUSTAND_DATEI):
+        quelle = os.path.join(hier, name)
+        ziel_datei = os.path.join(ziel, name)
+        if os.path.exists(quelle) and not os.path.exists(ziel_datei):
+            try:
+                shutil.copy2(quelle, ziel_datei)
+                print(f"  {name} mitgenommen")
+            except Exception as e:
+                print(f"  {name} konnte nicht mitgenommen werden: {e}")
+
+    print(f"Die Programmdatei liegt jetzt hier: {neu}")
+    print("Die heruntergeladene Datei kann danach geloescht werden.")
+    # Ab hier gelten die Dateien am neuen Ort - auch fuer die Einrichtung.
+    pfade.programmordner = lambda: ziel      # type: ignore[assignment]
+    return neu
+
+
+def _frage(text: str, vorgabe: str = "") -> str:
+    import einrichtung
+    return einrichtung._frage(text, vorgabe)
+
+
+def _ja(text: str, standard: bool = True) -> bool:
+    import einrichtung
+    return einrichtung._ja(text, standard)
+
+
+def _energiesparen() -> tuple[bool, str]:
+    """Geht der Rechner im Netzbetrieb von selbst schlafen?
+
+    Der Dienst laeuft unabhaengig von Anmeldung, Benutzerwechsel und Sperre -
+    aber nicht, wenn der Rechner schlaeft. Das ist die letzte Luecke im
+    Dauerbetrieb, und sie faellt erst auf, wenn ein Gottesdienst stumm bleibt.
+
+    Rueckgabe: (schlaeft_ein, Klartext). Laesst sich der Wert nicht lesen, gilt
+    das als "unbekannt" - dann wird trotzdem angeboten, ihn abzuschalten.
+    """
+    if not ist_windows():
+        return False, ""
+    p = subprocess.run(["powercfg", "/query", "SCHEME_CURRENT", "SUB_SLEEP", "STANDBYIDLE"],
+                       capture_output=True)
+    if p.returncode != 0:
+        return True, "unbekannt"
+    text = _text(p.stdout)
+    # Sprachunabhaengig: Die erste Hex-Zahl nach "AC"/"Wechselstrom" ist der
+    # Wert fuer den Netzbetrieb. Die Beschriftung wechselt mit der Sprache, die
+    # Reihenfolge nicht - Netzbetrieb steht immer vor Akkubetrieb.
+    import re
+    werte = re.findall(r"0x([0-9a-fA-F]{8})", text)
+    if len(werte) < 2:
+        return True, "unbekannt"
+    sekunden = int(werte[-2], 16)      # vorletzter Wert = Netzbetrieb
+    if sekunden == 0:
+        return False, "aus"
+    return True, f"nach {sekunden // 60} Minuten"
+
+
+def _energiesparen_abschalten() -> None:
+    """Fragt nach und stellt den Rechner auf Dauerbetrieb um."""
+    schlaeft, wie = _energiesparen()
+    if not schlaeft:
+        return
+    print()
+    print("Energiesparen: Der Rechner geht im Netzbetrieb schlafen"
+          + (f" ({wie})." if wie != "unbekannt" else " - oder koennte es."))
+    print("Solange er schlaeft, laeuft der Dienst nicht und es wird nicht gelaeutet.")
+    if not _ja("Standby im Netzbetrieb abschalten?", standard=True):
+        print("Unveraendert. Bitte daran denken, dass ein schlafender Rechner "
+              "nicht laeutet.")
+        return
+    for schalter in ("standby-timeout-ac", "hibernate-timeout-ac"):
+        subprocess.run(["powercfg", "/change", schalter, "0"], capture_output=True)
+    schlaeft, _ = _energiesparen()
+    print("Erledigt - der Rechner bleibt im Netzbetrieb wach." if not schlaeft else
+          "Das hat nicht geklappt. Bitte in den Energieoptionen von Hand auf "
+          "\"Niemals\" stellen.")
+
+
+def _verknuepfung_anlegen(ziel: str) -> None:
+    """Legt eine Verknuepfung im Startmenue an.
+
+    Nach der Einrichtung verschwindet die Programmdatei aus dem Blick - sie
+    liegt in einem Ordner, den niemand im Alltag oeffnet. Gebraucht wird sie
+    aber wieder: fuer die Einstellungen, den Status, das Protokoll. Ueber das
+    Startmenue ist sie mit einem Tippen da.
+    """
+    if not ist_windows():
+        return
+    basis = os.environ.get("PROGRAMDATA", r"C:\ProgramData")
+    ordner = os.path.join(basis, "Microsoft", "Windows", "Start Menu", "Programs")
+    verknuepfung = os.path.join(ordner, "Glockensteuerung.lnk")
+    befehl = (
+        "$w = New-Object -ComObject WScript.Shell; "
+        f"$s = $w.CreateShortcut('{verknuepfung}'); "
+        f"$s.TargetPath = '{ziel}'; "
+        f"$s.WorkingDirectory = '{os.path.dirname(ziel)}'; "
+        "$s.Description = 'Glockensteuerung: Einstellungen, Status, Protokoll'; "
+        "$s.Save()"
+    )
+    p = subprocess.run(["powershell", "-NoProfile", "-Command", befehl], capture_output=True)
+    if p.returncode == 0:
+        print("Im Startmenue liegt jetzt \"Glockensteuerung\" - darueber sind die")
+        print("Einstellungen jederzeit erreichbar.")
+
+
 def _bestand_melden() -> None:
     """Sagt, was schon da ist - und was davon unangetastet bleibt.
 
@@ -327,6 +527,10 @@ def installieren() -> int:
     # das Protokoll bleiben, wo sie sind, und werden weiterbenutzt.
     _bestand_melden()
 
+    # Der Pfad ist die wichtigste Angabe beim Einrichten - er landet im Dienst.
+    global _ZIELDATEI
+    _ZIELDATEI = _an_festen_ort_bringen()
+
     if not _konfiguration_sicherstellen():
         print()
         print("Ohne Zugangsdaten wird der Dienst nicht eingerichtet.")
@@ -357,10 +561,15 @@ def installieren() -> int:
         return 1
     if windienst.starten() != 0:
         print("Beim naechsten Hochfahren startet er trotzdem von selbst.")
+    _verknuepfung_anlegen(programmdatei())
+    _energiesparen_abschalten()
+
     print()
     print("Fertig. Der Dienst steht jetzt in services.msc unter "
           f"'{windienst.ANZEIGENAME}':")
     print("  - er startet beim Hochfahren, ohne dass sich jemand anmeldet,")
+    print("  - er laeuft weiter, wenn der Rechner gesperrt wird, sich jemand")
+    print("    abmeldet oder ein anderer Benutzer sich anmeldet,")
     print("  - Windows startet ihn nach einem Absturz von selbst neu,")
     print("  - und er haelt die Verbindung selbst wieder her, wenn sie abreisst.")
     print()
@@ -375,6 +584,12 @@ def entfernen() -> int:
     if not ist_admin():
         return als_admin_neu_starten(["--entfernen"])
     aufgaben_aufraeumen()
+    basis = os.environ.get("PROGRAMDATA", r"C:\ProgramData")
+    try:
+        os.remove(os.path.join(basis, "Microsoft", "Windows", "Start Menu",
+                               "Programs", "Glockensteuerung.lnk"))
+    except Exception:
+        pass          # war keine da - dann ist auch nichts aufzuraeumen
     if windienst.VERFUEGBAR:
         return windienst.entfernen()
     _schtasks("/End", "/TN", AUFGABE)
@@ -435,6 +650,11 @@ def status() -> int:
                   "starten: " + ", ".join(uebrig))
             print("               Solange die aktiv sind, kann es doppelt laeuten "
                   "(--installieren raeumt sie weg).")
+        schlaeft, wie = _energiesparen()
+        if schlaeft:
+            print("ACHTUNG:       Der Rechner geht im Netzbetrieb schlafen"
+                  + (f" ({wie})." if wie != "unbekannt" else "."))
+            print("               Waehrenddessen wird nicht gelaeutet.")
     print()
     protokoll(15)
     return 0
@@ -465,7 +685,7 @@ def menue() -> int:
     if not pfade.env_datei():
         print("Noch nicht eingerichtet - dafuer ist Punkt 1 da.")
     print()
-    print(" 1  Einrichten: Zugangsdaten abfragen und Dienst anlegen")
+    print(" 1  Installieren: Ordner, Zugangsdaten und Dienst einrichten")
     print(" 2  Einstellungen (Zugang, Simulation, Ruhezeit, E-Mail, Geraet)")
     print(" 3  Status und Protokoll ansehen")
     print(" 4  Testlauf im Fenster (loest NICHTS aus)")
@@ -530,6 +750,7 @@ def main(argv: list[str] | None = None) -> int:
                     help="Am Ende auf eine Taste warten (fuer das UAC-Fenster)")
     args = ap.parse_args(argv)
 
+    _eigene_module_schuetzen()
     rc = 0
     if args.windows_dienst:
         windienst.im_dienstbetrieb_starten()
