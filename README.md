@@ -185,3 +185,17 @@ gekostet hätte.
   MQTT-Anbindung wurde aus dem öffentlichen Web-Client der VOCO-futura abgeleitet.
   Für dauerhaften Betrieb – besonders bei mehreren Gemeinden – empfiehlt sich eine
   offizielle Freigabe/Schnittstelle von HEW.
+
+## Lizenz
+
+[MIT](LICENSE) – Copyright © 2026 Himmelfahrtskirchgemeinde Cranzahl.
+
+Kurz gesagt: Jede Gemeinde darf die Glockensteuerung benutzen, anpassen und
+weitergeben; der Urheberrechtshinweis muss erhalten bleiben, und es gibt keine
+Gewährleistung. Teile der Erweiterung stammen aus dem ebenfalls MIT-lizenzierten
+[ChurchTools extension-boilerplate](https://github.com/churchtools/extension-boilerplate).
+
+> Die Lizenz ist zugleich die Voraussetzung für die **kostenlose Code-Signatur**
+> quelloffener Projekte über die [SignPath Foundation](https://signpath.org/).
+> Damit steht im Windows-Dialog beim Start der Programmdatei künftig
+> „Himmelfahrtskirchgemeinde Cranzahl" statt „Unbekannter Herausgeber".
