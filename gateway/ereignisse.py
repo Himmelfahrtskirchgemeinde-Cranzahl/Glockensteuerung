@@ -16,6 +16,7 @@ geht darin unter. Das Lebenszeichen beantwortet "laeuft er?" ohnehin besser.
 from __future__ import annotations
 import datetime as dt
 import logging
+import time
 
 from kv import KV
 
@@ -63,6 +64,57 @@ class Ereignisse:
                 self._letzter_fehler = True
             self.kv.vergessen()
             return False
+
+
+class LogWaechter(logging.Handler):
+    """Schreibt Warnungen und Fehler des Dienstes ins Ereignis-Log.
+
+    Bisher stand dort nur, was ausdruecklich gemeldet wurde. Alles andere -
+    ein abgewiesener Verbindungsversuch, ein klemmender Postausgang, ein
+    Fehlschlag beim Lesen - landete allein im Protokoll auf dem Rechner der
+    Gemeinde. Wer in ChurchTools nachsah, fand einen Dienst, der "nicht
+    erreichbar" war, und keinen Hinweis, woran es lag.
+
+    Zwei Vorkehrungen, ohne die das mehr schadet als nutzt:
+
+    - **Entprellung.** Dieselbe Meldung wird hoechstens alle 30 Minuten
+      geschrieben. Ein Dienst, der im Sekundentakt dieselbe Zeile meldet,
+      verstopft sonst das Log und schreibt dabei ununterbrochen nach
+      ChurchTools.
+    - **Kein Kreis.** Das Schreiben selbst protokolliert im Fehlerfall - und
+      loeste damit sich selbst aus. Waehrend geschrieben wird, ist der Waechter
+      deshalb stumm.
+    """
+
+    ABSTAND_S = 1800
+
+    def __init__(self, ereignisse: "Ereignisse"):
+        super().__init__(level=logging.WARNING)
+        self.ereignisse = ereignisse
+        self._zuletzt: dict[str, float] = {}
+        self._schreibt = False
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if self._schreibt:
+            return
+        try:
+            text = record.getMessage()
+        except Exception:
+            return
+        # Die ersten Zeichen reichen, um "dieselbe Meldung" zu erkennen: Was
+        # sich daran unterscheidet, ist meist nur eine wechselnde Fehlernummer.
+        schluessel = text[:70]
+        jetzt = time.time()
+        if jetzt - self._zuletzt.get(schluessel, 0.0) < self.ABSTAND_S:
+            return
+        self._zuletzt[schluessel] = jetzt
+        self._schreibt = True
+        try:
+            self.ereignisse.melde("aus" if record.levelno >= logging.ERROR else "info", text)
+        except Exception:
+            pass
+        finally:
+            self._schreibt = False
 
 
 class Zustandswaechter:
