@@ -390,13 +390,100 @@ VOCO_QUIET=22:00-06:00     # in diesem Fenster wird NIE ausgelöst
 
 ---
 
-## Teil 4 – Sicherheit (bitte beachten)
+## Teil 4 – Wer darf was? (Rechte in ChurchTools)
 
-- **Geräte-Passwort & Login-Token sind Geheimnisse.** Nie in Chats, E-Mails oder
-  ins Repository. In der Extension liegen sie zugriffsbeschränkt in ChurchTools,
-  im Gateway in der lokalen `.env` (durch `.gitignore` ausgeschlossen).
-- **Modulzugriff einschränken:** Wer das Modul öffnen kann, kann läuten. Rechte in
-  ChurchTools entsprechend vergeben.
+**Wer das Modul öffnen kann, kann läuten.** Das ist der wichtigste Satz dieser
+Anleitung: Ein Klick auf „Läuten" löst echtes Geläut aus, im ganzen Dorf hörbar.
+Deshalb gehört der Zugriff eingeschränkt, bevor die Erweiterung in den Alltag
+geht.
+
+### 4.1 Was es zu vergeben gibt
+
+Die Erweiterung erfindet **keine eigenen Rechte**. Sie benutzt die, die
+ChurchTools für Custom Modules ohnehin kennt – und zwar **pro Untermenü**. Jedes
+Untermenü ist technisch eine eigene Kategorie, und für jede lässt sich getrennt
+festlegen, wer sie **sehen** und wer sie **bearbeiten** darf.
+
+| Untermenü | „sehen" erlaubt | „bearbeiten" erlaubt |
+|---|---|---|
+| **Steuerung** | Untermenü öffnen, Gerätestatus sehen, **läuten und stoppen**, Gerätedaten lesen | Seriennummer, Gerätepasswort und Broker-Adresse ändern |
+| **Ereignis-Log** | das Log lesen, auch das gespeicherte früherer Tage | eigene Zeilen dauerhaft speichern, Log leeren |
+| **Automatik-Regeln** | Regeln und die Vorschau der nächsten Läutungen ansehen | Regeln anlegen, ändern, löschen |
+| **E-Mail-Versand** | den hinterlegten Postausgang sehen | Postausgang und Zugangsdaten ändern |
+
+Dazu kommt ein Recht aus ChurchTools selbst:
+
+| Recht | Wirkung hier |
+|---|---|
+| **Erweiterung verwalten** (`administer custom modules`) | darf den **Simulationsmodus ausschalten** – also scharfschalten – und sieht alle Untermenüs, unabhängig von den Kategorie-Rechten |
+
+> **Zwei Dinge, die man wissen muss:**
+>
+> **1. „Steuerung sehen" ist das Läuterecht.** Wer das Untermenü sehen darf, hat
+> dort auch die Knöpfe. Ein reines Ansehen ohne Auslösen gibt es nicht – das
+> Modul wäre sonst nutzlos.
+>
+> **2. Die Gerätedaten liegen absichtlich in „Steuerung".** Seriennummer und
+> Gerätepasswort braucht jeder, der läuten können soll: Ohne sie baut die Seite
+> keine Verbindung zur Anlage auf und meldet „Gerät nicht eingerichtet". Wer
+> läuten darf, kann diese Daten also auch lesen. Das Untermenü **E-Mail-Versand**
+> ist davon getrennt, weil dort ein Postfach-Passwort liegt – das geht niemanden
+> außer den Verwaltern etwas an.
+
+### 4.2 So wird es eingestellt
+
+1. In ChurchTools als Administrator in die **Berechtigungen** gehen
+   (Admin-Bereich → *Berechtigungen*; je nach Version heißt es *Rechte* oder
+   *Rechteverwaltung*).
+2. Die **Gruppe, Rolle oder Person** wählen, die künftig läuten darf.
+3. In der Liste der Module den Eintrag **„Glockensteuerung"** aufklappen. Dort
+   stehen die Rechte je Kategorie – also je Untermenü der Erweiterung.
+4. Haken setzen, speichern.
+
+> Die vier Kategorien entstehen **beim ersten Öffnen** der Erweiterung durch
+> einen Administrator. Vorher ist unter „Glockensteuerung" nichts zu vergeben –
+> und der Gateway findet keine Konfiguration. Also: einmal selbst öffnen, dann
+> die Rechte verteilen.
+
+### 4.3 Drei Rollen, die sich bewährt haben
+
+| Rolle | Rechte | Kann damit |
+|---|---|---|
+| **Läuten** (Küsterin, Mesner, Gemeindebüro) | *Steuerung: sehen*, *Ereignis-Log: sehen* | manuell läuten und stoppen, den Zustand der Anlage sehen, nachvollziehen, was passiert ist |
+| **Automatik pflegen** (wer die Gottesdienstordnung kennt) | zusätzlich *Automatik-Regeln: sehen + bearbeiten* | Regeln anlegen und ändern, Vorschau prüfen |
+| **Verwaltung** (technisch Verantwortliche) | zusätzlich *Steuerung: bearbeiten*, *E-Mail-Versand: sehen + bearbeiten*, ChurchTools-Recht **Erweiterung verwalten** | Gerät einrichten, Postausgang pflegen, **scharfschalten**, Erweiterung aktualisieren |
+
+Wer nur zusehen soll, bekommt allein *Ereignis-Log: sehen* – dann ist das
+Läuten-Untermenü gar nicht sichtbar.
+
+### 4.4 Was die Erweiterung tut, wenn Rechte fehlen
+
+- **Kein „sehen"** → das Untermenü erscheint nicht.
+- **Nur „sehen"** → das Untermenü ist da, aber schreibgeschützt; Eingabefelder
+  sind gesperrt, und es steht „nur lesen" daneben.
+- **Kein „Erweiterung verwalten"** → der Schalter zum Scharfschalten ist nicht
+  sichtbar. Diese Person kann ausschließlich **testen**, also in Simulation.
+- **Hilfe und Feedback** sind immer für alle offen.
+
+Wichtig: Die Oberfläche blendet nur passend aus. **Erzwungen werden die Rechte
+von ChurchTools selbst**, beim Zugriff auf die Daten. Wer die Adresse des Moduls
+kennt, kommt ohne Recht trotzdem nicht an die Gerätedaten.
+
+### 4.5 Prüfen, ob es stimmt
+
+Am schnellsten mit einem Testbenutzer: anmelden, die Erweiterung öffnen und
+nachsehen, ob nur die vorgesehenen Untermenüs erscheinen. Bleibt ein Untermenü
+sichtbar, das nicht sichtbar sein soll, fehlt der Haken nicht bei der Person,
+sondern bei einer **Gruppe**, in der sie steckt.
+
+### 4.6 Das Übrige
+
+- **Gerätepasswort und Login-Token sind Geheimnisse.** Nie in Chats, E-Mails
+  oder ins Repository. In der Erweiterung liegen sie zugriffsbeschränkt in
+  ChurchTools, im Gateway in der lokalen `.env`.
+- **Der Gateway braucht einen eigenen Benutzer** mit Leserechten auf die
+  Kalender und das Modul sowie Schreibrecht auf *Steuerung* (für das
+  Lebenszeichen). Sein Login-Token ist so gut wie ein Passwort.
 - **Testen immer in unkritischen Zeiten** – jeder „Läuten"-Knopf ist echt.
 
 ---
