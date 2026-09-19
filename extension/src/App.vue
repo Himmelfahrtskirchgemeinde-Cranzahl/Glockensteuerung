@@ -1085,7 +1085,7 @@ async function loadNextRingings() {
                     <tbody>
                       <tr v-for="(n, i) in nextRingings" :key="i">
                         <td><b>{{ fmtDay(n.when) }} · {{ fmtTime(n.when) }}</b></td>
-                        <td><span class="gs-label">{{ n.program }}</span></td>
+                        <td><span class="gs-label">{{ decodeName(n.program) }}</span></td>
                         <td class="gs-muted">{{ n.source }}</td>
                       </tr>
                     </tbody>
@@ -1150,15 +1150,15 @@ async function loadNextRingings() {
                 <select v-model="rule.pgsName" :disabled="!canEdit('regeln')">
                   <option value="">(bitte wählen)</option>
                   <optgroup v-if="catalog.sPGS.length" label="Sofort-PGS">
-                    <option v-for="n in catalog.sPGS" :key="'s' + n" :value="n">{{ n }}</option>
+                    <option v-for="n in catalog.sPGS" :key="'s' + n" :value="n">{{ decodeName(n) }}</option>
                   </optgroup>
                   <optgroup v-if="catalog.melodies.length" label="Melodien">
-                    <option v-for="n in catalog.melodies" :key="'m' + n" :value="n">{{ n }}</option>
+                    <option v-for="n in catalog.melodies" :key="'m' + n" :value="n">{{ decodeName(n) }}</option>
                   </optgroup>
                   <optgroup v-if="catalog.programsteps.length" label="Programmschritte (Vorlagen)">
-                    <option v-for="n in catalog.programsteps" :key="'p' + n" :value="n">{{ n }}</option>
+                    <option v-for="n in catalog.programsteps" :key="'p' + n" :value="n">{{ decodeName(n) }}</option>
                   </optgroup>
-                  <option v-if="rule.pgsName && !allCatalogNames.includes(rule.pgsName)" :value="rule.pgsName">{{ rule.pgsName }} (aktuell)</option>
+                  <option v-if="rule.pgsName && !allCatalogNames.includes(rule.pgsName)" :value="rule.pgsName">{{ decodeName(rule.pgsName) }} (aktuell)</option>
                 </select>
                 <label>Vorlauf (Min.)</label><input type="number" min="0" v-model.number="rule.leadMinutes" :disabled="!canEdit('regeln')">
                 <label>Aktiv</label><label class="gs-switch"><input type="checkbox" v-model="rule.active" :disabled="!canEdit('regeln')"></label>
