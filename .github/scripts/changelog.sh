@@ -25,6 +25,17 @@
 # Commits ohne solche Zeile tauchen im Changelog nicht auf - das ist Absicht:
 # CI-Anpassungen, Refactorings und Tippfehler interessieren Anwender nicht.
 #
+# Korrekturen ERGAENZEN, Neuerungen ERSETZEN:
+#
+#   Bringt eine Version ausschliesslich behobene Fehler, wird der Changelog der
+#   letzten Funktionsversion mitgenommen und die Korrektur angehaengt. Sonst
+#   stuende im Fenster "Was ist neu" einer Korrektur-Version nur noch die
+#   Korrektur - und alles, was die Fassung davor gebracht hat, waere fuer jeden
+#   verschwunden, der erst jetzt aktualisiert.
+#
+#   Bringt eine Version dagegen Neuerungen, faengt der Changelog frisch an:
+#   Dann gehoert die neue Fassung in den Blick, nicht die alte.
+#
 # Wird eine Aenderung noch vor der Veroeffentlichung wieder verworfen, nimmt ein
 # spaeterer Commit ihre Zeile zurueck - Wort fuer Wort, nur unter anderem Namen:
 #
@@ -50,12 +61,16 @@ fi
 TAG="${1:?Aufruf: changelog.sh <tag> [<vorheriger-tag>]}"
 PREV="${2:-}"
 
-if [ -z "${PREV}" ]; then
-  # Vorherigen Versions-Tag suchen: versionssortiert, damit v26.10.0 nach
-  # v26.9.9 kommt (alphabetisch waere es umgekehrt).
-  PREV="$(git tag -l 'v*' --sort=-v:refname \
+# Vorherigen Versions-Tag suchen: versionssortiert, damit v26.10.0 nach
+# v26.9.9 kommt (alphabetisch waere es umgekehrt).
+vorheriger_tag() {  # vorheriger_tag <tag>
+  git tag -l 'v*' --sort=-v:refname \
     | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
-    | grep -A1 -x -F "${TAG}" | tail -n +2 | head -1 || true)"
+    | grep -A1 -x -F "$1" | tail -n +2 | head -1 || true
+}
+
+if [ -z "${PREV}" ]; then
+  PREV="$(vorheriger_tag "${TAG}")"
 fi
 
 if [ -n "${PREV}" ]; then RANGE="${PREV}..${TAG}"; else RANGE="${TAG}"; fi
@@ -82,30 +97,72 @@ sammle() {  # sammle <Trailer-Name>
     | sort -u || true
 }
 
-# Alle Changelog-Zeilen des Bereichs einsammeln. Doppelte entfernen: Ein Commit
-# kann ueber einen Merge zweimal in der Liste auftauchen.
-ENTRIES="$(sammle 'Changelog')"
-
-# Zurueckgezogene Eintraege abziehen.
+# Alle Changelog-Zeilen EINES Bereichs, Zurueckgezogenes bereits abgezogen.
 #
-# Wird eine Aenderung im selben Release-Zeitraum wieder verworfen oder ersetzt,
-# bliebe ihr Satz sonst im Changelog stehen und behauptete etwas Falsches - die
-# Zeile im alten Commit laesst sich ja nicht mehr aendern. Ein spaeterer Commit
-# nimmt sie mit derselben Zeile unter anderem Namen zurueck:
+# Zurueckgezogene Eintraege: Wird eine Aenderung im selben Release-Zeitraum
+# wieder verworfen oder ersetzt, bliebe ihr Satz sonst im Changelog stehen und
+# behauptete etwas Falsches - die Zeile im alten Commit laesst sich ja nicht
+# mehr aendern. Ein spaeterer Commit nimmt sie mit derselben Zeile unter
+# anderem Namen zurueck:
 #
 #     Changelog-entfaellt: <Art> | <Bereich> | <derselbe Satz>
+eintraege_fuer() {  # eintraege_fuer <range>
+  RANGE="$1"
+  local eintraege zurueck
+  # Doppelte entfernen: Ein Commit kann ueber einen Merge zweimal auftauchen.
+  eintraege="$(sammle 'Changelog')"
+  zurueck="$(sammle 'Changelog-entfaellt')"
+  if [ -n "${zurueck}" ]; then
+    eintraege="$(printf '%s\n' "${eintraege}" \
+      | grep -vxF -f <(printf '%s\n' "${zurueck}") || true)"
+  fi
+  printf '%s' "${eintraege}"
+}
+
+# Sind das ausschliesslich behobene Fehler?
+nur_fehler() {  # nur_fehler <eintraege>
+  [ -n "$1" ] || return 1
+  ! printf '%s\n' "$1" | awk -F'|' '
+      { art=$1; gsub(/^[ \t]+|[ \t]+$/, "", art);
+        if (tolower(art) !~ /fehler|bugfix|behoben/) { gefunden=1 } }
+      END { exit gefunden ? 0 : 1 }'
+}
+
+ENTRIES="$(eintraege_fuer "${RANGE}")"
+
+# Ein reines Fehlerbehebungs-Release ERGAENZT den Changelog, statt ihn zu
+# ersetzen.
 #
-# Nach der Veroeffentlichung wirkt das nicht mehr: Der naechste Release-Bereich
-# beginnt beim neuen Tag, beide Zeilen liegen dann dahinter.
-ZURUECK="$(sammle 'Changelog-entfaellt')"
-if [ -n "${ZURUECK}" ]; then
-  ENTRIES="$(printf '%s\n' "${ENTRIES}" \
-    | grep -vxF -f <(printf '%s\n' "${ZURUECK}") || true)"
-fi
+# Sonst stuende im Fenster "Was ist neu" einer Korrektur-Version nur noch die
+# Korrektur - und alles, was die Fassung davor gebracht hat, waere fuer jeden
+# verschwunden, der erst jetzt aktualisiert. Deshalb wird der betrachtete
+# Bereich Tag um Tag zurueckgeschoben, bis er etwas anderes als Fehler enthaelt.
+# Herauskommt: die Neuerungen der letzten Funktionsversion samt aller seither
+# behobenen Fehler. Ein Release MIT Neuerungen faengt dagegen frisch an - dort
+# gehoert die neue Fassung in den Blick, nicht die alte.
+BASIS="${PREV}"
+SEIT=""
+SCHRITTE=0
+while [ -n "${BASIS}" ] && [ "${SCHRITTE}" -lt 20 ] \
+      && { [ -z "${ENTRIES}" ] || nur_fehler "${ENTRIES}"; }; do
+  DAVOR="$(vorheriger_tag "${BASIS}")"
+  [ -n "${DAVOR}" ] || break
+  BASIS="${DAVOR}"
+  ENTRIES="$(eintraege_fuer "${BASIS}..${TAG}")"
+  SEIT="${BASIS}"
+  SCHRITTE=$((SCHRITTE + 1))
+done
 
 if [ -z "${ENTRIES}" ]; then
   echo "_Nur interne Anpassungen - fuer Anwender aendert sich nichts._"
   exit 0
+fi
+
+# Sagt, worauf sich die Liste bezieht - sonst waere unklar, warum in einer
+# Korrektur-Version Neuerungen stehen, die man schon kennt.
+if [ -n "${SEIT}" ]; then
+  printf '_Diese Liste zeigt alles seit Version %s: die Korrekturen dieser_\n' "${SEIT#v}"
+  printf '_Fassung und die Neuerungen, die seither dazugekommen sind._\n\n'
 fi
 
 # Nach Art gruppieren, in fester Reihenfolge. Innerhalb einer Art nach Bereich,
