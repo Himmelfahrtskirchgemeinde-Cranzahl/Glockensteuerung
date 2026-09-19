@@ -7,34 +7,93 @@ eigenen Instanz pruefen: https://<gemeinde>.church.tools/api
 """
 from __future__ import annotations
 import datetime as dt
+import logging
+import time
+
 import requests
+
+log = logging.getLogger("voco-gateway")
+
+# Wie oft eine Anfrage wiederholt wird, bevor sie als gescheitert gilt, und wie
+# lange dazwischen gewartet wird. Kurz gehalten: Der Dienst prueft ohnehin alle
+# 20 Sekunden erneut, er darf nur nicht minutenlang im Versuch haengen.
+VERSUCHE = 3
+PAUSE_S = 2
 
 
 class ChurchTools:
+    """Spricht mit ChurchTools - und bleibt dabei ueber Wochen ansprechbar.
+
+    Die Anmeldung per Login-Token setzt ein Sitzungs-Cookie, und dieses Cookie
+    laeuft ab. Genau daran scheiterte der Dienst bisher im laufenden Betrieb:
+    Nach einigen Stunden beantwortete ChurchTools jede Anfrage mit 401. Sichtbar
+    wurde das als "keine Verbindung" in der Erweiterung und als "0 Automationen
+    geplant" im Fenster - die Regeln liessen sich schlicht nicht mehr lesen.
+    Deshalb wird der Token hier behalten und die Sitzung bei 401 neu aufgebaut;
+    die Anfrage laeuft danach weiter, als waere nichts gewesen.
+
+    Genauso behandelt werden kurze Netzaussetzer: Ein Zeitabbruch beendet nicht
+    mehr den Dienst, sondern wird ein paar Mal wiederholt.
+    """
+
     def __init__(self, base_url: str, login_token: str, timeout: int = 15):
         self.base = base_url.rstrip("/")
         self.api = self.base + "/api"
         self.timeout = timeout
+        self._token = login_token
         self.s = requests.Session()
         self.s.headers["Accept"] = "application/json"
-        # Session per Login-Token etablieren (setzt Cookie)
-        r = self.s.get(f"{self.api}/whoami", params={"login_token": login_token}, timeout=timeout)
+        self.anmelden()
+
+    def anmelden(self) -> None:
+        """Sitzung per Login-Token (neu) aufbauen - setzt das Cookie."""
+        r = self.s.get(f"{self.api}/whoami", params={"login_token": self._token},
+                       timeout=self.timeout)
         r.raise_for_status()
+
+    def _anfrage(self, methode: str, path: str, *, params=None, json=None):
+        letzter: Exception | None = None
+        neu_angemeldet = False
+        for versuch in range(VERSUCHE):
+            try:
+                r = self.s.request(methode, self.api + path, params=params, json=json,
+                                   timeout=self.timeout)
+            except requests.RequestException as e:
+                # Netz weg, Namensaufloesung, Zeitabbruch: gleich noch einmal.
+                letzter = e
+                if versuch + 1 < VERSUCHE:
+                    time.sleep(PAUSE_S * (versuch + 1))
+                continue
+
+            # 401 heisst hier fast immer: Die Sitzung ist abgelaufen. Einmal neu
+            # anmelden und dieselbe Anfrage wiederholen. Nur einmal - kommt
+            # danach wieder 401, stimmt etwas mit dem Token nicht, und stures
+            # Wiederholen machte es nur schlimmer.
+            if r.status_code == 401 and not neu_angemeldet:
+                neu_angemeldet = True
+                log.info("ChurchTools-Sitzung abgelaufen - melde neu an.")
+                try:
+                    self.anmelden()
+                    continue
+                except Exception as e:
+                    letzter = e
+                    if versuch + 1 < VERSUCHE:
+                        time.sleep(PAUSE_S * (versuch + 1))
+                    continue
+
+            r.raise_for_status()
+            return self._unwrap(r)
+
+        raise letzter if letzter else RuntimeError(f"{methode} {path} fehlgeschlagen")
 
     def get(self, path: str, **params):
-        r = self.s.get(self.api + path, params=params, timeout=self.timeout)
-        r.raise_for_status()
-        return self._unwrap(r)
+        return self._anfrage("GET", path, params=params)
 
     def post(self, path: str, json: dict | None = None):
-        r = self.s.post(self.api + path, json=json, timeout=self.timeout)
-        r.raise_for_status()
-        return self._unwrap(r)
+        return self._anfrage("POST", path, json=json)
 
     def put(self, path: str, json: dict | None = None):
-        r = self.s.put(self.api + path, json=json, timeout=self.timeout)
-        r.raise_for_status()
-        return self._unwrap(r)
+        return self._anfrage("PUT", path, json=json)
 
     @staticmethod
     def _unwrap(r):
@@ -59,14 +118,25 @@ class ChurchTools:
             params[f"calendar_ids[{i}]"] = cid
         try:
             raw = self.get("/calendars/appointments", **params)
-        except Exception:
+        except Exception as sammel_fehler:
             # Fallback: pro Kalender einzeln
             raw = []
+            fehler = []
             for cid in calendar_ids:
                 try:
-                    raw += self.get(f"/calendars/{cid}/appointments", **{"from": frm.isoformat(), "to": to.isoformat()})
-                except Exception:
-                    pass
+                    raw += self.get(f"/calendars/{cid}/appointments",
+                                    **{"from": frm.isoformat(), "to": to.isoformat()})
+                except Exception as e:
+                    fehler.append(e)
+            # Ist ALLES gescheitert, ist die Antwort nicht "keine Termine",
+            # sondern "unbekannt". Der Unterschied ist entscheidend: Eine leere
+            # Liste loescht im Dienst den Ausloeseplan, ein Fehler laesst den
+            # bisherigen Plan stehen. Ein zweiminuetiger Aussetzer der API darf
+            # kein Gelaeut ausfallen lassen.
+            if fehler and not raw:
+                raise RuntimeError(
+                    f"Termine konnten nicht geladen werden ({sammel_fehler}; "
+                    f"auch einzeln nicht: {fehler[0]})") from sammel_fehler
         return [_norm_appointment(a) for a in raw if a]
 
 
