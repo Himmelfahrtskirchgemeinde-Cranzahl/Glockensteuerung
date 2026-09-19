@@ -13,9 +13,10 @@
 # Also bekommt jede Version ihr eigenes Release. Das ist ohnehin die Form, auf
 # die GitHub mit dieser Einstellung hinauswill.
 #
-# Jedes Release traegt genau zwei Dateien, beide unter festem Namen:
-#   glockensteuerung.zip           die Erweiterung fuer ChurchTools
-#   glockensteuerung-gateway.zip   der Dienst fuer den eigenen Rechner
+# Jedes Release traegt dieselben Dateien unter festem Namen:
+#   glockensteuerung.zip            die Erweiterung fuer ChurchTools
+#   Glockensteuerung-Gateway.exe    der Dienst fuer Windows, fertig gebaut
+#   glockensteuerung-gateway.zip    derselbe Dienst als Quelltext
 #
 # Ohne Versionsnummer im Dateinamen: Das Release heisst "Version 26.6.7", damit
 # ist die Zuordnung eindeutig. Zwei Dateien mit demselben Inhalt und nur anderem
@@ -58,13 +59,18 @@ fi
   printf 'Automatisch gebauter Stand. Unten liegen zwei Archive:\n\n'
   printf '* **glockensteuerung.zip** - die Erweiterung. Unveraendert in ChurchTools\n'
   printf '  hochladen, kein Entpacken noetig.\n'
-  printf '* **glockensteuerung-gateway.zip** - der Dienst, der automatisch laeutet.\n'
-  printf '  Auf dem Rechner entpacken, der dauerhaft laeuft (siehe README darin).\n\n'
+  printf '* **Glockensteuerung-Gateway.exe** - der Dienst fuer Windows, fertig\n'
+  printf '  gebaut. Neben die vorhandene .env legen, Doppelklick, "1" waehlen -\n'
+  printf '  danach laeuft er als Windows-Dienst, auch ohne Anmeldung.\n'
+  printf '* **glockensteuerung-gateway.zip** - derselbe Dienst als Quelltext,\n'
+  printf '  fuer Linux oder eigenen Python-Betrieb (siehe README darin).\n\n'
   if [ -n "${REPO}" ]; then
     printf 'Dauerlinks zur jeweils neuesten Fassung (bleiben immer gleich):\n\n'
     printf '* Erweiterung fuer ChurchTools:\n'
     printf '  https://github.com/%s/releases/latest/download/glockensteuerung.zip\n' "${REPO}"
-    printf '* Gateway-Dienst fuer den eigenen Rechner:\n'
+    printf '* Gateway-Dienst fuer Windows (fertige Programmdatei):\n'
+    printf '  https://github.com/%s/releases/latest/download/Glockensteuerung-Gateway.exe\n' "${REPO}"
+    printf '* Gateway-Dienst als Quelltext:\n'
     printf '  https://github.com/%s/releases/latest/download/glockensteuerung-gateway.zip\n\n' "${REPO}"
   fi
   # Ab hier beginnt der Changelog. Die Extension zeigt beim Klick auf die

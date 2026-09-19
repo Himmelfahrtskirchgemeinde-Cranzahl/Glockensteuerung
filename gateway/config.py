@@ -12,8 +12,13 @@ lassen. Deshalb werden hier ALLE Kategorien des Moduls nach den Schluesseln
 """
 from __future__ import annotations
 import json
+import logging
 import os
 from dataclasses import dataclass, field
+
+import pfade
+
+log = logging.getLogger("voco-gateway")
 
 EXT_KEY = os.environ.get("VOCO_EXT_KEY", "glockensteuerung")
 
@@ -204,10 +209,24 @@ def _parse_value(raw):
         return None
 
 
-def load_dotenv(path=".env"):
-    if os.path.exists(path):
-        for line in open(path, encoding="utf-8"):
+def load_dotenv(path: str | None = None) -> str | None:
+    """Laedt die .env - dort, wo sie liegt, nicht dort, wo aufgerufen wurde.
+
+    Frueher stand hier schlicht '.env'. Das ist genau so lange richtig, wie
+    jemand den Dienst von Hand im richtigen Ordner startet. Die Aufgabenplanung
+    tut das nicht: Sie startet als Dienst im Systemverzeichnis, fand die Datei
+    nicht und der Dienst beendete sich sofort wieder. Gesucht wird deshalb neben
+    dem Programm (siehe pfade.py); die Datei selbst bleibt unangetastet.
+
+    Rueckgabe: der gelesene Pfad, oder None wenn keine .env gefunden wurde.
+    """
+    pfad = path or pfade.env_datei()
+    if not pfad or not os.path.exists(pfad):
+        return None
+    with open(pfad, encoding="utf-8") as f:
+        for line in f:
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip())
+    return pfad
