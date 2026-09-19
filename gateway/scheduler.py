@@ -460,8 +460,16 @@ def einmal_laufen(dry: bool, notifier: EmailNotifier, erster_start: bool) -> Non
         voco.on_zustand = None
         log.removeHandler(log_waechter)
         if beenden:
-            log.info("Auf Wunsch beendet.")
-            ereignisse.melde("info", "Automatik-Dienst beendet.")
+            # Deutlich sagen, WER beendet hat. "Auf Wunsch beendet" las sich wie
+            # eine Entscheidung des Programms - dabei kommt der Befehl immer von
+            # aussen: aus der Dienststeuerung von Windows (sc stop, services.msc,
+            # Menuepunkt 7, Herunterfahren) oder als Strg+C im Fenster. Wer das
+            # nicht weiss, sucht den Fehler im Programm statt in Windows.
+            log.info("Angehalten - der Befehl kam von der Dienststeuerung "
+                     "(Windows) oder als Strg+C. Das Programm beendet sich nie "
+                     "von selbst.")
+            ereignisse.melde("info", "Automatik-Dienst wurde angehalten "
+                                     "(Befehl von Windows).")
         voco.close()
 
 
