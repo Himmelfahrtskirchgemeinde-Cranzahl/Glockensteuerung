@@ -93,9 +93,24 @@ const updateAvailable = computed(() =>
 /** Gibt es überhaupt Automatik, die ausfallen könnte? Ohne aktive Regel läutet
  *  nichts von allein – das ist dann so gewollt und keine Störung. */
 const hasAutomation = computed(() => rules.value.some((r) => r.active && r.pgsName));
+/**
+ * Startet der Dienst gerade mit einer neuen Fassung neu?
+ *
+ * Er kündigt das an, bevor er sich beendet. Bis zum Ablauf der Frist ist sein
+ * Schweigen erwartet — und keine Störung. Ohne diese Ausnahme meldete jede
+ * Aktualisierung einen Ausfall, samt E-Mail.
+ */
+const gatewayAktualisiert = computed(() => {
+    const bis = gatewayStatus.value?.updateBis;
+    if (!bis) return false;
+    const t = new Date(bis).getTime();
+    return Number.isFinite(t) && now.value < t;
+});
+
 /** Kein Lebenszeichen oder zu altes -> Automatik läuft nicht. */
 const gatewayDown = computed(() =>
-    hasAutomation.value && (gatewayAgeMin.value === null || gatewayAgeMin.value > GATEWAY_STALE_MIN),
+    hasAutomation.value && !gatewayAktualisiert.value
+    && (gatewayAgeMin.value === null || gatewayAgeMin.value > GATEWAY_STALE_MIN),
 );
 /**
  * Ist über die Automatik überhaupt etwas bekannt?
@@ -107,6 +122,7 @@ const gatewayDown = computed(() =>
 const gatewayBekannt = computed(() => hasAutomation.value || gatewayStatus.value !== null);
 /** Was im Tooltip des Kennzeichens steht. */
 const gatewayPillTitel = computed(() => {
+    if (gatewayAktualisiert.value) return 'Der Dienst startet gerade mit einer neuen Fassung neu.';
     if (gatewayDown.value) return `Die Automatik meldet sich nicht. ${gatewayDownText.value}`;
     const s = gatewayStatus.value;
     const teile = [gatewayDownText.value];
@@ -419,6 +435,10 @@ async function stoerungMelden(betreff: string, text: string, dringend = false) {
 function gatewayZustandMelden() {
     // Ohne Regeln und ohne je ein Lebenszeichen gibt es nichts zu melden.
     if (!hasAutomation.value && gatewayStatus.value === null) return;
+    // Während eines angekündigten Neustarts wird nichts gemeldet - weder ins
+    // Log noch per E-Mail. Das ist der Kern der Sache: Ein geplanter Neustart
+    // darf sich nicht wie ein Ausfall anfühlen.
+    if (gatewayAktualisiert.value) return;
     const steht = gatewayDown.value;
     if (gatewayZuletztGesehen === steht) return;
     const erster = gatewayZuletztGesehen === null;
@@ -924,9 +944,10 @@ async function loadNextRingings() {
         <span v-else class="gs-pill muted"><span class="dot"></span> verbinde …</span>
         <!-- Zweites Kennzeichen: Das Gerät kann online sein, während die
              Automatik längst steht - dann läutet von allein trotzdem nichts. -->
-        <span v-if="gatewayBekannt" class="gs-pill" :class="gatewayDown ? 'warn' : 'ok'"
+        <span v-if="gatewayBekannt" class="gs-pill"
+              :class="gatewayAktualisiert ? 'blue' : (gatewayDown ? 'warn' : 'ok')"
               :title="gatewayPillTitel"><span class="dot"></span>
-          <span class="ptxt">Automatik </span>{{ gatewayDown ? 'steht' : 'läuft' }}</span>
+          <span class="ptxt">Automatik </span>{{ gatewayAktualisiert ? 'aktualisiert' : (gatewayDown ? 'steht' : 'läuft') }}</span>
         <button class="gs-btn gs-ghost" @click="requestSync">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg><span class="btxt">Aktualisieren</span></button>
         <span class="gs-vdiv"></span>

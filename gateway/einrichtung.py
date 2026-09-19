@@ -28,6 +28,7 @@ FELDER: list[tuple[str, str]] = [
                        "# (ChurchTools: Persoenliche Einstellungen -> Sicherheit -> Login-Token)"),
     ("VOCO_SIMULATION", "1 = es wird NICHTS ausgeloest, nur protokolliert"),
     ("VOCO_QUIET", "Ruhezeit, z. B. 22:00-06:00 - darin wird nie ausgeloest"),
+    ("VOCO_AUTO_UPDATE", "1 = neue Fassungen selbst einspielen, wenn nichts laeutet"),
     ("VOCO_SERIAL", "Geraet: nur noetig, wenn es in der Erweiterung fehlt"),
     ("VOCO_DEVICE_PW", "Geraetepasswort (GEHEIM)"),
     ("SMTP_HOST", "Postausgang fuer Stoerungsmeldungen (die Erweiterung hat Vorrang)"),
@@ -222,6 +223,18 @@ def _simulation(werte: dict[str, str]) -> None:
     _schreibe(werte)
 
 
+def _selbstaktualisierung(werte: dict[str, str]) -> None:
+    an = _ist_an(werte.get("VOCO_AUTO_UPDATE", "1"))
+    print()
+    print(f"Selbstaktualisierung ist zurzeit {'EIN' if an else 'AUS'}.")
+    print("Eingeschaltet holt sich der Dienst neue Fassungen selbst - aber nur,")
+    print("wenn eine davon ihn betrifft, und nur, wenn gerade nichts laeutet und")
+    print("in der naechsten halben Stunde nichts ansteht. Der Neustart dauert")
+    print("Sekunden; die Erweiterung weiss davon und meldet keine Stoerung.")
+    werte["VOCO_AUTO_UPDATE"] = "1" if _ja("Selbstaktualisierung einschalten?", standard=an) else "0"
+    _schreibe(werte)
+
+
 def _ruhezeit(werte: dict[str, str]) -> None:
     print()
     print("In der Ruhezeit wird NIE ausgeloest - auch nicht, wenn ein Termin es")
@@ -362,6 +375,7 @@ def _zustand(werte: dict[str, str]) -> list[str]:
         f"E-Mail:       {mail or '(aus)'}",
         f"Geraet:       {werte.get('VOCO_SERIAL') or '(aus der Erweiterung)'}",
         f"Zertifikat:   {werte.get('VOCO_CA_BUNDLE') or '(die des Systems)'}",
+        f"Selbstaktualisierung: {'ein' if _ist_an(werte.get('VOCO_AUTO_UPDATE', '1')) else 'aus'}",
     ]
 
 
@@ -384,6 +398,7 @@ def einstellungen() -> bool:
         print(" 4  E-Mail-Versand (Stoerungsmeldungen)")
         print(" 5  Geraet (nur als Ersatz zur Erweiterung)")
         print(" 6  Eigenes Zertifikatsbuendel")
+        print(" 7  Selbstaktualisierung ein- oder ausschalten")
         print(" 0  Zurueck")
         print()
         try:
@@ -402,6 +417,8 @@ def einstellungen() -> bool:
             _geraet(werte)
         elif wahl == "6":
             _zertifikat(werte)
+        elif wahl == "7":
+            _selbstaktualisierung(werte)
         else:
             return bool(pfade.env_datei())
 

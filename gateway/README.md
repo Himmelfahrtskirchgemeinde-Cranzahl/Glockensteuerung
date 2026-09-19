@@ -141,6 +141,31 @@ würde zweimal geläutet.
 > Zertifikat signiert ist. Über *Weitere Informationen → Trotzdem ausführen*
 > geht es weiter.
 
+### Er hält sich selbst auf dem Stand
+
+Eine Korrektur am Gateway nützt nichts, solange niemand an den Rechner der
+Gemeinde geht. Der Dienst sieht deshalb alle sechs Stunden nach, ob es eine
+neue Fassung gibt, und spielt sie selbst ein — **unter drei Bedingungen**:
+
+1. **Nur, wenn es ihn betrifft.** Eine neue Fassung der Erweiterung ändert an
+   diesem Programm nichts. Entschieden wird das am Changelog des Release: Steht
+   dort ein Abschnitt „Gateway", ist etwas für ihn dabei.
+2. **Nur, wenn nichts brennt.** Während geläutet wird oder eine halbe Stunde vor
+   oder nach einer Auslösung wird nicht getauscht — ein Neustart dauert
+   Sekunden, aber die falschen Sekunden wären die vor dem Gottesdienst.
+3. **Der Weg zurück bleibt offen.** Die bisherige Programmdatei wird nicht
+   gelöscht, sondern als `.alt` danebengelegt, bis die neue nachweislich läuft.
+
+Was heruntergeladen wurde, wird vorher angesehen: Es muss von GitHub kommen,
+mindestens 3 MB groß sein und mit der Kennung eines Windows-Programms beginnen.
+
+Der Neustart löst **keine Störungsmeldung** aus: Der Dienst kündigt ihn im
+Lebenszeichen an, und die Erweiterung weiß dadurch, dass Schweigen für die
+nächsten zehn Minuten erwartet ist. Meldet er sich danach nicht zurück, ist es
+ein Ausfall wie jeder andere — mit E-Mail.
+
+Abschalten lässt sich das über **Einstellungen → 7** (oder `VOCO_AUTO_UPDATE=0`).
+
 ### Was den Dienst nicht stört
 
 Er läuft als `LocalSystem` und hängt an keiner Benutzersitzung:
@@ -227,6 +252,7 @@ WantedBy=multi-user.target
 | `pfade.py` | findet `.env`, Zustand und Protokoll neben dem Programm |
 | `einrichtung.py` | Einstellungsmenü: fragt ab, prüft und schreibt die `.env` |
 | `sperre.py` | verhindert, dass zwei Gateways gleichzeitig läuten |
+| `aktualisierung.py` | holt neue Fassungen und tauscht die Programmdatei |
 | `kv.py` | gemeinsamer Zugriff auf den Speicher der Extension |
 | `heartbeat.py` | Lebenszeichen alle 2 Minuten nach ChurchTools |
 | `ereignisse.py` | hält Verbindungen und Ausfälle im Ereignis-Log fest |
