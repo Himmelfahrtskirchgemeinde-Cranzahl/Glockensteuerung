@@ -288,7 +288,9 @@ des Dienstes nötig. Danach steht er in `services.msc` als
 Was dann von selbst passiert:
 
 - Der Dienst startet **beim Hochfahren des Rechners**, ohne dass sich jemand
-  anmeldet.
+  anmeldet – und zwar **sofort**, nicht verzögert. Er wartet nur darauf, dass
+  Windows das Netzwerk bereitgestellt hat. (Ältere Einrichtungen liefen zwei
+  Minuten verzögert an; das stellt der Dienst beim nächsten Start selbst um.)
 - Er läuft weiter, wenn der Rechner **gesperrt** wird (Win+L), sich jemand
   **abmeldet**, ein **anderer Benutzer** sich anmeldet oder ein neuer Benutzer
   angelegt wird – er hängt an keiner Anmeldung.
@@ -309,6 +311,16 @@ Dieselbe Datei beantwortet alle Fragen zum Betrieb:
 | 6 | `--neustart` | Anhalten und wieder starten |
 | 7 | `--anhalten` | Anhalten, um die Programmdatei ersetzen zu können |
 | 8 | `--entfernen` | Dienst wieder abmelden |
+| 0 | | schließen |
+
+**Das Menü bleibt offen.** Nach jedem Punkt kommt es zurück – Status ansehen,
+dann Testlauf, dann Einstellungen, alles nacheinander im selben Fenster. Erst
+**0** (oder das Schließen des Fensters) beendet es. Oben steht dabei immer der
+aktuelle Zustand des Dienstes, frisch gelesen.
+
+Fragt Windows für einen Punkt nach **Administratorrechten** (1, 6, 7, 8), geht
+es in einem zweiten Fenster weiter – dort steht dasselbe Menü, nur mit den
+nötigen Rechten. Das erste Fenster kann dann zu.
 
 Zeigt der **Testlauf** die richtigen Auslösungen, ist alles richtig verdrahtet.
 In ChurchTools steht dann unter **Ereignis-Log**, wann der Dienst gestartet ist
@@ -360,6 +372,11 @@ Die bisherige Programmdatei bleibt als `.alt` liegen, bis die neue läuft.
 > Erweiterung auf „Automatik steht", schreibt es ins Ereignis-Log und schickt
 > die dringende E-Mail. So bleibt noch Zeit, von Hand zu läuten, wenn es kurz
 > vor einem Gottesdienst passiert.
+>
+> **Wird der Dienst angehalten und bleibt aus** – von Windows (Update,
+> Herunterfahren, Energiesparen) oder von Hand über Punkt 7 –, schickt er die
+> Meldung **selbst**, bevor er geht. Nur beim Neustart (Punkt 6) und bei der
+> Selbstaktualisierung bleibt es still: Da ist er Sekunden später wieder da.
 >
 > Bemerken kann das allerdings nur eine **geöffnete** Seite – die Erweiterung
 > läuft im Browser, nicht auf einem Server. Wer sichergehen will, lässt das

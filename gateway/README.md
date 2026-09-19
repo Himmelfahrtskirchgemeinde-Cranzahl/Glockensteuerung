@@ -83,7 +83,8 @@ Sie braucht kein Python und keine virtuelle Umgebung.
 
 1. Die EXE in einen eigenen Ordner legen. Liegt dort schon eine `.env`, bleibt
    sie unverändert und wird benutzt.
-2. Doppelklick → **1 (Einrichten)**. Gibt es noch keine `.env`, fragt das
+2. Doppelklick → **1 (Einrichten)**. Das Menü bleibt danach offen; erst **0**
+   schließt es. Gibt es noch keine `.env`, fragt das
    Programm nach der ChurchTools-Adresse und dem Login-Token, probiert beides
    sofort aus und legt die Datei selbst an.
 3. Die Windows-Abfrage nach Administratorrechten bestätigen – die braucht es
@@ -162,6 +163,33 @@ mindestens 3 MB groß sein und mit der Kennung eines Windows-Programms beginnen.
 Der Neustart löst **keine Störungsmeldung** aus: Der Dienst kündigt ihn im
 Lebenszeichen an, und die Erweiterung weiß dadurch, dass Schweigen für die
 nächsten zehn Minuten erwartet ist.
+
+> **Wird der Dienst angehalten, hängt es davon ab, ob er wiederkommt.**
+>
+> | Auslöser | Meldung |
+> |---|---|
+> | **6 – Neustart** | keine: er ist Sekunden später wieder da |
+> | **Selbstaktualisierung** | keine: derselbe Fall, nur mit neuer Fassung |
+> | **7 – Anhalten** | **E-Mail** – er bleibt aus, bis ihn jemand startet |
+> | **Windows** (Update, Herunterfahren, Virenscanner) | **E-Mail** |
+>
+> Verschickt wird sie vom Dienst **selbst**, bevor er geht.
+>
+> Das ist der einzige Augenblick, in dem das überhaupt geht: Die Meldung der
+> Erweiterung liegt im Postausgang, bis der Dienst zurückkommt – **kommt er
+> nicht zurück, kommt auch die Meldung nie**. Ein Browser kann kein SMTP
+> sprechen; verschicken kann nur der Dienst.
+>
+> Was er nicht melden kann: einen Stromausfall oder einen abgestürzten
+> Rechner. Dann ist er weg, bevor er etwas tun könnte. Wer auch das bemerken
+> will, braucht einen Wächter außerhalb – etwa eine Überwachung, die den
+> Rechner anpingt.
+
+> **Im Ereignis-Log steht, welche Fassung läuft.** Jede Startmeldung nennt sie
+> („Automatik-Dienst 26.10.0 gestartet …"), und hat sich der Dienst
+> zwischendurch selbst aktualisiert, steht das als eigene Zeile davor:
+> „Automatik-Dienst aktualisiert: 26.10.0 → 26.10.1." Ohne sie bliebe die
+> Selbstaktualisierung völlig unsichtbar.
 
 > Dasselbe gilt für den **Wiederanlauf** nach einer Störung. Reißt eine
 > Verbindung ab, wartet der Dienst 15 Sekunden bis 5 Minuten und nimmt einen

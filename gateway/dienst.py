@@ -88,6 +88,13 @@ def programmdatei() -> str:
     return os.path.abspath(__file__)
 
 
+# Rueckgabewert von als_admin_neu_starten(): Die Arbeit laeuft ab jetzt in
+# einem zweiten, erhoehten Fenster. Dieses hier hat nichts mehr zu tun und darf
+# NICHT ins Menue zurueckkehren - sonst staenden zwei Menues offen und man
+# bediente das falsche.
+IM_ANDEREN_FENSTER = 99
+
+
 def als_admin_neu_starten(argumente: list[str]) -> int:
     """Dasselbe Programm noch einmal starten, diesmal mit Adminrechten (UAC).
 
@@ -112,7 +119,7 @@ def als_admin_neu_starten(argumente: list[str]) -> int:
               "Administrator ausfuehren' oeffnen und es dort erneut versuchen.")
         return 1
     print("Es geht im neuen Fenster weiter.")
-    return 0
+    return IM_ANDEREN_FENSTER
 
 
 # --- Alte Eintraege in der Aufgabenplanung --------------------------------
@@ -599,15 +606,51 @@ def entfernen() -> int:
     return 0
 
 
+def wartung_ankuendigen(grund: str) -> None:
+    """Sagt dem laufenden Dienst, wer ihn gleich anhaelt und warum.
+
+    Davon haengt ab, ob es eine Meldung gibt:
+
+      "neustart"  Menuepunkt 6 - er ist gleich wieder da, also still.
+      "anhalten"  Menuepunkt 7 - er bleibt aus, das gehoert gemeldet.
+
+    Ohne Marke gilt das Anhalten als Befehl von Windows und wird ebenfalls
+    gemeldet. Genau so soll es sein: Haelt Windows den Dienst an (Update,
+    Herunterfahren, Virenscanner), muss das auffallen.
+
+    Die Marke ist eine kleine Datei neben dem Programm; der Dienst holt sie
+    beim Beenden ab und entfernt sie dabei.
+    """
+    try:
+        with open(pfade.wartungsmarke(), "w", encoding="utf-8") as f:
+            f.write(grund)
+    except Exception as e:
+        # Kein Abbruch: Dann kommt eben eine Meldung zu viel.
+        print(f"Hinweis: Die Wartungsmarke liess sich nicht setzen ({e}).")
+        print("Es kann deshalb eine Stoerungsmeldung geben, obwohl alles in Ordnung ist.")
+
+
 def neustart() -> int:
     if not ist_admin():
         return als_admin_neu_starten(["--neustart"])
+    wartung_ankuendigen("neustart")
     if not windienst.VERFUEGBAR:
         _schtasks("/End", "/TN", AUFGABE)
         _schtasks("/Run", "/TN", AUFGABE)
         print("Aufgabe neu gestartet.")
         return 0
-    windienst.anhalten()
+    # Erst sagen, was ueberhaupt ansteht: Laeuft der Dienst gar nicht, wird er
+    # nur gestartet - und niemand raetselt, warum das Anhalten "nicht ging".
+    if windienst.zustand() == "laeuft":
+        print("Dienst wird angehalten ...")
+        if windienst.anhalten() != 0:
+            print()
+            print("Der Neustart wurde abgebrochen, weil sich der Dienst nicht")
+            print("anhalten liess. Er laeuft also weiter.")
+            return 1
+    else:
+        print("Der Dienst laeuft gerade nicht - er wird jetzt gestartet.")
+    print("Dienst wird gestartet ...")
     return windienst.starten()
 
 
@@ -620,6 +663,10 @@ def anhalten() -> int:
     """
     if not ist_admin():
         return als_admin_neu_starten(["--anhalten"])
+    # Bewusst "anhalten" und nicht schweigen: Der Dienst bleibt jetzt aus, bis
+    # ihn jemand startet. Daran soll eine Meldung erinnern - auch wenn man es
+    # selbst veranlasst hat und der Tausch der Programmdatei dazwischenkommt.
+    wartung_ankuendigen("anhalten")
     if not windienst.VERFUEGBAR:
         _schtasks("/End", "/TN", AUFGABE)
         print("Angehalten.")
@@ -638,8 +685,25 @@ def status() -> int:
     print(f"Protokoll:     {pfade.protokolldatei()}")
     if ist_windows():
         print(f"Dienst:        {windienst.zustand()}")
-        if windienst.VERFUEGBAR and windienst.zustand() != "nicht eingerichtet" \
-                and not windienst.zeigt_auf(programmdatei()):
+        # Die wichtigere Frage als "laeuft er gerade": Faengt er nach einem
+        # Neustart des Rechners von selbst wieder an? Stand bisher nirgends.
+        eingerichtet = windienst.VERFUEGBAR and windienst.zustand() != "nicht eingerichtet"
+        if eingerichtet:
+            print(f"Startet:       {windienst.starttyp()}")
+            if windienst.starttyp().startswith("automatisch (verz"):
+                # Alter Eintrag aus frueheren Fassungen: Windows laesst solche
+                # Dienste erst 120 Sekunden nach den uebrigen anlaufen. Der
+                # Dienst stellt das beim naechsten Start selbst um - hier steht
+                # nur, warum es beim letzten Hochfahren noch gedauert hat.
+                print("               (verzoegert - noch der alte Eintrag. Der")
+                print("               Dienst stellt das beim naechsten Start")
+                print("               selbst auf sofort um.)")
+            if not windienst.startet_von_selbst():
+                print("ACHTUNG:       Nach einem Neustart des Rechners bleibt der")
+                print("               Dienst aus - es wird dann nicht gelaeutet.")
+                print("               Punkt 1 (Installieren) stellt das richtig;")
+                print("               Zugangsdaten bleiben dabei erhalten.")
+        if eingerichtet and not windienst.zeigt_auf(programmdatei()):
             print(f"ACHTUNG:       Der Dienst startet eine ANDERE Datei:")
             print(f"               {windienst.programmpfad()}")
             print("               Diese hier wird also nicht benutzt. Mit "
@@ -677,10 +741,43 @@ def protokoll(zeilen: int = 40) -> int:
 
 
 def menue() -> int:
-    """Was bei einem Doppelklick passiert."""
+    """Was bei einem Doppelklick passiert.
+
+    Das Menue bleibt stehen: Nach jedem Punkt kommt es zurueck, bis jemand 0
+    waehlt oder das Fenster schliesst. Vorher endete das Programm nach einer
+    einzigen Aktion - wer nach dem Status noch einen Testlauf wollte, musste
+    die Programmdatei erneut oeffnen.
+    """
+    while True:
+        rc = _menue_einmal()
+        if rc is None:          # 0 oder Fenster zu
+            return 0
+        if rc == IM_ANDEREN_FENSTER:
+            # Dort steht gleich dasselbe Menue - mit Adminrechten.
+            try:
+                input("\nDieses Fenster kann zu. Eingabetaste ...")
+            except (EOFError, KeyboardInterrupt):
+                pass
+            return 0
+        try:
+            input("\nWeiter mit der Eingabetaste ...")
+        except (EOFError, KeyboardInterrupt):
+            return rc
+        print()
+        print()
+
+
+def _menue_einmal() -> int | None:
+    """Zeigt das Menue und fuehrt EINEN Punkt aus.
+
+    Gibt None zurueck, wenn Schluss ist (Punkt 0 oder geschlossenes Fenster),
+    sonst den Rueckgabewert der Aktion.
+    """
     print(f"Glockensteuerung-Gateway {pfade.version()}")
     print("=" * 56)
     if ist_windows():
+        # Bei jedem Durchgang frisch: Nach "anhalten" soll hier auch
+        # "angehalten" stehen, nicht der Stand von vor fuenf Minuten.
         print(f"Dienst: {windienst.zustand()}")
     if not pfade.env_datei():
         print("Noch nicht eingerichtet - dafuer ist Punkt 1 da.")
@@ -698,7 +795,7 @@ def menue() -> int:
     try:
         wahl = input("Auswahl: ").strip()
     except (EOFError, KeyboardInterrupt):
-        return 0
+        return None
     if wahl == "1":
         rc = installieren()
     elif wahl == "2":
@@ -719,13 +816,11 @@ def menue() -> int:
         rc = anhalten()
     elif wahl == "8":
         rc = entfernen()
+    elif wahl in ("0", ""):
+        return None
     else:
-        return 0
-    if not ist_admin():         # im erhoehten Fenster wartet bereits --warten
-        try:
-            input("\nMit der Eingabetaste schliessen ...")
-        except Exception:
-            pass
+        print(f"'{wahl}' kenne ich nicht - bitte eine Zahl von 0 bis 8.")
+        rc = 0
     return rc
 
 
@@ -781,10 +876,17 @@ def main(argv: list[str] | None = None) -> int:
         return menue()
 
     if args.warten:
+        # Das erhoehte Fenster hat seine Aufgabe erledigt - und bleibt jetzt
+        # offen, mit dem Menue. Dort gelten Adminrechte, die Punkte 1, 6, 7
+        # und 8 fragen also nicht noch einmal nach. Vorher schloss es sich
+        # nach der einen Aktion, und fuer die naechste ging alles von vorn los.
         try:
-            input("\nMit der Eingabetaste schliessen ...")
-        except Exception:
-            pass
+            input("\nWeiter mit der Eingabetaste ...")
+        except (EOFError, KeyboardInterrupt):
+            return rc
+        print()
+        print()
+        return menue()
     return rc
 
 

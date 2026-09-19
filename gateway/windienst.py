@@ -123,10 +123,17 @@ def einrichten() -> int:
             print(f"Der Dienst konnte nicht angelegt werden: {e}")
             return 1
 
-    # Verspaeteter Start: Beim Hochfahren ist das Netz oft noch nicht da. Der
-    # Dienst faengt sich zwar selbst, aber so beginnt sein Protokoll nicht mit
-    # einer Fehlermeldung.
-    _sc("config", NAME, "start=", "delayed-auto")
+    # Sofort mit dem Hochfahren starten - NICHT "delayed-auto". Windows laesst
+    # verzoegerte Dienste erst 120 Sekunden nach den uebrigen anlaufen; zwei
+    # Minuten, in denen nicht gelaeutet wuerde und in denen der Dienst wie
+    # ausgefallen aussieht.
+    #
+    # Der frueher dafuer angefuehrte Grund - beim Hochfahren ist das Netz oft
+    # noch nicht da - traegt nicht mehr: Die Dienstschleife faengt genau das ab
+    # und versucht es nach 15 Sekunden erneut. Damit es gar nicht erst dazu
+    # kommt, haengt der Dienst jetzt an den Netzwerkdiensten: Windows startet
+    # ihn erst, wenn TCP/IP und die Namensaufloesung stehen.
+    _sc("config", NAME, "start=", "auto", "depend=", "Tcpip/Dnscache")
     # Faellt der Dienst aus, startet Windows ihn nach einer Minute neu - immer
     # wieder, nicht nur die ersten drei Male ("reset= 0" setzt den Zaehler nie
     # zurueck, also gilt die dritte Regel dauerhaft).
@@ -135,25 +142,77 @@ def einrichten() -> int:
     return 0
 
 
+def warte_auf(ziel: str, sekunden: float = 30.0) -> bool:
+    """Wartet, bis der Dienst den Zustand erreicht. True, wenn er ihn erreicht.
+
+    Noetig, weil StopService und StartService zurueckkehren, sobald Windows den
+    Befehl ANGENOMMEN hat - nicht, wenn er ausgefuehrt ist. Wer direkt danach
+    starten will, trifft den Dienst mitten im Anhalten an, und der Start
+    scheitert. Genau daran lag es, dass ein Neustart zweimal noetig war.
+    """
+    import time
+    ende = time.time() + sekunden
+    while time.time() < ende:
+        if zustand() == ziel:
+            return True
+        time.sleep(0.5)
+    return zustand() == ziel
+
+
 def starten() -> int:
     import win32serviceutil
     try:
         win32serviceutil.StartService(NAME)
-        print("Dienst gestartet.")
-        return 0
     except Exception as e:
         print(f"Der Dienst konnte nicht gestartet werden: {e}")
         return 1
+    # Erst melden, wenn er wirklich laeuft - sonst steht "Dienst gestartet" da,
+    # waehrend der Start noch aussteht oder gleich wieder abbricht.
+    if warte_auf("laeuft"):
+        print("Dienst gestartet.")
+        return 0
+    print(f"Der Dienst wurde gestartet, laeuft aber (noch) nicht: {zustand()}.")
+    print("Was dabei schiefging, steht in gateway.log daneben.")
+    return 1
+
+
+# Windows-Fehler 1062: "Der Dienst wurde nicht gestartet." Wer anhalten will,
+# was ohnehin steht, hat sein Ziel bereits erreicht - das ist kein Fehler.
+NICHT_GESTARTET = 1062
+
+
+def _fehlernummer(e: Exception) -> int:
+    """Windows-Fehlernummer aus einer pywin32-Ausnahme, sonst 0."""
+    nr = getattr(e, "winerror", None)
+    if isinstance(nr, int):
+        return nr
+    args = getattr(e, "args", ())
+    return args[0] if args and isinstance(args[0], int) else 0
 
 
 def anhalten() -> int:
+    """Haelt den Dienst an. Ein bereits angehaltener Dienst ist kein Fehler."""
     import win32serviceutil
     try:
         win32serviceutil.StopService(NAME)
+        # Abwarten, bis er wirklich steht. Windows nimmt den Befehl sofort an,
+        # braucht danach aber noch einen Moment; wer gleich weitermacht (etwa
+        # die Programmdatei ersetzt oder neu startet), laeuft sonst ins Leere.
+        if not warte_auf("angehalten"):
+            print(f"Der Dienst haelt noch an (Zustand: {zustand()}).")
+            return 1
         print("Dienst angehalten.")
         return 0
     except Exception as e:
-        print(f"Der Dienst laeuft nicht oder liess sich nicht anhalten: {e}")
+        if _fehlernummer(e) == NICHT_GESTARTET:
+            # (Der Dienst stand schon - dann ist auch nichts abzuwarten.)
+            # Frueher stand hier "Der Dienst laeuft nicht ODER liess sich nicht
+            # anhalten" samt Windows-Fehlertext. Das las sich wie eine Stoerung,
+            # obwohl alles in Ordnung war - beim Neustart erschien es jedes Mal,
+            # wenn der Dienst vorher schon stand.
+            print("Der Dienst lief nicht - es gibt nichts anzuhalten.")
+            return 0
+        print(f"Der Dienst liess sich nicht anhalten: {e}")
         return 1
 
 
@@ -208,6 +267,70 @@ def zeigt_auf(datei: str) -> bool:
     else:
         teil = teil.split(" ", 1)[0]
     return os.path.normcase(os.path.abspath(teil)) == os.path.normcase(os.path.abspath(datei))
+
+
+def verzoegerung_abstellen() -> bool:
+    """Stellt einen verzoegerten Start auf sofort um. True, wenn geaendert.
+
+    Frueher wurde der Dienst als "delayed-auto" eingetragen; Windows laesst
+    solche Dienste erst 120 Sekunden nach den uebrigen anlaufen. Wer schon
+    eingerichtet hat, saesse sonst weiter auf den zwei Minuten - und muesste
+    dafuer von Hand noch einmal durch Punkt 1.
+
+    Der Dienst laeuft als SYSTEM und darf das selbst richten. Umgestellt wird
+    NUR von "verzoegert" auf "sofort", also innerhalb des automatischen Starts.
+    Wer bewusst "nur von Hand" oder "deaktiviert" gewaehlt hat, behaelt das:
+    Das waere eine Entscheidung, keine Altlast.
+    """
+    if not VERFUEGBAR or not starttyp().startswith("automatisch (verz"):
+        return False
+    if _sc("config", NAME, "start=", "auto", "depend=", "Tcpip/Dnscache") != 0:
+        return False
+    return True
+
+
+def starttyp() -> str:
+    """Startet der Dienst beim Hochfahren von selbst? Klartext.
+
+    Das ist die wichtigste Frage ueberhaupt: Ein Dienst, der nur laeuft, weil
+    ihn jemand gestartet hat, ist nach dem naechsten Neustart des Rechners weg
+    - und niemand merkt es, bis ein Gottesdienst ungelaeutet bleibt. Im Status
+    stand bisher nur, ob er GERADE laeuft.
+    """
+    if not VERFUEGBAR:
+        return "unbekannt (pywin32 fehlt)"
+    import win32service
+    try:
+        h_scm = win32service.OpenSCManager(None, None, win32service.SC_MANAGER_CONNECT)
+        try:
+            h = win32service.OpenService(h_scm, NAME, win32service.SERVICE_QUERY_CONFIG)
+            try:
+                cfg = win32service.QueryServiceConfig(h)
+                typ = cfg[1]
+                verzoegert = False
+                try:
+                    verzoegert = bool(win32service.QueryServiceConfig2(
+                        h, win32service.SERVICE_CONFIG_DELAYED_AUTO_START_INFO))
+                except Exception:
+                    pass
+            finally:
+                win32service.CloseServiceHandle(h)
+        finally:
+            win32service.CloseServiceHandle(h_scm)
+    except Exception:
+        return "nicht eingerichtet"
+    if typ == win32service.SERVICE_AUTO_START:
+        return "automatisch (verzoegert)" if verzoegert else "automatisch"
+    if typ == win32service.SERVICE_DEMAND_START:
+        return "nur von Hand"
+    if typ == win32service.SERVICE_DISABLED:
+        return "deaktiviert"
+    return f"Typ {typ}"
+
+
+def startet_von_selbst() -> bool:
+    """Faengt der Dienst beim Hochfahren von selbst an zu laufen?"""
+    return starttyp().startswith("automatisch")
 
 
 def zustand() -> str:

@@ -122,12 +122,23 @@ export interface GatewayStatus {
     rules?: number;          // wie viele Regeln der Dienst geladen hat
     simulation?: boolean;    // laeuft der Dienst im Simulationsmodus?
     device?: string | null;  // Seriennummer, die er nutzt
+    /** Welche Fassung des Gateways gerade läuft (z. B. „26.10.0"). */
+    version?: string;
     /**
      * Kann Feedback per E-Mail rausgehen? Der Gateway beantwortet das, weil die
      * Extension es nicht kann: Die Zugangsdaten liegen in der Kategorie „email",
      * die normale Benutzer nicht lesen dürfen.
      */
     mail?: boolean;
+    /**
+     * Dürfen Störungsmeldungen raus? Ein eigener Schalter, nicht derselbe.
+     *
+     * Vorher hing beides an `mail` – also am Feedback-Formular. Wer „Feedback
+     * per E-Mail" abschaltete, aber „Störungen melden" anließ, bekam keine
+     * Störungsmeldungen, obwohl er sie eingeschaltet hatte. Fehlt das Feld
+     * (älterer Gateway), gilt wie bisher `mail`.
+     */
+    mailFehler?: boolean;
     /**
      * Bis wann ein Neustart erwartet ist (ISO).
      *
