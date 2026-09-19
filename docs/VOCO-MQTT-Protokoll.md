@@ -77,6 +77,26 @@ geschnittene Name wird zurechtgerückt, und zwar in dieser Reihenfolge:
 2. **DOS (CP437/CP850)**, sobald ein Byte aus `0x80`–`0x9F` vorkommt.
 3. Sonst bleibt es bei **Latin-1**.
 
+### Die Anlage benutzt die Folge ab `0x18`
+
+Gemessen an einem echten Gerät: „TESTLÄUTEN" kommt als `TESTL` + **`0x1A`** +
+`UTEN` an. Dieselben acht Zeichen gibt es also zweimal, zwölf Stellen
+versetzt:
+
+| Zeichen | Variante A | Variante B (in der Praxis) |
+|---|---|---|
+| `:` | `0x24` | `0x18` |
+| `ß` | `0x25` | `0x19` |
+| `Ä` | `0x26` | **`0x1A`** |
+| `Ö` | `0x27` | `0x1B` |
+| `Ü` | `0x28` | `0x1C` |
+| `ä` | `0x29` | `0x1D` |
+| `ö` | `0x2A` | `0x1E` |
+| `ü` | `0x2B` | `0x1F` |
+
+Beide werden umgesetzt. Gefahrlos ist das, weil `0x18`–`0x1F` Steuerzeichen
+sind, die in einem Programmnamen nie vorkommen.
+
 ### Umlaute kommen als DOS-Bytes
 
 Die Steuerbyte-Tabelle oben ist nicht der einzige Weg, auf dem Umlaute
