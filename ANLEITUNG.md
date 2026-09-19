@@ -86,20 +86,22 @@ Titel. Diesen Link kann man sich merken oder weitergeben.
 
 **Eine bestimmte Version (Archiv):**
 
-Unter **Releases** hat jede Version einen eigenen Eintrag („Version 26.6.1") mit
-ihrem Changelog und der Datei `glockensteuerung-vX.Y.Z.zip`. Nur nötig, wenn ihr
-gezielt eine ältere Fassung braucht.
+Unter **Releases** hat jede Version einen eigenen Eintrag („Version 26.8.0") mit
+ihrem Changelog und der Datei `glockensteuerung.zip`. Welche Version darin
+steckt, sagt der Titel – nur nötig, wenn ihr gezielt eine ältere Fassung
+braucht.
 
 **Oder als schneller Test-Build (ohne Tag):**
 
 1. Auf GitHub in den Tab **„Actions"**.
-2. Links den Workflow **„ChurchTools-Extension bauen (ZIP)"** wählen →
+2. Links den Workflow **„Erweiterung und Gateway bauen (ZIP)"** wählen →
    **„Run workflow"** (Knopf rechts) → Branch wählen → **Run**.
 3. Nach ~1 Minute den Lauf öffnen → unten unter **„Artifacts"**
    `glockensteuerung-extension` herunterladen.
 4. ⚠️ **Wichtig:** Dieser Download ist selbst ein ZIP (so macht es GitHub). Erst
-   **entpacken** – darin liegt die eigentliche `glockensteuerung-…zip`. **Diese
-   innere ZIP** kommt nach ChurchTools.
+   **entpacken** – darin liegen die eigentliche `glockensteuerung-…zip` für
+   ChurchTools und die Programmdatei für Windows. **Die innere ZIP** kommt nach
+   ChurchTools.
 
 ### Weg B: Selbst bauen (wenn Node.js vorhanden)
 
@@ -184,9 +186,10 @@ Der Gateway liest eure ChurchTools-Termine + die Regeln und löst automatisch au
 
 Irgendein Gerät, das **dauerhaft an ist und Internet hat**:
 
+- **Windows-PC, der ohnehin durchläuft** – dafür gibt es die fertige
+  Programmdatei; es ist der einfachste Weg (3.3).
 - **Raspberry Pi** (günstig, stromsparend) – gute Dauerlösung.
 - **Kleiner Server / VPS** (z. B. günstiger Root-/Cloud-Server).
-- **Vorhandener Dauer-PC / Heimserver.**
 
 Es muss **nicht** in der Kirche stehen – Steuerung und ChurchTools laufen über
 das Internet.
@@ -200,87 +203,94 @@ Der Gateway meldet sich mit einem **Login-Token** an ChurchTools an
   Login-Token** anzeigen/erzeugen. Der Benutzer braucht Leserechte auf die
   betreffenden Kalender/Veranstaltungen und das Modul.
 
-### 3.3 Installieren
+### 3.3 Windows: einrichten in fünf Minuten
 
-#### Windows: fertige Programmdatei (empfohlen)
+Für Windows gibt es den Gateway **fertig gebaut** – ohne Python, ohne
+Kommandozeile, ohne Aufgabenplanung.
 
-Für Windows gibt es den Gateway fertig gebaut – ohne Python, ohne
-Kommandozeile. Aus dem
-[neuesten Release](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest)
-die Datei **`Glockensteuerung-Gateway.exe`** herunterladen und in einen eigenen
-Ordner legen, zum Beispiel `C:\Automationen\Glockensteuerung\gateway`.
+1. **Herunterladen:**
+   [`Glockensteuerung-Gateway.exe`](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest/download/Glockensteuerung-Gateway.exe)
+   (der Link zeigt immer auf die neueste Fassung).
+2. **Ablegen:** in einen eigenen Ordner, zum Beispiel
+   `C:\Automationen\Glockensteuerung\gateway`. Wohin, ist frei – der Dienst
+   merkt sich den Ort.
+3. **Doppelklick** und **1** wählen: *Einrichten: Zugangsdaten abfragen und
+   Dienst anlegen*.
 
-Daneben eine Textdatei **`.env`** mit den Zugangsdaten anlegen:
+Gefragt wird dabei nur nach zwei Dingen:
 
-```
-CT_BASE_URL=https://EUREGEMEINDE.church.tools
-CT_LOGIN_TOKEN=... (der Token aus 3.2)
-```
+| Frage | Antwort |
+|---|---|
+| Adresse von ChurchTools | `https://EUREGEMEINDE.church.tools` |
+| Login-Token | der Token aus 3.2 |
+| Simulation einschalten? | beim ersten Mal **ja** – dann wird nichts ausgelöst |
 
-Das Gerät (Seriennummer + Passwort) wird aus der Erweiterung gelesen; nur wenn
-dort nichts steht, zusätzlich `VOCO_SERIAL` und `VOCO_DEVICE_PW` eintragen.
+Das Programm probiert die Angaben **sofort aus** und sagt, was es vorfindet
+(„Geräts VH-… gefunden, 3 aktive Regeln"). Erst danach schreibt es die Datei
+`.env` in denselben Ordner. Ein Tippfehler fällt damit sofort auf und nicht
+erst, wenn am Sonntag die Glocken schweigen.
 
-Weiter bei **3.5 Dauerbetrieb einrichten** – die Programmdatei erledigt den Rest.
+Anschließend fragt Windows nach Administratorrechten – das ist für das Anlegen
+des Dienstes nötig. Danach steht er in `services.msc` als
+**Glockensteuerung Gateway**.
 
-#### Linux oder eigener Python-Betrieb
+> **„Der Computer wurde durch Windows geschützt"** erscheint beim ersten Start,
+> weil die Datei nicht mit einem gekauften Zertifikat signiert ist.
+> *Weitere Informationen → Trotzdem ausführen.*
 
-```bash
-# Projekt holen (oder „Source code" aus dem neuesten Release herunterladen)
-git clone https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung.git
-cd Glockensteuerung/gateway
+Was dann von selbst passiert:
 
-# Python-Umgebung + Abhängigkeiten
-python3 -m venv .venv
-source .venv/bin/activate        # Windows: .venv\\Scripts\\activate
-pip install -r requirements.txt
+- Der Dienst startet **beim Hochfahren des Rechners**, ohne dass sich jemand
+  anmeldet.
+- Windows startet ihn nach einem Absturz **selbst neu**.
+- Verbindungen, die abreißen, baut er **eigenständig wieder auf**.
+- Er schreibt mit, was passiert – `gateway.log` neben der Programmdatei.
 
-# Konfiguration
-cp .env.example .env
-# .env öffnen und ausfüllen:
-#   CT_BASE_URL=https://EUREGEMEINDE.church.tools
-#   CT_LOGIN_TOKEN=... (der Token aus 3.2)
-# Gerät wird i. d. R. aus der Extension gelesen; alternativ VOCO_SERIAL/VOCO_DEVICE_PW setzen.
-```
+### 3.4 Prüfen, ohne dass etwas läutet
 
-### 3.4 Testen (ohne dass etwas läutet)
+Dieselbe Datei beantwortet alle Fragen zum Betrieb:
 
-```bash
-python voco_mqtt.py status      # zeigt: Gerät online? + eure Programme
-python scheduler.py --dry-run   # plant aus euren Terminen, löst NICHT aus (nur Anzeige)
-```
+| Menü | Befehl | Wofür |
+|---|---|---|
+| 3 | `--status` | Läuft der Dienst? Was steht zuletzt im Protokoll? |
+| 4 | `--testlauf` | Läuft sichtbar im Fenster und löst **nichts** aus |
+| 5 | `--diagnose` | Prüft die verschlüsselte Verbindung zum Broker |
+| 6 | `--neustart` | Anhalten und wieder starten |
+| 2 | `--einrichten` | Zugangsdaten ändern (Token gewechselt, Instanz umgezogen) |
+| 7 | `--entfernen` | Dienst wieder abmelden |
 
-Wenn `--dry-run` die richtigen Auslösungen anzeigt, ist alles korrekt verdrahtet.
+Zeigt der **Testlauf** die richtigen Auslösungen, ist alles richtig verdrahtet.
+In ChurchTools steht dann unter **Ereignis-Log**, wann der Dienst gestartet ist
+und ob er verbunden war.
 
-### 3.5 Dauerbetrieb einrichten
+Zum Scharfschalten: Menüpunkt **2** und bei „Simulation einschalten?" **n**
+antworten – oder in der `.env` `VOCO_SIMULATION=0` setzen und den Dienst neu
+starten.
 
-**Windows** – Doppelklick auf `Glockensteuerung-Gateway.exe`, dann **1
-(Dienst einrichten)** wählen und die Windows-Abfrage bestätigen.
-
-Danach steht der Gateway in `services.msc` als **Glockensteuerung Gateway** und
-
-- startet beim Hochfahren des Rechners, **ohne dass sich jemand anmeldet**,
-- wird von Windows nach einem Absturz von selbst neu gestartet,
-- baut Verbindungen, die abreißen, eigenständig wieder auf,
-- schreibt mit, was passiert (`gateway.log` neben der Programmdatei).
-
-Dieselbe Datei beantwortet später die Frage, ob alles läuft:
-
-```text
-Glockensteuerung-Gateway.exe --status      läuft er? was steht im Protokoll?
-Glockensteuerung-Gateway.exe --neustart    anhalten und wieder starten
-Glockensteuerung-Gateway.exe --testlauf    läuft im Fenster, löst NICHTS aus
-Glockensteuerung-Gateway.exe --entfernen   Dienst wieder abmelden
-```
-
-> Beim ersten Start meldet sich Windows mit „Der Computer wurde durch Windows
-> geschützt“, weil die Datei nicht mit einem gekauften Zertifikat signiert ist.
-> Über *Weitere Informationen → Trotzdem ausführen* geht es weiter.
->
 > Wer den Gateway vorher in der **Aufgabenplanung** hatte: Beim Einrichten
 > werden solche Einträge gesucht und abgeschaltet. Sonst liefe er doppelt – und
 > es würde zweimal geläutet.
 
-**Linux (systemd)** – Datei `/etc/systemd/system/voco-gateway.service`:
+### 3.5 Linux (oder eigener Python-Betrieb)
+
+Der Quelltext steckt in „Source code" des
+[neuesten Releases](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest)
+– oder direkt aus Git:
+
+```bash
+git clone https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung.git
+cd Glockensteuerung/gateway
+
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+python dienst.py --einrichten     # fragt Adresse und Token ab, schreibt .env
+python scheduler.py --dry-run     # plant aus euren Terminen, löst NICHT aus
+```
+
+Für den Dauerbetrieb eine systemd-Unit,
+`/etc/systemd/system/voco-gateway.service`:
 
 ```ini
 [Unit]
@@ -373,7 +383,7 @@ Angehängt werden nur technische Angaben (Instanz-Host, Version, letzte Ereignis
 | Es läutet doppelt | Es läuft noch ein zweiter Gateway, meist ein alter Eintrag in der Aufgabenplanung. `--status` nennt solche Einträge; `--installieren` schaltet sie ab. |
 | Windows meldet „Der Computer wurde durch Windows geschützt" | Die Programmdatei ist nicht signiert. *Weitere Informationen → Trotzdem ausführen*. |
 | Keine Programme in der Liste | Am Gerät sind (noch) keine **Sofort-PGS** angelegt. |
-| `--dry-run` zeigt keine Auslösungen | Der Gateway schreibt den Grund ins Log: keine Termine im Zeitraum, oder kein Titel passt exakt (er nennt dann Gesuchtes **und** Vorhandenes). Danach Schreibweise bzw. Kalender der Regel korrigieren. |
+| Der Testlauf (`--testlauf`, Menüpunkt 4) zeigt keine Auslösungen | Der Gateway schreibt den Grund ins Log: keine Termine im Zeitraum, oder kein Titel passt exakt (er nennt dann Gesuchtes **und** Vorhandenes). Danach Schreibweise bzw. Kalender der Regel korrigieren. |
 | ChurchTools-Login schlägt fehl | `CT_BASE_URL`/`CT_LOGIN_TOKEN` prüfen; Benutzer braucht Leserechte. |
 | Extension lädt lokal nicht (`npm run dev`) | CORS in ChurchTools erlauben: System-Einstellungen → Integrationen → API → CORS → Origin `http://localhost:5173`. |
 | Endpunkte/Feldnamen weichen ab | ChurchTools-API-Versionen unterscheiden sich – gegen `https://<gemeinde>.church.tools/api` (Swagger) prüfen; ggf. `gateway/churchtools.py` anpassen. |

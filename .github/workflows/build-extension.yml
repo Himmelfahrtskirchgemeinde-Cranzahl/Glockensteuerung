@@ -134,6 +134,7 @@ jobs:
           --name Glockensteuerung-Gateway
           --paths gateway
           --hidden-import diagnose
+          --hidden-import einrichtung
           --hidden-import win32timezone
           --hidden-import servicemanager
           gateway/dienst.py
