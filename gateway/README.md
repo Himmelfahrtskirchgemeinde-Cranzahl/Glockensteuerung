@@ -67,8 +67,13 @@ Für den Rund-um-die-Uhr-Betrieb gibt es eine fertige Programmdatei:
 [neuesten Release](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest).
 Sie braucht kein Python und keine virtuelle Umgebung.
 
-1. Die EXE in den Ordner legen, in dem die `.env` liegt (die bleibt unverändert).
-2. Doppelklick → **1 (Dienst einrichten)** → die Windows-Abfrage bestätigen.
+1. Die EXE in einen eigenen Ordner legen. Liegt dort schon eine `.env`, bleibt
+   sie unverändert und wird benutzt.
+2. Doppelklick → **1 (Einrichten)**. Gibt es noch keine `.env`, fragt das
+   Programm nach der ChurchTools-Adresse und dem Login-Token, probiert beides
+   sofort aus und legt die Datei selbst an.
+3. Die Windows-Abfrage nach Administratorrechten bestätigen – die braucht es
+   für das Anlegen des Dienstes.
 
 Das war alles. Der Dienst steht danach in `services.msc` als
 **Glockensteuerung Gateway** und
@@ -82,6 +87,7 @@ Weitere Schalter derselben Datei:
 
 ```text
 Glockensteuerung-Gateway.exe --status      läuft er? was steht im Protokoll?
+Glockensteuerung-Gateway.exe --einrichten  Zugangsdaten ändern (.env)
 Glockensteuerung-Gateway.exe --neustart    anhalten und wieder starten
 Glockensteuerung-Gateway.exe --testlauf    läuft im Fenster, löst NICHTS aus
 Glockensteuerung-Gateway.exe --diagnose    prüft die Zertifikatskette
@@ -156,6 +162,7 @@ WantedBy=multi-user.target
 | `dienst.py` | Bedienung: einrichten, Status, Protokoll (wird zur EXE gebaut) |
 | `windienst.py` | meldet den Gateway als Windows-Dienst an |
 | `pfade.py` | findet `.env`, Zustand und Protokoll neben dem Programm |
+| `einrichtung.py` | fragt Adresse und Token ab und schreibt die `.env` |
 
 ## Wenn die Verbindung am Zertifikat scheitert
 
