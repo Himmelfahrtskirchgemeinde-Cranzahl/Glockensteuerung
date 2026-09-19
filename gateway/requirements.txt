@@ -3,3 +3,7 @@ requests>=2.28
 # Wurzelzertifikate. Kommt zwar mit 'requests', wird aber auch direkt fuer MQTT
 # und SMTP gebraucht - unter Windows bringt Python selbst keine mit.
 certifi>=2024.2.2
+# Nur unter Windows: macht den Gateway zu einem echten Dienst (services.msc),
+# statt ihn in die Aufgabenplanung zu haengen. Die fertige Programmdatei bringt
+# das schon mit; fuer den Betrieb aus dem Quelltext wird es hier installiert.
+pywin32>=306; sys_platform == "win32"
