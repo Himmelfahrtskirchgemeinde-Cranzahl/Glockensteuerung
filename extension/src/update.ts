@@ -136,7 +136,19 @@ export async function fetchLatest(): Promise<UpdateCheck | null> {
     }
 }
 
-/** Marker, hinter dem in der Release-Beschreibung die Versionsabschnitte beginnen. */
+/**
+ * Marken, die den Changelog in der Release-Beschreibung eingrenzen.
+ *
+ * Der Changelog steht dort seit 26.9 GANZ OBEN - er ist das Einzige, was sich
+ * von Version zu Version ändert, und gehört deshalb zuerst gelesen. Alles
+ * danach (welche Datei wofür da ist) ist bei jeder Fassung dieselbe Erklärung
+ * und hat im Fenster „Was ist neu" nichts verloren.
+ *
+ * Ältere Veröffentlichungen haben es umgekehrt: erst die Erklärung, dann die
+ * Startmarke, dann der Changelog. Beide Formen werden gelesen - sonst zeigte
+ * das Fenster bei einem Blick zurück den falschen Ausschnitt.
+ */
+const ENDE_MARKER = '<!-- changelog-ende -->';
 const MARKER = '<!-- changelog -->';
 
 /**
@@ -150,9 +162,15 @@ const MARKER = '<!-- changelog -->';
  */
 export function parseChangelog(md: string): ChangelogZeile[] {
     let text = String(md ?? '');
-    // Die Einleitung („Automatisch gebaute …") interessiert im Dialog nicht.
+    // Neue Form: Der Changelog steht oben, die Endmarke schließt ihn ab.
+    const e = text.indexOf(ENDE_MARKER);
     const i = text.indexOf(MARKER);
-    if (i >= 0) {
+    if (e >= 0) {
+        text = text.slice(0, e);
+        // Steht die alte Startmarke ebenfalls davor, beginnt der Changelog dort.
+        if (i >= 0 && i < e) text = text.slice(i + MARKER.length);
+    } else if (i >= 0) {
+        // Alte Form: alles hinter der Startmarke.
         text = text.slice(i + MARKER.length);
     } else {
         // Ältere Veröffentlichungen tragen die Marke noch nicht. Dann beginnt
