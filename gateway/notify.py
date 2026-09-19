@@ -67,8 +67,16 @@ class EmailNotifier:
         self.mail_to = cfg.mail_to or self.mail_to
         self.send_errors = cfg.send_errors
 
-    def notify(self, subject: str, body: str, dedup_key: str | None = None) -> bool:
-        """Verschickt eine E-Mail. Gibt zurueck, ob sie rausging."""
+    def notify(self, subject: str, body: str, dedup_key: str | None = None,
+               dringend: bool = False) -> bool:
+        """Verschickt eine E-Mail. Gibt zurueck, ob sie rausging.
+
+        `dringend` setzt die Kopfzeilen, an denen Mailprogramme eine wichtige
+        Nachricht erkennen, und umgeht die Spam-Sperre. Gedacht fuer das eine,
+        was keinen Aufschub duldet: dass die Automatik steht. Eine solche
+        Meldung darf nicht deshalb ausbleiben, weil eine Stunde zuvor eine
+        aehnliche kam.
+        """
         if not self.enabled:
             if not self._warned:
                 log.info("E-Mail-Versand nicht eingerichtet (kein Postausgang) – Meldungen nur im Log.")
@@ -76,15 +84,22 @@ class EmailNotifier:
             return False
         key = dedup_key or subject
         now = time.time()
-        if now - self._last.get(key, 0) < self.min_interval:
+        if not dringend and now - self._last.get(key, 0) < self.min_interval:
             return False  # kürzlich schon gemeldet
         self._last[key] = now
         try:
             msg = EmailMessage()
-            msg["Subject"] = f"[Glockensteuerung] {subject}"
+            msg["Subject"] = ("[Glockensteuerung] " + ("DRINGEND: " if dringend else "") + subject)
             msg["From"] = self.mail_from
             msg["To"] = self.mail_to
             msg["Date"] = formatdate(localtime=True)
+            if dringend:
+                # Drei Kopfzeilen, weil kein Mailprogramm alle drei kennt:
+                # X-Priority ist der alte Standard, Importance der neuere,
+                # X-MSMail-Priority versteht Outlook.
+                msg["X-Priority"] = "1"
+                msg["X-MSMail-Priority"] = "High"
+                msg["Importance"] = "high"
             msg.set_content(body)
             if self.use_ssl:
                 with smtplib.SMTP_SSL(self.host, self.port, context=tls.context_fuer(self.host, self.port), timeout=20) as s:
