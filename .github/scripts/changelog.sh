@@ -114,11 +114,21 @@ fi
 # oder "Verbesserung  |  Geraet" geschrieben hat, darf keine Rolle spielen.
 norm() {
   awk -F'|' '{
+    # Ohne beide Trenner ist es kein Eintrag, sondern eine Zeile, die zufaellig
+    # so anfaengt - etwa eine Commit-Ueberschrift "Changelog: ...". Frueher
+    # wurde daraus ein Eintrag mit leerem Bereich und leerem Text: In der
+    # Ausgabe tauchte er nie auf (er passt in keine Gruppe), aber er zaehlte
+    # als Neuerung - und verhinderte damit die Hotfix-Stelle in der
+    # Versionsnummer. Genau so wurde aus v26.9.6.1 ein v26.9.7.
+    if (NF < 3) next;
     art=$1; ber=$2; txt=$3; for (i=4; i<=NF; i++) txt = txt "|" $i;
     gsub(/^[ \t]+|[ \t]+$/, "", art);
     gsub(/^[ \t]+|[ \t]+$/, "", ber);
     gsub(/^[ \t]+|[ \t]+$/, "", txt);
-    if (art == "" && ber == "" && txt == "") next;
+    # Die Art traegt die Entscheidung (Fehler oder Neuerung) und der Text ist
+    # das, was der Gemeinde angezeigt wird. Fehlt eines von beiden, ist der
+    # Eintrag unbrauchbar.
+    if (art == "" || txt == "") next;
     print art " | " ber " | " txt
   }'
 }
