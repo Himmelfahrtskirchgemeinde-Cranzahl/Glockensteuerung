@@ -62,35 +62,51 @@ jobs:
           MAJOR=$(date +%y)
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          LATEST=$(git tag -l 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          LATEST=$(git tag -l 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$' | head -1)
           LATEST=${LATEST:-v0.0.0}
-          VER=${LATEST#v}; MA=${VER%%.*}; REST=${VER#*.}; MI=${REST%%.*}; PA=${REST##*.}
+          VER=${LATEST#v}
+          # Vier Stellen sind moeglich: <Jahr>.<Mittel>.<Patch>[.<Hotfix>]
+          IFS='.' read -r MA MI PA HF <<< "${VER}"
+          HF=${HF:-0}
           # 10# erzwingt Basis 10 (sonst waere z. B. "08" eine ungueltige Oktalzahl).
-          MA=$((10#$MA)); MI=$((10#$MI)); PA=$((10#$PA))
-          # Schema:  <Jahr zweistellig>.<Mittelstelle>.<Patch>
-          #   - Patch laeuft nur bis 9, dann Uebertrag:      v26.6.9 -> v26.7.0
-          #   - Die Mittelstelle zaehlt unbegrenzt weiter:   v26.9.9 -> v26.10.0
-          #   - Neues Jahr faengt wieder bei .0.0 an:        v26.12.3 -> v27.0.0
+          MA=$((10#$MA)); MI=$((10#$MI)); PA=$((10#$PA)); HF=$((10#$HF))
+
+          # Bringt dieser Stand nur behobene Fehler? Dann ist es ein Hotfix.
+          # Entschieden wird das von changelog.sh - derselben Stelle, die auch
+          # ueber Ergaenzen oder Ersetzen des Changelogs entscheidet.
+          ART="$(bash .github/scripts/changelog.sh --art HEAD "${LATEST}" || echo neuerung)"
+
           # Eine groessere Neuerung soll sich auch in der Nummer zeigen, nicht
           # als neunter Patch untergehen. Traegt die Commit-Nachricht des Merges
           # die Zeile 'Version-Sprung: Mittelstelle', zaehlt die Mittelstelle
           # weiter statt des Patches - ohne dass jemand von Hand taggen muss.
           NACHRICHT="$(git log -1 --format=%B)"
+
+          # Schema:  <Jahr zweistellig>.<Mittelstelle>.<Patch>[.<Hotfix>]
+          #   - Patch laeuft nur bis 9, dann Uebertrag:     v26.6.9   -> v26.7.0
+          #   - Die Mittelstelle zaehlt unbegrenzt weiter:  v26.9.9   -> v26.10.0
+          #   - Neues Jahr faengt wieder bei .0.0 an:       v26.12.3  -> v27.0.0
+          #   - Nur behobene Fehler haengen eine vierte     v26.8.9   -> v26.8.9.1
+          #     Stelle an und zaehlen dort weiter:          v26.8.9.1 -> v26.8.9.2
+          #     So bleibt sichtbar, zu welcher Fassung eine Korrektur gehoert,
+          #     statt dass sie die naechste Nummer verbraucht.
           if [ "$MA" -lt "$MAJOR" ]; then
             # Neues Jahr (oder alte Zaehlung wie v0.4.x) -> bei .0.0 starten.
-            MA=$MAJOR; MI=0; PA=0
+            NEXT="v${MAJOR}.0.0"
           elif printf '%s' "$NACHRICHT" | grep -qiE '^Version-Sprung:[[:space:]]*Mittelstelle'; then
-            MI=$((MI + 1)); PA=0
+            NEXT="v${MA}.$((MI + 1)).0"
+          elif [ "$ART" = "fehler" ]; then
+            NEXT="v${MA}.${MI}.${PA}.$((HF + 1))"
           else
             PA=$((PA + 1))
             if [ "$PA" -gt 9 ]; then PA=0; MI=$((MI + 1)); fi
+            NEXT="v${MA}.${MI}.${PA}"
           fi
-          NEXT="v${MA}.${MI}.${PA}"
           echo "Neuer Tag: $NEXT (bisher: $LATEST)"
           git tag "$NEXT"
           git push origin "$NEXT"
           echo "tag=$NEXT" >> "$GITHUB_OUTPUT"
-          echo "version=${MA}.${MI}.${PA}" >> "$GITHUB_OUTPUT"
+          echo "version=${NEXT#v}" >> "$GITHUB_OUTPUT"
 
   # Die fertige Programmdatei fuer Windows. Sie muss auf einem Windows-Laeufer
   # entstehen - eine EXE laesst sich unter Linux nicht bauen. Der Dienst enthaelt

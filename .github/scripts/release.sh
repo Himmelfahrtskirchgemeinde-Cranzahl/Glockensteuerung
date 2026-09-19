@@ -56,6 +56,24 @@ NOTES_FILE="$(mktemp)"
 ARBEIT="$(mktemp -d)"
 trap 'rm -rf "${NOTES_FILE}" "${ARBEIT}"' EXIT
 
+
+
+# Die Versionsnummer aus dem Dateinamen nehmen: Nur unter festem Namen bleibt der
+# Dauerlink gueltig, und welche Version darin steckt, sagt der Titel des Release.
+# Aus 'glockensteuerung-v26.6.7.zip' wird 'glockensteuerung.zip'.
+DATEIEN=()
+for z in "${ZIPS[@]}"; do
+  [ -f "${z}" ] || continue
+  basis="$(basename "${z}")"
+  fest="$(printf '%s' "${basis}" | sed -E 's/-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+-g[0-9a-f]+)?\.zip$/.zip/')"
+  if [ "${fest}" = "${basis}" ]; then
+    DATEIEN+=("${z}")          # traegt schon einen festen Namen
+  else
+    cp "${z}" "${ARBEIT}/${fest}"
+    DATEIEN+=("${ARBEIT}/${fest}")
+  fi
+done
+
 # Welche Dateien trug das vorherige Release? Kommt eine dazu oder faellt eine
 # weg, ist das eine Aenderung wie jede andere - und die einzige Angabe zu den
 # Dateien, die in einer Release-Beschreibung etwas zu suchen hat. Die immer
@@ -63,10 +81,14 @@ trap 'rm -rf "${NOTES_FILE}" "${ARBEIT}"' EXIT
 # niemandem: Wer aktualisiert, will wissen, was sich geaendert hat.
 vorheriger_tag() {
   git tag -l 'v*' --sort=-v:refname \
-    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$' \
     | grep -A1 -x -F "$1" | tail -n +2 | head -1 || true
 }
 
+# WICHTIG: Erst hier, nach der Schleife oben. Stand das frueher davor, war
+# DATEIEN noch leer - und jede Datei des vorherigen Release galt als entfallen.
+# Im Release 26.8.7 stand deshalb "Entfaellt: Glockensteuerung-Gateway.exe",
+# waehrend die Datei unveraendert darunter lag.
 JETZT_NAMEN="$(for d in "${DATEIEN[@]}"; do basename "${d}"; done | sort -u)"
 VORHER="$(vorheriger_tag "${TAG}")"
 VORHER_NAMEN=""
@@ -86,7 +108,11 @@ fi
   # Nur der Changelog. Er ist das, worum es in einem Release geht.
   bash "${HIER}/changelog.sh" "${TAG}"
   if [ -n "${DAZU}" ] || [ -n "${WEG}" ]; then
-    printf '\n### Dateien\n\n'
+    # Auf der obersten Ebene, neben "Erweiterung" und "Gateway": Eine neue
+    # Datei betrifft den Download, nicht die Oberflaeche - im Fenster "Was ist
+    # neu" der Erweiterung hat sie deshalb nichts zu suchen. Stuende sie eine
+    # Ebene tiefer, erschiene sie dort als Versionsnummer.
+    printf '\n## Dateien\n\n'
     while IFS= read -r name; do
       [ -n "${name}" ] || continue
       printf '* **Neu:** `%s`\n' "${name}"
@@ -103,22 +129,6 @@ fi
   # Korrektur-Version mit ab.
   printf '\n<!-- changelog-ende -->\n'
 } > "${NOTES_FILE}"
-
-# Die Versionsnummer aus dem Dateinamen nehmen: Nur unter festem Namen bleibt der
-# Dauerlink gueltig, und welche Version darin steckt, sagt der Titel des Release.
-# Aus 'glockensteuerung-v26.6.7.zip' wird 'glockensteuerung.zip'.
-DATEIEN=()
-for z in "${ZIPS[@]}"; do
-  [ -f "${z}" ] || continue
-  basis="$(basename "${z}")"
-  fest="$(printf '%s' "${basis}" | sed -E 's/-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+-g[0-9a-f]+)?\.zip$/.zip/')"
-  if [ "${fest}" = "${basis}" ]; then
-    DATEIEN+=("${z}")          # traegt schon einen festen Namen
-  else
-    cp "${z}" "${ARBEIT}/${fest}"
-    DATEIEN+=("${ARBEIT}/${fest}")
-  fi
-done
 
 # Ein bestehendes Release ist unveraenderlich - bei einem erneuten Lauf desselben
 # Tags bleibt es unangetastet, statt mit einem Fehler abzubrechen.
