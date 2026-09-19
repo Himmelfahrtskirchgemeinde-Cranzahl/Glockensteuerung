@@ -90,6 +90,32 @@ PUT  /api/custommodules/{modulId}/customdatacategories/{katId}/customdatavalues/
 So schreibt es die Extension (`utils/kv-store.ts`), und so muss der Gateway es
 auch schreiben (`gateway/kv.py`) – sonst lesen die beiden aneinander vorbei.
 
+### Ein Eintrag fasst 10 000 Zeichen
+
+Mehr nimmt ChurchTools nicht an:
+
+```
+400 – Eingabe muss ein Text sein, der zwischen 0 und 10000 Zeichen enthält.
+```
+
+Gezählt wird die ganze Zeichenkette samt `{"key":…,"data":…}`. Abgeschnitten
+wird **nichts** – der Schreibversuch scheitert schlicht. Für eine wachsende
+Liste heißt das: Sie wird ab einem bestimmten Tag gar nicht mehr gespeichert.
+Genau so ist es dem Ereignis-Log ergangen, das als ein Eintrag mit 300 Zeilen
+angelegt war (rund 35 000 Zeichen).
+
+Deshalb liegt das Log jetzt in **Wochenblöcken**: ein Eintrag je Kalenderwoche
+(`log-2026-W38`), bei viel Betrieb mehrere (`log-2026-W38-2`). Gelesen wird
+trotzdem in einer einzigen Abfrage – die API gibt alle Einträge einer
+Kategorie zusammen heraus. Alte Wochen fallen als Ganzes weg, statt im Bestand
+zu schneiden.
+
+| Schlüssel | Kategorie | Inhalt |
+|---|---|---|
+| `log-JJJJ-Wnn` | `ereignislog` | Ereignisse dieser Kalenderwoche, neueste zuerst |
+| `log-JJJJ-Wnn-2` … | `ereignislog` | Fortsetzung, wenn eine Woche nicht in einen Eintrag passt |
+| `log` | `ereignislog` | der frühere Sammel-Eintrag; wird beim ersten Schreiben aufgeteilt und entfernt |
+
 ### Kategorien sind Rechte-Schalter
 
 Jedes Untermenü der Extension ist eine eigene Kategorie. Das ist keine
