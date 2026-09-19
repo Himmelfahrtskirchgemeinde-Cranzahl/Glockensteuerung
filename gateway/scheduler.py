@@ -49,7 +49,11 @@ CONFIG_REFRESH_S = 300      # Konfig/Termine alle 5 min neu laden
 TICK_S = 20                 # so oft pruefen, ob etwas ansteht
 OUTBOX_S = 60               # so oft den Postausgang der Extension abarbeiten
 FIRE_WINDOW_S = 150         # Toleranz: bis 2,5 min nach Soll noch ausloesen
-HEARTBEAT_S = 120           # so oft ein Lebenszeichen nach ChurchTools schreiben
+# So oft ein Lebenszeichen nach ChurchTools geschrieben wird. Zusammen mit
+# TICK_S ergibt das einen Schlag alle 40 s. Die Erweiterung meldet einen
+# Ausfall nach 2 Minuten - das geht nur auf, wenn oefter geschrieben wird als
+# frueher (alle 2 min), sonst waere schon der Normalbetrieb ein Alarm.
+HEARTBEAT_S = 30
 
 # Wiederanlauf nach einer Stoerung: erst kurz warten, dann immer laenger, aber
 # hoechstens 5 Minuten. Kurz genug, dass ein Aussetzer beim Hochfahren keine

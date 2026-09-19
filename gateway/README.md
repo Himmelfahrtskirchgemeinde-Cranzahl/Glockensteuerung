@@ -40,7 +40,7 @@ Wer die `.env` lieber selbst schreibt: `cp .env.example .env` und ausfüllen
 **Benoetigte Rechte:** Der Benutzer muss die Kategorien des Moduls
 „Glockensteuerung" **lesen** duerfen (Geraet + Regeln) und in der Kategorie
 `steuerung` zusaetzlich **schreiben** duerfen. Das Schreibrecht braucht nur das
-Lebenszeichen (Heartbeat), das der Dienst alle 2 Minuten hinterlegt, damit die
+Lebenszeichen (Heartbeat), das der Dienst alle 40 Sekunden hinterlegt, damit die
 Extension anzeigen kann, ob die Automatik ueberhaupt laeuft. Fehlt das Recht,
 laeuft der Dienst normal weiter und laeutet wie gewohnt - er schreibt dann nur
 eine Warnung ins Log, und die Extension meldet „Gateway nicht erreichbar".
@@ -254,7 +254,7 @@ WantedBy=multi-user.target
 | `sperre.py` | verhindert, dass zwei Gateways gleichzeitig läuten |
 | `aktualisierung.py` | holt neue Fassungen und tauscht die Programmdatei |
 | `kv.py` | gemeinsamer Zugriff auf den Speicher der Extension |
-| `heartbeat.py` | Lebenszeichen alle 2 Minuten nach ChurchTools |
+| `heartbeat.py` | Lebenszeichen alle 40 Sekunden nach ChurchTools |
 | `ereignisse.py` | hält Verbindungen und Ausfälle im Ereignis-Log fest |
 | `outbox.py` | arbeitet den Postausgang der Extension ab |
 | `notify.py` | verschickt Fehlermeldungen per E-Mail |
