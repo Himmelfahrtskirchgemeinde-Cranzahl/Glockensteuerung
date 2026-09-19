@@ -63,6 +63,17 @@ Diese drei Links liefern stets die **neueste** veröffentlichte Fassung – sie
 Welche Version dahintersteckt, sagt der Titel des
 [neuesten Releases](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest).
 
+### Signatur der Windows-Programmdatei
+
+Free code signing provided by [SignPath.io](https://signpath.io/), certificate
+by [SignPath Foundation](https://signpath.org/).
+
+Die `Glockensteuerung-Gateway.exe` wird damit als von der
+**Himmelfahrtskirchgemeinde Cranzahl** stammend ausgewiesen, statt als
+„Unbekannter Herausgeber". Windows kann beim **ersten** Start trotzdem noch
+warnen, bis die Datei genug verbreitet ist – wie du das umgehst, steht in
+[`ANLEITUNG.md`, Abschnitt 3.3](ANLEITUNG.md).
+
 ## Schnellstart
 
 1. **Extension bauen:** GitHub-Actions-Workflow „ChurchTools-Extension bauen“
@@ -193,7 +204,8 @@ gekostet hätte.
 Kurz gesagt: Jede Gemeinde darf die Glockensteuerung benutzen, anpassen und
 weitergeben; der Urheberrechtshinweis muss erhalten bleiben, und es gibt keine
 Gewährleistung. Teile der Erweiterung stammen aus dem ebenfalls MIT-lizenzierten
-[ChurchTools extension-boilerplate](https://github.com/churchtools/extension-boilerplate).
+[ChurchTools extension-boilerplate](https://github.com/churchtools/extension-boilerplate);
+die Herkunft steht in [`NOTICE`](NOTICE).
 
 > Die Lizenz ist zugleich die Voraussetzung für die **kostenlose Code-Signatur**
 > quelloffener Projekte über die [SignPath Foundation](https://signpath.org/).
