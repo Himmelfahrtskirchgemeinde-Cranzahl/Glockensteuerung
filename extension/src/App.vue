@@ -367,6 +367,33 @@ async function openChangelog() {
     }
 }
 
+/**
+ * Meldet im Ereignis-Log, wenn die Automatik ausfällt oder zurückkommt.
+ *
+ * Das kann nur die Seite tun: Ein Dienst, der steht, schreibt nichts mehr —
+ * gerade sein Schweigen ist die Nachricht. Die erste Feststellung beim Öffnen
+ * bleibt flüchtig, sonst stünde bei jedem Seitenaufruf eine Zeile im
+ * gespeicherten Log; die Wechsel danach werden festgehalten.
+ */
+let gatewayZuletztGesehen: boolean | null = null;
+function gatewayZustandMelden() {
+    // Ohne Regeln und ohne je ein Lebenszeichen gibt es nichts zu melden.
+    if (!hasAutomation.value && gatewayStatus.value === null) return;
+    const steht = gatewayDown.value;
+    if (gatewayZuletztGesehen === steht) return;
+    const erster = gatewayZuletztGesehen === null;
+    gatewayZuletztGesehen = steht;
+    if (erster) {
+        pushLog(steht
+            ? `Automatik meldet sich nicht. ${gatewayDownText.value}`
+            : `Automatik läuft. ${gatewayDownText.value}`, steht ? 'gw' : 'in', true);
+        return;
+    }
+    pushLog(steht
+        ? `Automatik antwortet nicht mehr. ${gatewayDownText.value}`
+        : 'Automatik meldet sich wieder.', steht ? 'gw' : 'in');
+}
+
 /** Holt das Lebenszeichen erneut. Fehler bleiben still: Der alte Wert altert
  *  dann weiter, und genau das soll das Banner ja anzeigen. */
 async function refreshGatewayStatus() {
@@ -387,6 +414,7 @@ async function refreshGatewayStatus() {
     } catch {
         /* dito – die zuletzt geholten Ereignisse bleiben stehen */
     }
+    gatewayZustandMelden();
 }
 
 async function boot() {

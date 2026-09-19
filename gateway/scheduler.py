@@ -34,7 +34,7 @@ import time
 
 from churchtools import ChurchTools
 from config import EXT_KEY, GatewayConfig, Rule, load_dotenv, load_from_churchtools
-from ereignisse import Ereignisse, Zustandswaechter
+from ereignisse import Ereignisse, LogWaechter, Zustandswaechter
 from heartbeat import Heartbeat, mask_serial
 from notify import EmailNotifier
 import outbox
@@ -256,9 +256,17 @@ def einmal_laufen(dry: bool, notifier: EmailNotifier, erster_start: bool) -> Non
     # Log im Browser vergisst beim Schliessen alles.
     ereignisse = Ereignisse(ct, EXT_KEY)
     waechter = Zustandswaechter(ereignisse)
-    ereignisse.melde("info", ("Automatik-Dienst gestartet." if erster_start
-                              else "Automatik-Dienst nach einer Störung neu gestartet.")
+    ereignisse.melde("an", ("Automatik-Dienst gestartet und mit ChurchTools verbunden."
+                            if erster_start else
+                            "Automatik-Dienst nach einer Störung neu gestartet, "
+                            "Verbindung zu ChurchTools steht wieder.")
                      + (" Simulation: es wird nichts ausgelöst." if dry else ""))
+    # Ab hier landen auch Warnungen und Fehler des Dienstes im Ereignis-Log.
+    # Ohne das fand man in ChurchTools einen Dienst, der "nicht erreichbar" war,
+    # und keinen Hinweis, woran es lag - der Grund stand allein im Protokoll auf
+    # dem Rechner der Gemeinde.
+    log_waechter = LogWaechter(ereignisse)
+    log.addHandler(log_waechter)
 
     voco = Voco(serial=cfg.device.serial, device_pw=cfg.device.device_pw,
                 broker_url=cfg.device.broker_url)
@@ -391,6 +399,7 @@ def einmal_laufen(dry: bool, notifier: EmailNotifier, erster_start: bool) -> Non
         # Zuerst melden, dann trennen: Das Trennen loest den Zustandswaechter
         # aus, und "Verbindung verloren" waere beim geplanten Beenden irrefuehrend.
         voco.on_zustand = None
+        log.removeHandler(log_waechter)
         if beenden:
             log.info("Auf Wunsch beendet.")
             ereignisse.melde("info", "Automatik-Dienst beendet.")
