@@ -12,6 +12,7 @@ Aufgabenplanung:
     --entfernen            -> nimmt ihn wieder heraus
     --status               -> laeuft er? was steht im Protokoll?
     --neustart             -> Dienst anhalten und wieder starten
+    --anhalten             -> Dienst anhalten (um die Programmdatei zu ersetzen)
     --testlauf             -> laeuft sichtbar im Fenster, loest NICHTS aus
     --diagnose             -> prueft die Zertifikatskette zum Broker
     --dienst               -> Dauerbetrieb im Vordergrund (ohne Dienststeuerung)
@@ -233,6 +234,44 @@ def aufgabe_einrichten() -> int:
 
 # --- Einrichten, entfernen, nachsehen -------------------------------------
 
+def _bestand_melden() -> None:
+    """Sagt, was schon da ist - und was davon unangetastet bleibt.
+
+    Beim Wechsel auf eine neue Fassung ist das die wichtigste Frage: Muss ich
+    alles neu eintragen? Nein - und das soll man lesen, statt es hoffen zu
+    muessen.
+    """
+    gefunden = []
+    env = pfade.env_datei()
+    if env:
+        gefunden.append(f"Zugangsdaten:   {env}")
+    zustand = pfade.zustandsdatei()
+    if os.path.exists(zustand):
+        gefunden.append(f"Gemerkte Ausloesungen: {zustand}")
+    protokoll = pfade.protokolldatei()
+    if os.path.exists(protokoll):
+        gefunden.append(f"Protokoll:      {protokoll}")
+
+    schon_da = ist_windows() and windienst.VERFUEGBAR and windienst.zustand() != "nicht eingerichtet"
+    if not gefunden and not schon_da:
+        return
+
+    print()
+    print("Vorhandene Einrichtung gefunden:")
+    for zeile in gefunden:
+        print("  " + zeile)
+    if schon_da:
+        alt = windienst.programmpfad()
+        if windienst.zeigt_auf(programmdatei()):
+            print("  Dienst:         bereits eingetragen, wird aktualisiert")
+        else:
+            print(f"  Dienst:         eingetragen auf eine ANDERE Datei")
+            if alt:
+                print(f"                  ({alt})")
+            print("                  Er wird gleich auf diese hier umgestellt.")
+    print("Nichts davon wird ueberschrieben - alles wird weiterbenutzt.")
+
+
 def _konfiguration_sicherstellen() -> bool:
     """Sorgt dafuer, dass Zugangsdaten da sind - notfalls durch Nachfragen.
 
@@ -283,6 +322,11 @@ def installieren() -> int:
               "Gateway in eine systemd-Unit (siehe README).")
         return 1
 
+    # Erst nachsehen, was schon da ist. Eine neue Fassung soll an einer
+    # laufenden Anlage nichts umwerfen: Zugangsdaten, gemerkte Ausloesungen und
+    # das Protokoll bleiben, wo sie sind, und werden weiterbenutzt.
+    _bestand_melden()
+
     if not _konfiguration_sicherstellen():
         print()
         print("Ohne Zugangsdaten wird der Dienst nicht eingerichtet.")
@@ -300,6 +344,14 @@ def installieren() -> int:
         print("         Mit 'pip install pywin32' gibt es stattdessen einen "
               "richtigen Windows-Dienst.")
         return aufgabe_einrichten()
+
+    # Zeigt der Eintrag noch auf eine andere Datei, muss der alte Dienst erst
+    # stehen: Sonst laeuft die alte Fassung weiter, und unter Windows liesse
+    # sich ihre Programmdatei nicht einmal ersetzen.
+    if windienst.zustand() == "laeuft" and not windienst.zeigt_auf(programmdatei()):
+        print()
+        print("Die bisherige Fassung wird angehalten ...")
+        windienst.anhalten()
 
     if windienst.einrichten() != 0:
         return 1
@@ -344,6 +396,26 @@ def neustart() -> int:
     return windienst.starten()
 
 
+def anhalten() -> int:
+    """Haelt den Dienst an - noetig, um die Programmdatei zu ersetzen.
+
+    Windows sperrt die Datei eines laufenden Dienstes. Wer eine neue Fassung
+    darueberkopieren will, bekommt sonst nur "Zugriff verweigert" und keinen
+    Hinweis, woran es liegt.
+    """
+    if not ist_admin():
+        return als_admin_neu_starten(["--anhalten"])
+    if not windienst.VERFUEGBAR:
+        _schtasks("/End", "/TN", AUFGABE)
+        print("Angehalten.")
+        return 0
+    rc = windienst.anhalten()
+    print()
+    print("Jetzt laesst sich die Programmdatei ersetzen. Danach die neue Datei")
+    print("starten und Punkt 1 waehlen - die Zugangsdaten bleiben erhalten.")
+    return rc
+
+
 def status() -> int:
     print(f"Glockensteuerung-Gateway {pfade.version()}")
     print(f"Programm:      {programmdatei()}")
@@ -351,6 +423,12 @@ def status() -> int:
     print(f"Protokoll:     {pfade.protokolldatei()}")
     if ist_windows():
         print(f"Dienst:        {windienst.zustand()}")
+        if windienst.VERFUEGBAR and windienst.zustand() != "nicht eingerichtet" \
+                and not windienst.zeigt_auf(programmdatei()):
+            print(f"ACHTUNG:       Der Dienst startet eine ANDERE Datei:")
+            print(f"               {windienst.programmpfad()}")
+            print("               Diese hier wird also nicht benutzt. Mit "
+                  "--installieren umstellen.")
         uebrig = alte_aufgaben()
         if uebrig:
             print("ACHTUNG:       Es gibt noch Aufgaben, die den Gateway ebenfalls "
@@ -393,7 +471,8 @@ def menue() -> int:
     print(" 4  Testlauf im Fenster (loest NICHTS aus)")
     print(" 5  Verbindung pruefen (Zertifikate)")
     print(" 6  Dienst neu starten")
-    print(" 7  Dienst wieder entfernen")
+    print(" 7  Dienst anhalten (noetig, um die Programmdatei zu ersetzen)")
+    print(" 8  Dienst wieder entfernen")
     print(" 0  Schliessen")
     print()
     try:
@@ -417,6 +496,8 @@ def menue() -> int:
     elif wahl == "6":
         rc = neustart()
     elif wahl == "7":
+        rc = anhalten()
+    elif wahl == "8":
         rc = entfernen()
     else:
         return 0
@@ -439,6 +520,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="Zugang, Simulation, Ruhezeit, E-Mail und Geraet pflegen")
     ap.add_argument("--entfernen", action="store_true")
     ap.add_argument("--neustart", action="store_true")
+    ap.add_argument("--anhalten", action="store_true",
+                    help="Dienst anhalten (um die Programmdatei zu ersetzen)")
     ap.add_argument("--status", action="store_true")
     ap.add_argument("--protokoll", action="store_true")
     ap.add_argument("--testlauf", action="store_true", help="Laeuft im Fenster, loest NICHTS aus")
@@ -461,6 +544,8 @@ def main(argv: list[str] | None = None) -> int:
         rc = entfernen()
     elif args.neustart:
         rc = neustart()
+    elif args.anhalten:
+        rc = anhalten()
     elif args.status:
         rc = status()
     elif args.protokoll:
