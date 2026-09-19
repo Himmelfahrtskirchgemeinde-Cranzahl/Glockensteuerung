@@ -191,6 +191,22 @@ an jedem anderen Rechner wieder da.
 - **Leeren** löscht das Log für alle. Was der Gateway-Dienst festgehalten hat,
   bleibt stehen; das gehört ihm.
 
+**Etwas wiederfinden.** Über dem Log stehen Suche und Filter:
+
+| | |
+|---|---|
+| **Suchfeld** | Freitext über Ereignis **und** Name. Mehrere Wörter müssen alle vorkommen, die Reihenfolge ist egal – „läuten anna" findet die Zeile, in der beides steht. Groß- und Kleinschreibung spielt keine Rolle. |
+| **Art-Schalter** | ▶ Gesendet, ◀ Antwort, ⚙ Simulation, ℹ Info, ⚠ Automatik. Mehrere lassen sich gleichzeitig anschalten; nochmal klicken hebt es auf. |
+| **⚠ Nur Auffälliges** | zeigt allein Störungen und Hinweise – der schnellste Weg zu „was war da los?". |
+| **Von/Bis** | grenzt den Zeitraum ein. |
+
+Was auffällt, ist auch farbig: **Störungen rot**, **Hinweise gelb** – etwa
+„Ruhezeit aktiv … übersprungen" oder „Simulation: … wäre jetzt ausgelöst
+worden". Der gewöhnliche Betrieb bleibt unauffällig.
+
+**Herunterladen** speichert genau das, was die Suche gerade übrig lässt. Ohne
+Filter ist es der ganze gespeicherte Bestand.
+
 ---
 
 ## Teil 3 – Automatik-Gateway einrichten
