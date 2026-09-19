@@ -119,6 +119,20 @@ Taucht eines auf, ist der Text DOS-kodiert. CP437 und CP850 sind in diesem
 Bereich identisch, ebenso beim `ß` – sie müssen also nicht auseinandergehalten
 werden.
 
+### Das gilt für **jeden** Namen, der vom Gerät kommt
+
+Nicht nur für die startbaren PGS aus `/playpgsD`, sondern genauso für den
+Katalog aus `/syncdata` – die Listen `sPGS`, `programsteps` und `melodies`,
+aus denen die Auswahl „Läuteprogramm" in den Automatik-Regeln besteht. Dort
+fiel es zuletzt auf: Im Ereignis-Log stand „TESTLÄUTEN", im Auswahlmenü
+daneben weiter das Kästchen.
+
+Gespeichert wird in den Regeln bewusst weiter der **rohe** Name. Er ist das,
+was die Anlage versteht; umgesetzt wird erst bei der Anzeige. Beide Formen
+werden beim Auslösen akzeptiert (`resolve` in `gateway/voco_mqtt.py` und
+`extension/src/voco/mqtt.ts`) – eine Regel, die den Anzeigenamen enthält,
+funktioniert also ebenfalls.
+
 Bleibt trotzdem ein Zeichen übrig, das sich nicht zuordnen lässt, nennt das
 Ereignis-Log seinen Zahlenwert. Dann lässt sich die Tabelle gezielt ergänzen,
 statt erneut zu raten.
