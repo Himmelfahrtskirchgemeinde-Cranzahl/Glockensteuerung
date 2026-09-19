@@ -205,3 +205,76 @@ export function aufteilen(
     }
     return raus;
 }
+
+/* ---------------------------------------------------------------------------
+ * Suchen, filtern, einfärben
+ *
+ * Das Log hält inzwischen mehrere Wochen. Wer darin etwas sucht – „wann war
+ * der Ausfall?", „hat jemand am Sonntag von Hand geläutet?" – scrollt sonst
+ * durch hunderte Zeilen, von denen die meisten Betriebsmeldungen sind.
+ * ------------------------------------------------------------------------ */
+
+/** Wie ernst ist eine Zeile? Bestimmt ihre Farbe und den Schnellfilter. */
+export type Schwere = 'fehler' | 'hinweis' | '';
+
+/**
+ * Was als Störung gilt – rot.
+ *
+ * Bewusst am Text und nicht an der Art: Ein Fehler kann in jeder Art stecken.
+ * „Auslösen fehlgeschlagen" ist eine Antwort der Anlage, „Automatik antwortet
+ * nicht mehr" eine Meldung über den Dienst – beides muss rot sein, sonst geht
+ * es zwischen den Betriebszeilen unter.
+ */
+const FEHLER = /fehler|fehlgeschlagen|nicht erreichbar|antwortet nicht|meldet sich nicht|keine verbindung|verbindung verloren|abgebrochen|konnte nicht|kann nicht|abgelehnt|störung|verweigert|zeitüberschreitung/i;
+
+/** Was Aufmerksamkeit verdient, aber keine Störung ist – gelb. */
+const HINWEIS = /hinweis|achtung|ruhezeit|übersprungen|simulation|wäre jetzt|wird nicht|noch nie|startet gerade neu|aktualisiert sich|nur mitlesen/i;
+
+export function schwere(zeile: Zeile): Schwere {
+    if (FEHLER.test(zeile.line)) return 'fehler';
+    if (HINWEIS.test(zeile.line)) return 'hinweis';
+    return '';
+}
+
+/** Wonach im Ereignis-Log gesucht und gefiltert wird. */
+export type LogFilter = {
+    /** Freitext – gesucht wird im Ereignis UND im Namen der Person. */
+    suche: string;
+    /** Welche Arten gezeigt werden. Leer = alle. */
+    arten: Set<LogDir>;
+    /** Nur Fehler und Hinweise zeigen. */
+    nurAuffaellig: boolean;
+    /** Zeitraum in Millisekunden; `-Infinity`/`Infinity` = offen. */
+    von: number;
+    bis: number;
+};
+
+export function leererFilter(): LogFilter {
+    return { suche: '', arten: new Set(), nurAuffaellig: false, von: -Infinity, bis: Infinity };
+}
+
+/** Ist gerade überhaupt etwas eingegrenzt? */
+export function filterAktiv(f: LogFilter): boolean {
+    return !!f.suche.trim() || f.arten.size > 0 || f.nurAuffaellig
+        || Number.isFinite(f.von) || Number.isFinite(f.bis);
+}
+
+/**
+ * Wendet den Filter an – Reihenfolge und Inhalt bleiben, es fällt nur weg.
+ *
+ * Die Suche zerlegt die Eingabe in Wörter, die ALLE vorkommen müssen (in
+ * beliebiger Reihenfolge). „läuten josua" findet damit die Zeile, in der beides
+ * steht, ohne dass jemand die genaue Formulierung kennen muss.
+ */
+export function filtern(zeilen: Zeile[], f: LogFilter): Zeile[] {
+    const worte = f.suche.toLowerCase().split(/\s+/).filter(Boolean);
+    return zeilen.filter((z) => {
+        const t = z.ts.getTime();
+        if (t < f.von || t > f.bis) return false;
+        if (f.arten.size && !f.arten.has(z.dir)) return false;
+        if (f.nurAuffaellig && !schwere(z)) return false;
+        if (!worte.length) return true;
+        const heuhaufen = `${z.line} ${z.wer ?? ''}`.toLowerCase();
+        return worte.every((w) => heuhaufen.includes(w));
+    });
+}

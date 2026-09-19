@@ -71,6 +71,10 @@ der Gateway erwartet (`VOCO_EXT_KEY`).
 - **Automatik-Regeln:** je Regel Kalender und/oder Termin-Titel (exakter
   Vergleich) → PGS + Vorlaufzeit. Gespeichert im ChurchTools-KV-Store
   (`custommodules`).
+- **Ereignis-Log:** dauerhaft in ChurchTools, wochenweise abgelegt (acht Wochen).
+  Mit Volltextsuche, Filtern nach Art, Schnellfilter „Nur Auffälliges" und
+  Zeitraum; Störungen sind rot, Hinweise gelb. Herunterladen speichert die
+  aktuelle Auswahl als Textdatei.
 
 ## 🔐 Sicherheit & Berechtigungen
 

@@ -207,12 +207,41 @@ button.ver:focus-visible { outline: 2px solid var(--gs-blue); outline-offset: 2p
 .gs-dltools label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--gs-dim); }
 .gs-dltools input { padding: 6px 9px; width: auto; }
 .gs-dltools .hint { color: var(--gs-faint); font-size: 12px; align-self: center; }
+
+/* Suche ueber dem Log - breit, damit sie als Erstes auffaellt. */
+.gs-logsuche { position: relative; margin-bottom: 8px; }
+.gs-logsuche .lupe { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--gs-faint); display: flex; pointer-events: none; }
+.gs-logsuche input { width: 100%; padding: 8px 12px 8px 34px; }
+.gs-logsuche input::-webkit-search-cancel-button { cursor: pointer; }
+
+/* Filterzeile: Art-Schalter, Zeitraum, Herunterladen. */
+.gs-logfilter { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin-bottom: 12px; }
+.gs-logfilter label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--gs-dim); }
+.gs-logfilter input { padding: 6px 9px; width: auto; }
+.gs-chip { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; border: 1px solid var(--gs-border); border-radius: 999px; background: var(--gs-surface); color: var(--gs-dim); font-size: 12.5px; font-weight: 600; cursor: pointer; align-self: center; }
+.gs-chip:hover { border-color: var(--gs-border-strong); color: var(--gs-text); }
+/* Angeschaltet: der Schalter traegt die Farbe seiner Art - dieselbe wie das
+   Zeichen im Log, damit man beides ohne Legende zusammenbringt. */
+.gs-chip.an { background: var(--gs-surface-2); border-color: var(--gs-border-strong); color: var(--gs-text); }
+.gs-chip.an.out { border-color: #93b4f0; color: #3b6fd4; }
+.gs-chip.an.in { border-color: #5ad1c2; color: #10897a; }
+.gs-chip.an.sim { border-color: #f0c26b; color: #a5750d; }
+.gs-chip.an.info { border-color: #8b98ad; color: #4a5568; }
+.gs-chip.an.gw, .gs-chip.an.auffaellig { border-color: var(--gs-danger); color: var(--gs-danger); }
 .gs-dur { display: flex; align-items: center; gap: 5px; color: var(--gs-dim); font-size: 12.5px; white-space: nowrap; }
 .gs-dur input { width: 62px; padding: 5px 7px; }
 .gs-log { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.75; background: #0f1728; color: #cfe0f5; border-radius: var(--gs-radius-sm); padding: 12px 14px; max-height: 260px; overflow: auto; white-space: pre-wrap; }
 .gs-log .ts { color: #64748b; } .gs-log .in { color: #5ad1c2; } .gs-log .out { color: #93b4f0; } .gs-log .sim { color: #f0c26b; } .gs-log .info { color: #8b98ad; } .gs-log .gw { color: #f08a6b; }
 /* Wer es ausgeloest hat - gedaempft, damit die Meldung selbst vorn bleibt. */
 .gs-log .wer { color: var(--gs-dim); }
+/* Stoerungen und Hinweise faerben die GANZE Zeile: Im Fliesstext eines
+   Protokolls uebersieht man ein einzelnes farbiges Zeichen. Die Farben sind
+   fuer den dunklen Untergrund gewaehlt, nicht aus der uebrigen Oberflaeche
+   uebernommen - dort stuenden sie auf Weiss. */
+.gs-log .fehler { color: #ff8b80; font-weight: 600; }
+.gs-log .fehler .ts, .gs-log .fehler .wer { color: #c97a72; }
+.gs-log .hinweis { color: #f5c469; }
+.gs-log .hinweis .ts, .gs-log .hinweis .wer { color: #b3925a; }
 .gs-loghint { margin-top: 10px; color: var(--gs-dim); font-size: 13px; }
 
 /* ---- Tabelle (nächste Läutungen) ---- */
