@@ -15,9 +15,13 @@ import {
     getCustomDataValues,
     createCustomDataValue,
     updateCustomDataValue,
+    deleteCustomDataValue,
 } from './utils/kv-store';
 import type { UpdateCheck } from './update';
-import { zusammenfuehren } from './logbuch';
+import {
+    zusammenfuehren, nachWochen, istLogSchluessel, wocheVon,
+    wochenNachAlter, aufteilen, LOG_ALT,
+} from './logbuch';
 
 export const EXT_KEY: string = import.meta.env.VITE_KEY;
 
@@ -173,6 +177,35 @@ export interface LogEntry {
  */
 export const LOG_MAX = 300;
 
+/**
+ * So viele Zeichen darf EIN Eintrag im Speicher haben.
+ *
+ * ChurchTools lässt höchstens 10 000 zu und lehnt alles darüber mit „400 –
+ * Eingabe muss ein Text sein, der zwischen 0 und 10000 Zeichen enthält" ab.
+ * Der Abstand nach unten ist Absicht: Gezählt wird serverseitig, und ein
+ * Umlaut mehr oder weniger darf nicht über Speichern oder Verlieren
+ * entscheiden.
+ */
+export const LOG_WERT_MAX = 9000;
+
+/**
+ * So viele Kalenderwochen werden aufgehoben.
+ *
+ * Danach fällt eine Woche als Ganzes weg. Zwei Monate decken jede Rückfrage
+ * ab, die in der Praxis kommt („war am Sonntag vor drei Wochen etwas?"), und
+ * halten den Speicher klein.
+ */
+export const LOG_WOCHEN = 8;
+
+/**
+ * So viele Einträge darf EINE Woche belegen.
+ *
+ * Eine lebhafte Woche bekommt damit Platz für rund 300 Zeilen. Die Grenze
+ * schützt vor dem anderen Fall: Ein Fehler, der sich im Minutentakt
+ * wiederholt, soll nicht den Speicher der Gemeinde füllen.
+ */
+export const LOG_TEILE = 4;
+
 export interface AppConfig {
     device: DeviceConfig | null;
     rules: MappingRule[];
@@ -319,33 +352,141 @@ export class ConfigStore {
         return holder.v;
     }
 
-    /** Das dauerhafte Ereignis-Log – neueste Zeile zuerst. */
-    async loadLog(): Promise<LogEntry[]> {
-        const holder: { v: LogEntry[] } = { v: [] };
-        await this.loadFrom('log', 'log', (d) => {
-            holder.v = Array.isArray(d) ? (d as LogEntry[]) : [];
-        });
-        return holder.v;
+    /**
+     * Alle gespeicherten Blöcke des Logs – Schlüssel auf Einträge.
+     *
+     * Eine einzige Abfrage: Die API gibt alle Einträge einer Kategorie
+     * zusammen heraus, gleich wie viele Wochen darin liegen.
+     */
+    private async loadLogBloecke(): Promise<Map<string, LogEntry[]>> {
+        const raus = new Map<string, LogEntry[]>();
+        const catId = this.catIds['log'];
+        if (!catId) return raus;
+        try {
+            const values = await getCustomDataValues<StoredValue>(catId, this.moduleId);
+            for (const v of values as unknown as StoredValue[]) {
+                if (!v.key || !istLogSchluessel(v.key)) continue;
+                this.valueIds[`log:${v.key}`] = v.id;
+                raus.set(v.key, Array.isArray(v.data) ? (v.data as LogEntry[]) : []);
+            }
+        } catch {
+            // Kein Leserecht auf die Kategorie -> bleibt leer.
+        }
+        return raus;
+    }
+
+    /**
+     * Das dauerhafte Ereignis-Log – neueste Zeile zuerst, über alle Wochen.
+     *
+     * Für die Anzeige reichen `LOG_MAX` Zeilen. Zum Herunterladen wird die
+     * Grenze aufgehoben: Gespeichert sind mehrere Wochen, und wer eine Datei
+     * für den letzten Monat zieht, will sie vollständig.
+     */
+    async loadLog(max = LOG_MAX): Promise<LogEntry[]> {
+        const bloecke = await this.loadLogBloecke();
+        return zusammenfuehren([], ([] as LogEntry[]).concat(...bloecke.values()), max);
     }
 
     /**
      * Hängt Zeilen an das gespeicherte Log an und gibt den neuen Stand zurück.
      *
-     * Vor dem Schreiben wird frisch gelesen und zusammengeführt. Ohne das
-     * verlöre jede zweite offene Seite die Zeilen der anderen: Wer zuletzt
-     * schreibt, überschriebe sonst den ganzen Eintrag. Doppelte werden dabei
-     * an Zeitstempel und Text erkannt und fallen weg.
+     * Geschrieben wird je Kalenderwoche ein eigener Eintrag. Das ist keine
+     * Ordnungsfrage: Ein einzelner Eintrag mit dem ganzen Log sprengt die
+     * 10 000 Zeichen, die ChurchTools zulässt – und dann wird gar nichts mehr
+     * gespeichert.
+     *
+     * Angefasst werden nur die Wochen, für die wirklich etwas dazukommt.
+     * Vorher wird frisch gelesen und zusammengeführt, sonst verlöre die zweite
+     * offene Seite die Zeilen der ersten.
      */
     async appendLog(neue: LogEntry[]): Promise<LogEntry[]> {
-        if (!neue.length) return this.loadLog();
-        const zusammen = zusammenfuehren(await this.loadLog(), neue, LOG_MAX);
-        await this.upsert('log', 'log', zusammen);
-        return zusammen;
+        const bloecke = await this.loadLogBloecke();
+        if (neue.length) {
+            // Was noch im alten Sammel-Eintrag liegt, wandert in seine Wochen.
+            // Danach ist er leer und wird beim Aufräumen entfernt.
+            const altbestand = bloecke.get(LOG_ALT) ?? [];
+            const angefasst = new Set<string>();
+            for (const [wocheKey, zeilen] of nachWochen([...neue, ...altbestand])) {
+                const woche = wocheVon(wocheKey);
+                // Alle Teile dieser Woche zusammenwerfen und neu verteilen: Die
+                // neue Zeile gehört nach vorn, nicht ans Ende des letzten Teils.
+                const bisher: LogEntry[] = [];
+                const alteTeile: string[] = [];
+                for (const [key, liste] of bloecke) {
+                    if (key !== LOG_ALT && wocheVon(key) === woche) {
+                        bisher.push(...liste);
+                        alteTeile.push(key);
+                    }
+                }
+                const zusammen = zusammenfuehren(bisher, zeilen, LOG_MAX);
+                const teile = aufteilen(woche, zusammen, LOG_WERT_MAX, LOG_TEILE);
+                for (const key of alteTeile) bloecke.delete(key);
+                for (const [key, liste] of teile) {
+                    bloecke.set(key, liste);
+                    angefasst.add(key);
+                }
+                // Teile, die jetzt überflüssig sind (die Woche schrumpfte nie,
+                // aber sie kann sich anders verteilen), werden geleert.
+                for (const key of alteTeile) {
+                    if (!teile.has(key)) { bloecke.set(key, []); angefasst.add(key); }
+                }
+            }
+            if (altbestand.length) { bloecke.set(LOG_ALT, []); angefasst.add(LOG_ALT); }
+            for (const key of angefasst) {
+                await this.upsert('log', key, bloecke.get(key) ?? []);
+            }
+            await this.bloeckeAufraeumen(bloecke, angefasst);
+        }
+        return zusammenfuehren([], ([] as LogEntry[]).concat(...bloecke.values()), LOG_MAX);
+    }
+
+    /**
+     * Wirft Wochen weg, die über die Aufbewahrung hinaus sind.
+     *
+     * Ohne das wüchse die Kategorie unbegrenzt weiter – nicht mehr in der
+     * Größe eines Eintrags, aber in ihrer Zahl. Gerechnet wird in Wochen, nicht
+     * in Einträgen: Eine Woche mit vier Teilen ist trotzdem eine Woche.
+     *
+     * Ein Fehlschlag beim Löschen ist kein Drama: Die Zeilen sind gespeichert,
+     * nur der Platz bleibt belegt.
+     */
+    private async bloeckeAufraeumen(bloecke: Map<string, LogEntry[]>, angefasst: Set<string>): Promise<void> {
+        const catId = this.catIds['log'];
+        if (!catId) return;
+        const zuAlt = new Set(wochenNachAlter([...bloecke.keys()]).slice(LOG_WOCHEN));
+        for (const key of [...bloecke.keys()]) {
+            if (!zuAlt.has(wocheVon(key))) continue;
+            // Eine Woche, in die gerade noch geschrieben wurde, bleibt stehen -
+            // sonst verschwände dieselbe Zeile im selben Atemzug wieder. Der
+            // alte Sammel-Eintrag ist die Ausnahme: Er ist eben geleert worden.
+            if (angefasst.has(key) && key !== LOG_ALT) continue;
+            const id = this.valueIds[`log:${key}`];
+            bloecke.delete(key);
+            if (!id) continue;
+            try {
+                await deleteCustomDataValue(catId, id, this.moduleId);
+                delete this.valueIds[`log:${key}`];
+            } catch {
+                // Kein Löschrecht -> der Eintrag bleibt liegen, ohne Schaden.
+            }
+        }
     }
 
     /** Leert das gespeicherte Log (nicht die Ereignisse des Gateways). */
     async clearLog(): Promise<void> {
-        await this.upsert('log', 'log', []);
+        const catId = this.catIds['log'];
+        const bloecke = await this.loadLogBloecke();
+        for (const key of bloecke.keys()) {
+            const id = this.valueIds[`log:${key}`];
+            if (!catId || !id) continue;
+            try {
+                await deleteCustomDataValue(catId, id, this.moduleId);
+                delete this.valueIds[`log:${key}`];
+            } catch {
+                // Nicht löschbar -> wenigstens leeren, damit nichts stehen bleibt.
+                await this.upsert('log', key, []);
+            }
+        }
     }
 
     /**
