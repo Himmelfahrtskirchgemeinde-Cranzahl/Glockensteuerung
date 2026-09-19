@@ -97,12 +97,24 @@ Das war alles. Der Dienst steht danach in `services.msc` als
 - baut Verbindungen, die abreißen, eigenständig wieder auf,
 - schreibt mit, was passiert (`gateway.log` neben der EXE, umlaufend).
 
+### Auf eine neue Version wechseln
+
+Alles, was schon da ist, bleibt: Zugangsdaten, bereits ausgelöste Termine,
+Protokoll. Der Ablauf: **7 (Dienst anhalten)** → neue Datei über die alte
+kopieren → starten → **1**. Der Zwischenschritt ist nötig, weil Windows die
+Datei eines laufenden Dienstes sperrt.
+
+Beim Einrichten meldet das Programm, was es vorgefunden hat, und dass nichts
+davon überschrieben wird. Zeigt der Dienst noch auf eine andere Programmdatei,
+sagt `--status` das ausdrücklich – sonst liefe unbemerkt die alte Fassung weiter.
+
 Weitere Schalter derselben Datei:
 
 ```text
 Glockensteuerung-Gateway.exe --status         läuft er? was steht im Protokoll?
 Glockensteuerung-Gateway.exe --einstellungen  Zugang, Simulation, Ruhezeit, E-Mail, Gerät
-Glockensteuerung-Gateway.exe --neustart    anhalten und wieder starten
+Glockensteuerung-Gateway.exe --neustart       anhalten und wieder starten
+Glockensteuerung-Gateway.exe --anhalten       anhalten (um die Datei zu ersetzen)
 Glockensteuerung-Gateway.exe --testlauf    läuft im Fenster, löst NICHTS aus
 Glockensteuerung-Gateway.exe --diagnose    prüft die Zertifikatskette
 Glockensteuerung-Gateway.exe --entfernen   Dienst wieder abmelden

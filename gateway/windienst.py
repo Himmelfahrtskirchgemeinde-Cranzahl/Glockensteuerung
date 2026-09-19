@@ -172,6 +172,44 @@ def entfernen() -> int:
         return 1
 
 
+def programmpfad() -> str:
+    """Welche Programmdatei der eingetragene Dienst startet.
+
+    Wichtig beim Wechsel auf eine neue Fassung: Liegt die neue Datei woanders
+    (oder heisst sie anders), startet Windows weiter die alte - und niemand
+    versteht, warum die Neuerungen ausbleiben.
+    """
+    if not VERFUEGBAR:
+        return ""
+    try:
+        import win32service
+        scm = win32service.OpenSCManager(None, None, win32service.SC_MANAGER_CONNECT)
+        try:
+            dienst = win32service.OpenService(scm, NAME, win32service.SERVICE_QUERY_CONFIG)
+            try:
+                return str(win32service.QueryServiceConfig(dienst)[3] or "")
+            finally:
+                win32service.CloseServiceHandle(dienst)
+        finally:
+            win32service.CloseServiceHandle(scm)
+    except Exception:
+        return ""
+
+
+def zeigt_auf(datei: str) -> bool:
+    """Startet der eingetragene Dienst genau diese Programmdatei?"""
+    eingetragen = programmpfad()
+    if not eingetragen:
+        return False
+    # Im Eintrag stehen Anfuehrungszeichen und Argumente mit drin.
+    teil = eingetragen.strip()
+    if teil.startswith('"'):
+        teil = teil[1:].split('"', 1)[0]
+    else:
+        teil = teil.split(" ", 1)[0]
+    return os.path.normcase(os.path.abspath(teil)) == os.path.normcase(os.path.abspath(datei))
+
+
 def zustand() -> str:
     """Kurzer Klartext: laeuft er, steht er, gibt es ihn ueberhaupt?"""
     if not VERFUEGBAR:
