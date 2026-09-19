@@ -25,7 +25,61 @@ permissions:
   contents: write   # noetig, um bei Tags ein Release zu erstellen
 
 jobs:
+  # Die fertige Programmdatei fuer Windows. Sie muss auf einem Windows-Laeufer
+  # entstehen - eine EXE laesst sich unter Linux nicht bauen. Der Dienst enthaelt
+  # alles: Python, paho, requests, certifi und pywin32. Auf dem Rechner der
+  # Gemeinde ist dann nichts mehr zu installieren.
+  programmdatei:
+    name: Windows-Programmdatei bauen
+    runs-on: windows-latest
+    # Scheitert der Windows-Lauf, soll trotzdem ein Release entstehen - dann
+    # eben nur mit den Archiven. Ein Fehler hier darf nicht alles aufhalten.
+    continue-on-error: true
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Abhaengigkeiten installieren
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r gateway/requirements.txt pyinstaller
+
+      - name: Programmdatei bauen
+        # --onefile: eine einzige Datei, die sich irgendwohin legen laesst.
+        # Die verdeckten Importe sind noetig, weil diese Module erst zur
+        # Laufzeit geladen werden (im Menue) bzw. von pywin32 gebraucht werden -
+        # PyInstaller saehe sie sonst nicht und liesse sie weg.
+        run: >
+          pyinstaller --onefile --clean
+          --name Glockensteuerung-Gateway
+          --paths gateway
+          --hidden-import diagnose
+          --hidden-import win32timezone
+          --hidden-import servicemanager
+          gateway/dienst.py
+
+      - name: Kurz gegenpruefen, dass sie laeuft
+        # Ein Build, der zwar durchlaeuft, aber beim ersten Start ueber einen
+        # fehlenden Import stolpert, faellt sonst erst auf dem Rechner der
+        # Gemeinde auf.
+        run: ./dist/Glockensteuerung-Gateway.exe --status
+
+      - name: Programmdatei bereitstellen
+        uses: actions/upload-artifact@v4
+        with:
+          name: glockensteuerung-gateway-exe
+          path: dist/Glockensteuerung-Gateway.exe
+          if-no-files-found: error
+
   build:
+    needs: programmdatei
+    # Auch dann weiterbauen, wenn die Programmdatei nicht zustande kam.
+    if: always()
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -92,6 +146,13 @@ jobs:
       - name: Bauen und ZIP packen
         run: npm run deploy   # = build + scripts/package.js -> releases/*.zip
 
+      - name: Windows-Programmdatei holen
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: glockensteuerung-gateway-exe
+          path: extension/releases
+
       - name: Gateway als ZIP packen
         # Landet neben der Extension-ZIP, damit beide denselben Weg nehmen:
         # Artifact, Release, Dauerlink. Die Versionsnummer holt sich das Skript
@@ -102,9 +163,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: glockensteuerung-extension
-          path: extension/releases/*.zip
+          path: |
+            extension/releases/*.zip
+            extension/releases/*.exe
           if-no-files-found: error
-        # Enthaelt beide Archive: die Erweiterung und den Gateway-Dienst.
+        # Enthaelt beide Archive und die fertige Programmdatei fuer Windows.
 
       - name: Bei Versions-Tag ein Release mit der ZIP erstellen
         if: startsWith(github.ref, 'refs/tags/v')
@@ -112,7 +175,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # Läuft im Arbeitsverzeichnis extension/ -> Pfade relativ dazu.
         # Legt das Release dieser Version an (z. B. "Version 26.6.1").
-        run: bash ../.github/scripts/release.sh "${GITHUB_REF_NAME}" releases/*.zip
+        run: bash ../.github/scripts/release.sh "${GITHUB_REF_NAME}" releases/*.zip releases/*.exe
 
       - name: Release für den neuen Auto-Tag erstellen (nur main)
         if: github.ref == 'refs/heads/main'
@@ -120,7 +183,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # Der per GITHUB_TOKEN gepushte Tag loest keinen weiteren Workflow aus,
         # daher wird das Release hier direkt erstellt/erweitert.
-        run: bash ../.github/scripts/release.sh "${{ steps.bump.outputs.tag }}" releases/*.zip
+        run: bash ../.github/scripts/release.sh "${{ steps.bump.outputs.tag }}" releases/*.zip releases/*.exe
 
       # Das rollierende "latest"-Release ist entfallen: Es lebte davon, seine ZIP
       # bei jedem Merge zu ersetzen - mit unveraenderlichen Releases geht das

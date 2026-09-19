@@ -202,10 +202,32 @@ Der Gateway meldet sich mit einem **Login-Token** an ChurchTools an
 
 ### 3.3 Installieren
 
+#### Windows: fertige Programmdatei (empfohlen)
+
+Für Windows gibt es den Gateway fertig gebaut – ohne Python, ohne
+Kommandozeile. Aus dem
+[neuesten Release](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest)
+die Datei **`Glockensteuerung-Gateway.exe`** herunterladen und in einen eigenen
+Ordner legen, zum Beispiel `C:\Automationen\Glockensteuerung\gateway`.
+
+Daneben eine Textdatei **`.env`** mit den Zugangsdaten anlegen:
+
+```
+CT_BASE_URL=https://EUREGEMEINDE.church.tools
+CT_LOGIN_TOKEN=... (der Token aus 3.2)
+```
+
+Das Gerät (Seriennummer + Passwort) wird aus der Erweiterung gelesen; nur wenn
+dort nichts steht, zusätzlich `VOCO_SERIAL` und `VOCO_DEVICE_PW` eintragen.
+
+Weiter bei **3.5 Dauerbetrieb einrichten** – die Programmdatei erledigt den Rest.
+
+#### Linux oder eigener Python-Betrieb
+
 ```bash
 # Projekt holen (oder als ZIP von GitHub herunterladen)
-git clone https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Uhrensteuerung.git
-cd Uhrensteuerung/gateway
+git clone https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung.git
+cd Glockensteuerung/gateway
 
 # Python-Umgebung + Abhängigkeiten
 python3 -m venv .venv
@@ -231,6 +253,33 @@ Wenn `--dry-run` die richtigen Auslösungen anzeigt, ist alles korrekt verdrahte
 
 ### 3.5 Dauerbetrieb einrichten
 
+**Windows** – Doppelklick auf `Glockensteuerung-Gateway.exe`, dann **1
+(Dienst einrichten)** wählen und die Windows-Abfrage bestätigen.
+
+Danach steht der Gateway in `services.msc` als **Glockensteuerung Gateway** und
+
+- startet beim Hochfahren des Rechners, **ohne dass sich jemand anmeldet**,
+- wird von Windows nach einem Absturz von selbst neu gestartet,
+- baut Verbindungen, die abreißen, eigenständig wieder auf,
+- schreibt mit, was passiert (`gateway.log` neben der Programmdatei).
+
+Dieselbe Datei beantwortet später die Frage, ob alles läuft:
+
+```text
+Glockensteuerung-Gateway.exe --status      läuft er? was steht im Protokoll?
+Glockensteuerung-Gateway.exe --neustart    anhalten und wieder starten
+Glockensteuerung-Gateway.exe --testlauf    läuft im Fenster, löst NICHTS aus
+Glockensteuerung-Gateway.exe --entfernen   Dienst wieder abmelden
+```
+
+> Beim ersten Start meldet sich Windows mit „Der Computer wurde durch Windows
+> geschützt“, weil die Datei nicht mit einem gekauften Zertifikat signiert ist.
+> Über *Weitere Informationen → Trotzdem ausführen* geht es weiter.
+>
+> Wer den Gateway vorher in der **Aufgabenplanung** hatte: Beim Einrichten
+> werden solche Einträge gesucht und abgeschaltet. Sonst liefe er doppelt – und
+> es würde zweimal geläutet.
+
 **Linux (systemd)** – Datei `/etc/systemd/system/voco-gateway.service`:
 
 ```ini
@@ -254,10 +303,6 @@ sudo systemctl enable --now voco-gateway
 sudo systemctl status voco-gateway      # Log prüfen
 journalctl -u voco-gateway -f           # Live-Log
 ```
-
-**Windows** – Aufgabenplanung: neue Aufgabe „Bei Systemstart" →
-Programm `…\\.venv\\Scripts\\python.exe`, Argument `scheduler.py`,
-„Ausführen, auch wenn nicht angemeldet".
 
 ### 3.6 Ruhezeit & Sicherheit (empfohlen)
 
@@ -323,6 +368,10 @@ Angehängt werden nur technische Angaben (Instanz-Host, Version, letzte Ereignis
 | Problem | Ursache / Lösung |
 |---|---|
 | „Gerät offline" in der Extension | Seriennummer/Passwort falsch, oder VOCO gerade nicht mit dem HEW-Broker verbunden (Internet am Gerät prüfen). |
+| „Automatik nicht erreichbar" in der Extension | Der Gateway meldet sich nicht mehr. Unter Windows: `Glockensteuerung-Gateway.exe --status` – dort steht, ob der Dienst läuft und was zuletzt im Protokoll stand. |
+| Der Dienst lief, tat aber nichts | Bis Version 26.7 beendete er sich stillschweigend, sobald die ChurchTools-Sitzung ablief oder beim Hochfahren noch kein Netz da war. Ab 26.8 meldet er sich selbst neu an und versucht es weiter – die neue Fassung installieren. |
+| Es läutet doppelt | Es läuft noch ein zweiter Gateway, meist ein alter Eintrag in der Aufgabenplanung. `--status` nennt solche Einträge; `--installieren` schaltet sie ab. |
+| Windows meldet „Der Computer wurde durch Windows geschützt" | Die Programmdatei ist nicht signiert. *Weitere Informationen → Trotzdem ausführen*. |
 | Keine Programme in der Liste | Am Gerät sind (noch) keine **Sofort-PGS** angelegt. |
 | `--dry-run` zeigt keine Auslösungen | Der Gateway schreibt den Grund ins Log: keine Termine im Zeitraum, oder kein Titel passt exakt (er nennt dann Gesuchtes **und** Vorhandenes). Danach Schreibweise bzw. Kalender der Regel korrigieren. |
 | ChurchTools-Login schlägt fehl | `CT_BASE_URL`/`CT_LOGIN_TOKEN` prüfen; Benutzer braucht Leserechte. |
