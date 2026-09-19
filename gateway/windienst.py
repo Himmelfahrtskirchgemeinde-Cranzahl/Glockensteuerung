@@ -269,6 +269,26 @@ def zeigt_auf(datei: str) -> bool:
     return os.path.normcase(os.path.abspath(teil)) == os.path.normcase(os.path.abspath(datei))
 
 
+def verzoegerung_abstellen() -> bool:
+    """Stellt einen verzoegerten Start auf sofort um. True, wenn geaendert.
+
+    Frueher wurde der Dienst als "delayed-auto" eingetragen; Windows laesst
+    solche Dienste erst 120 Sekunden nach den uebrigen anlaufen. Wer schon
+    eingerichtet hat, saesse sonst weiter auf den zwei Minuten - und muesste
+    dafuer von Hand noch einmal durch Punkt 1.
+
+    Der Dienst laeuft als SYSTEM und darf das selbst richten. Umgestellt wird
+    NUR von "verzoegert" auf "sofort", also innerhalb des automatischen Starts.
+    Wer bewusst "nur von Hand" oder "deaktiviert" gewaehlt hat, behaelt das:
+    Das waere eine Entscheidung, keine Altlast.
+    """
+    if not VERFUEGBAR or not starttyp().startswith("automatisch (verz"):
+        return False
+    if _sc("config", NAME, "start=", "auto", "depend=", "Tcpip/Dnscache") != 0:
+        return False
+    return True
+
+
 def starttyp() -> str:
     """Startet der Dienst beim Hochfahren von selbst? Klartext.
 

@@ -720,6 +720,17 @@ def main(argv: list[str] | None = None):
         return
 
     log.info("Glockensteuerung-Gateway %s startet.", pfade.version())
+    # Altlast aus frueheren Fassungen selbst richten: Ein verzoegert
+    # eingetragener Dienst laeuft erst zwei Minuten nach dem Hochfahren an.
+    # Der Dienst darf das aendern - er laeuft als SYSTEM -, und so muss
+    # niemand dafuer noch einmal durch das Einrichten.
+    try:
+        import windienst
+        if windienst.VERFUEGBAR and windienst.verzoegerung_abstellen():
+            log.info("Der Dienst war auf verzoegerten Start eingestellt und "
+                     "startet ab dem naechsten Hochfahren sofort.")
+    except Exception as e:
+        log.debug("Starttyp nicht pruefbar: %s", e)
     log.info("Programmordner: %s", pfade.programmordner())
     log.info("Konfiguration: %s", env or "KEINE .env gefunden")
     if datei:

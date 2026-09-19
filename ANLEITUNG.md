@@ -289,7 +289,8 @@ Was dann von selbst passiert:
 
 - Der Dienst startet **beim Hochfahren des Rechners**, ohne dass sich jemand
   anmeldet – und zwar **sofort**, nicht verzögert. Er wartet nur darauf, dass
-  Windows das Netzwerk bereitgestellt hat.
+  Windows das Netzwerk bereitgestellt hat. (Ältere Einrichtungen liefen zwei
+  Minuten verzögert an; das stellt der Dienst beim nächsten Start selbst um.)
 - Er läuft weiter, wenn der Rechner **gesperrt** wird (Win+L), sich jemand
   **abmeldet**, ein **anderer Benutzer** sich anmeldet oder ein neuer Benutzer
   angelegt wird – er hängt an keiner Anmeldung.
