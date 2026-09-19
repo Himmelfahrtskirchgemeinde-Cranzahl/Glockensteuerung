@@ -81,7 +81,7 @@ done
 # niemandem: Wer aktualisiert, will wissen, was sich geaendert hat.
 vorheriger_tag() {
   git tag -l 'v*' --sort=-v:refname \
-    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$' \
     | grep -A1 -x -F "$1" | tail -n +2 | head -1 || true
 }
 

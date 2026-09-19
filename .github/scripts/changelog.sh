@@ -58,14 +58,23 @@ if [ -z "${LC_ALL:-}" ]; then
   done
 fi
 
-TAG="${1:?Aufruf: changelog.sh <tag> [<vorheriger-tag>]}"
+# Mit --art wird nichts ausgegeben ausser einem Wort: was fuer eine Art von
+# Aenderungen seit dem vorherigen Tag zusammengekommen ist. Der Workflow
+# entscheidet daran, ob die naechste Version eine Hotfix-Stelle bekommt
+# (26.8.9.1) oder weiterzaehlt (26.9.0) - und zwar mit DERSELBEN Regel, nach der
+# hier der Changelog ergaenzt oder ersetzt wird. Zwei Stellen, die dasselbe
+# unterschiedlich entscheiden, waeren eine sichere Fehlerquelle.
+NUR_ART=0
+if [ "${1:-}" = "--art" ]; then NUR_ART=1; shift; fi
+
+TAG="${1:?Aufruf: changelog.sh [--art] <tag> [<vorheriger-tag>]}"
 PREV="${2:-}"
 
 # Vorherigen Versions-Tag suchen: versionssortiert, damit v26.10.0 nach
 # v26.9.9 kommt (alphabetisch waere es umgekehrt).
 vorheriger_tag() {  # vorheriger_tag <tag>
   git tag -l 'v*' --sort=-v:refname \
-    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$' \
     | grep -A1 -x -F "$1" | tail -n +2 | head -1 || true
 }
 
@@ -127,6 +136,18 @@ nur_fehler() {  # nur_fehler <eintraege>
         if (tolower(art) !~ /fehler|bugfix|behoben/) { gefunden=1 } }
       END { exit gefunden ? 0 : 1 }'
 }
+
+if [ "${NUR_ART}" = "1" ]; then
+  ERSTE="$(eintraege_fuer "${RANGE}")"
+  if [ -z "${ERSTE}" ]; then
+    echo "nichts"
+  elif nur_fehler "${ERSTE}"; then
+    echo "fehler"
+  else
+    echo "neuerung"
+  fi
+  exit 0
+fi
 
 # Ein reines Fehlerbehebungs-Release ERGAENZT den Changelog, statt ihn zu
 # ersetzen - und zeigt beides, jede Version unter ihrer eigenen Nummer.
