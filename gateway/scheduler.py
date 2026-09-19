@@ -59,6 +59,12 @@ HEARTBEAT_S = 30
 # hoechstens 5 Minuten. Kurz genug, dass ein Aussetzer beim Hochfahren keine
 # Rolle spielt; lang genug, dass ein dauerhaft falscher Zugang nicht im
 # Sekundentakt ins Protokoll schreibt.
+# Der zuletzt aufgebaute Heartbeat und der zuletzt gemeldete Stand. Die
+# Dienstschleife greift im Fehlerfall darauf zurueck: Sie hat selbst keine
+# Verbindung zu ChurchTools, soll aber melden koennen, dass der Dienst lebt.
+LETZTER_BEAT = None
+LETZTER_STAND: dict = {}
+
 WIEDERANLAUF_MIN_S = 15
 WIEDERANLAUF_MAX_S = 300
 # Ab wann ein Lauf als "hat getragen" gilt und die Wartezeit wieder von vorn
@@ -306,6 +312,10 @@ def einmal_laufen(dry: bool, notifier: EmailNotifier, erster_start: bool) -> Non
     # ueberhaupt laeuft - ein stiller Ausfall faellt sonst erst auf, wenn ein
     # Gottesdienst ungelaeutet bleibt. 0.0 = gleich beim Start einmal senden.
     beat = Heartbeat(ct, EXT_KEY)
+    # Auch die Dienstschleife braucht ihn: Wenn hier eine Stoerung hochgeht,
+    # soll sie melden koennen, dass der Dienst lebt und neu aufbaut.
+    global LETZTER_BEAT, LETZTER_STAND
+    LETZTER_BEAT = beat
     last_beat = 0.0
     last_outbox = 0.0
     lese_stoerung_seit: float | None = None
@@ -344,10 +354,13 @@ def einmal_laufen(dry: bool, notifier: EmailNotifier, erster_start: bool) -> Non
 
             if now - last_beat > HEARTBEAT_S:
                 last_beat = now
-                beat.send(rules=len([r for r in cfg.rules if r.active and r.pgs_name]),
-                          simulation=dry,
-                          device=mask_serial(cfg.device.serial if cfg.device else ""),
-                          mail=notifier.enabled and bool(cfg.email and cfg.email.send_feedback))
+                LETZTER_STAND = {
+                    "rules": len([r for r in cfg.rules if r.active and r.pgs_name]),
+                    "simulation": dry,
+                    "device": mask_serial(cfg.device.serial if cfg.device else ""),
+                    "mail": notifier.enabled and bool(cfg.email and cfg.email.send_feedback),
+                }
+                beat.send(**LETZTER_STAND)
 
             # Was die Extension in den Postausgang gestellt hat, verschicken.
             # Nicht bei jedem Tick: Es sind zwei Abfragen, und niemand wartet
@@ -452,6 +465,29 @@ def einmal_laufen(dry: bool, notifier: EmailNotifier, erster_start: bool) -> Non
         voco.close()
 
 
+def pause_melden(warte_s: float, grund: str) -> None:
+    """Sagt der Erweiterung, dass der Dienst lebt und gerade neu aufbaut.
+
+    Ohne das sah sie nur, dass kein Lebenszeichen mehr kommt - und meldete
+    einen Ausfall samt E-Mail, obwohl der Dienst nach Sekunden wieder da war.
+    Der Wiederanlauf dauert 15 Sekunden bis 5 Minuten; die Erweiterung meldet
+    schon nach zwei Minuten. Das traf sich denkbar schlecht.
+
+    Schlaegt das Schreiben fehl, ist das kein Drama: Dann ist ChurchTools
+    gerade auch nicht erreichbar - und ein Ausfall ist dann die richtige
+    Meldung.
+    """
+    if LETZTER_BEAT is None:
+        return
+    bis = dt.datetime.now(dt.timezone.utc) + dt.timedelta(seconds=warte_s + HEARTBEAT_S)
+    try:
+        LETZTER_BEAT.send(**{**{"rules": 0, "simulation": True, "device": ""},
+                             **LETZTER_STAND},
+                          pause_bis=bis, grund=grund)
+    except Exception:
+        pass
+
+
 def dienstschleife(dry: bool, notifier: EmailNotifier) -> None:
     """Haelt den Dienst am Leben, was auch passiert.
 
@@ -477,6 +513,7 @@ def dienstschleife(dry: bool, notifier: EmailNotifier) -> None:
                 warte = WIEDERANLAUF_MIN_S   # lief lange - war offenbar nur ein Aussetzer
             log.warning("Dienst unterbrochen: %s", e)
             log.info("Neuer Versuch in %d Sekunden.", warte)
+            pause_melden(warte, str(e))
             try:
                 if STOPP.wait(warte):
                     break

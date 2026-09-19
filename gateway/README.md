@@ -161,7 +161,15 @@ mindestens 3 MB groß sein und mit der Kennung eines Windows-Programms beginnen.
 
 Der Neustart löst **keine Störungsmeldung** aus: Der Dienst kündigt ihn im
 Lebenszeichen an, und die Erweiterung weiß dadurch, dass Schweigen für die
-nächsten zehn Minuten erwartet ist. Meldet er sich danach nicht zurück, ist es
+nächsten zehn Minuten erwartet ist.
+
+> Dasselbe gilt für den **Wiederanlauf** nach einer Störung. Reißt eine
+> Verbindung ab, wartet der Dienst 15 Sekunden bis 5 Minuten und nimmt einen
+> neuen Anlauf — gemeldet würde ein Ausfall aber schon nach zwei Minuten.
+> Deshalb schreibt er vor dem Warten, bis wann er sich zurückmeldet; die
+> Erweiterung zeigt in dieser Zeit **„Automatik verbindet neu"** und schlägt
+> keinen Alarm. Kommt er danach nicht wieder, ist es ein Ausfall wie jeder
+> andere. Meldet er sich danach nicht zurück, ist es
 ein Ausfall wie jeder andere — mit E-Mail.
 
 Abschalten lässt sich das über **Einstellungen → 7** (oder `VOCO_AUTO_UPDATE=0`).
