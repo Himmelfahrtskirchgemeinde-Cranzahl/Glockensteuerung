@@ -31,16 +31,41 @@ const DECODE: Record<number, string> = {
 };
 
 /**
+ * Zeichen der DOS-Zeichensätze CP437/CP850 im Bereich 0x80–0x9F.
+ *
+ * Genau dort schickt die Anlage ihre Umlaute: „TESTLÄUTEN" kommt als
+ * `TESTL` + `0x8E` + `UTEN` an. In Latin-1 ist 0x8E ein unsichtbares
+ * Steuerzeichen – die Anzeige blieb deshalb leer bzw. zeigte ein Kästchen.
+ *
+ * Der Bereich 0x80–0x9F ist der verlässliche Fingerzeig: In Latin-1 stehen dort
+ * ausschließlich Steuerzeichen, die in einem Programmnamen nie vorkommen. Taucht
+ * eines auf, ist der Text DOS-kodiert. CP437 und CP850 sind in diesem Bereich
+ * identisch, ebenso beim ß (0xE1) – deshalb muss man sie hier nicht
+ * auseinanderhalten.
+ */
+const DOS: Record<number, string> = {
+    0x80: 'Ç', 0x81: 'ü', 0x82: 'é', 0x83: 'â', 0x84: 'ä', 0x85: 'à', 0x86: 'å',
+    0x87: 'ç', 0x88: 'ê', 0x89: 'ë', 0x8a: 'è', 0x8b: 'ï', 0x8c: 'î', 0x8d: 'ì',
+    0x8e: 'Ä', 0x8f: 'Å', 0x90: 'É', 0x91: 'æ', 0x92: 'Æ', 0x93: 'ô', 0x94: 'ö',
+    0x95: 'ò', 0x96: 'û', 0x97: 'ù', 0x98: 'ÿ', 0x99: 'Ö', 0x9a: 'Ü', 0x9b: '¢',
+    0x9c: '£', 0x9d: '¥', 0x9e: '₧', 0x9f: 'ƒ', 0xe1: 'ß',
+};
+
+/**
  * Macht aus einer Bytefolge Text – ohne dabei Umlaute zu verlieren.
  *
  * Die Anlage schickt ihre Namen als rohe Bytes, und welchen Zeichensatz sie
- * dabei benutzt, hängt vom Gerät ab. Deshalb wird nicht geraten: Ergibt die
- * Folge gültiges UTF-8 mit Zeichen jenseits von ASCII, ist sie UTF-8 – anders
- * kommt so eine Folge praktisch nicht zustande. Sonst bleibt es bei Latin-1,
- * wie es hereinkam.
+ * dabei benutzt, hängt vom Gerät ab. Geraten wird deshalb nicht, sondern der
+ * Reihe nach geprüft:
  *
- * Wichtig ist die Reihenfolge: Gelesen wird zuerst Latin-1 (ein Byte = ein
- * Zeichen), denn die Längenangaben im Listenformat zählen Bytes. Erst der
+ * 1. **UTF-8**, wenn die Folge als solches aufgeht – anders kommt eine gültige
+ *    Mehrbyte-Folge praktisch nicht zustande.
+ * 2. **DOS (CP437/CP850)**, sobald ein Zeichen aus 0x80–0x9F auftaucht. So
+ *    spricht die Anlage tatsächlich.
+ * 3. Sonst bleibt es bei **Latin-1**, wie es hereinkam.
+ *
+ * Wichtig ist die Reihenfolge davor: Gelesen wird zuerst Latin-1 (ein Byte =
+ * ein Zeichen), denn die Längenangaben im Listenformat zählen Bytes. Erst der
  * fertig geschnittene Name wird hier zurechtgerückt.
  */
 function alsText(latin1: string): string {
@@ -50,8 +75,31 @@ function alsText(latin1: string): string {
         const bytes = Uint8Array.from(latin1, (c) => c.charCodeAt(0) & 0xff);
         return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     } catch {
-        return latin1;   // kein UTF-8 – war also schon richtig
+        // kein UTF-8
     }
+    if (/[\u0080-\u009f]/.test(latin1)) {
+        return [...latin1].map((c) => DOS[c.charCodeAt(0)] ?? c).join('');
+    }
+    return latin1;
+}
+
+/**
+ * Bleibt nach der Umwandlung etwas Unlesbares übrig, sagt das hier, welches
+ * Byte es war.
+ *
+ * Damit endet das Rätselraten: Steht in der Anzeige ein Kästchen, nennt das
+ * Ereignis-Log den Zahlenwert dahinter – und die Zeichentabelle oben lässt sich
+ * gezielt ergänzen, statt die nächste Runde zu vermuten.
+ */
+export function unlesbareZeichen(text: string): string[] {
+    const raus = new Set<string>();
+    for (const c of text) {
+        const code = c.charCodeAt(0);
+        if ((code >= 0x80 && code <= 0x9f) || code === 0xfffd || (code < 0x20 && code !== 0x0a)) {
+            raus.add('0x' + code.toString(16).toUpperCase().padStart(2, '0'));
+        }
+    }
+    return [...raus];
 }
 
 export function decodeName(raw: string): string {
@@ -253,6 +301,14 @@ export class VocoMqtt {
                 this.status.stoppable = parseLenPrefixed(payload.substring(i + 1));
             }
             this.log(`Programmliste empfangen (${this.status.playable.length} startbar, ${this.status.stoppable.length} laufend)`, 'info');
+            // Falls ein Zeichen uebrig bleibt, das sich nicht zuordnen laesst:
+            // hier steht, welches es war - sonst sieht man nur ein Kaestchen.
+            const offen = [...new Set(this.status.playable.flatMap((r) => unlesbareZeichen(decodeName(r))))];
+            if (offen.length) {
+                this.log(`Hinweis: In den Programmnamen steht ein Zeichen, das sich nicht `
+                    + `zuordnen laesst (${offen.join(', ')}). Bitte melden - dann kann es `
+                    + `ergaenzt werden.`, 'info');
+            }
         } else if (sub === '/sw') {
             this.log(`Schlagwerk: ${payload}`, 'info');
         } else if (sub === '/auto') {
