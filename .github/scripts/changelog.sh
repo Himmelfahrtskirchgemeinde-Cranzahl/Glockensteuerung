@@ -82,7 +82,32 @@ if [ -z "${PREV}" ]; then
   PREV="$(vorheriger_tag "${TAG}")"
 fi
 
-if [ -n "${PREV}" ]; then RANGE="${PREV}..${TAG}"; else RANGE="${TAG}"; fi
+# Ein Tag aus der Zeit vor einem Umschreiben der Historie zeigt auf einen
+# Commit, den es in dieser Historie nicht mehr gibt. Der Bereich
+# "alterTag..HEAD" umfasste dann die GANZE Projektgeschichte - im Changelog
+# einer einzigen Korrektur stuende alles, was je passiert ist. (Genau das war
+# nach dem Entfernen alter Commit-Zeilen der Fall: 216 Commits, 51 Eintraege.)
+#
+# Gesucht wird deshalb der Commit mit demselben Dateistand: Beim Umschreiben
+# aendern sich nur die Nachrichten, der Baum bleibt Byte fuer Byte gleich.
+# Gibt es keinen, bleibt es beim Tag - lieber zu viel im Changelog als ein
+# Abbruch mitten im Release.
+erreichbar() {  # erreichbar <ref> [<ziel>]
+  local ref="$1" ziel="${2:-HEAD}" baum treffer
+  git rev-parse -q --verify "${ref}^{commit}" >/dev/null 2>&1 || { printf '%s' "${ref}"; return; }
+  if git merge-base --is-ancestor "${ref}" "${ziel}" 2>/dev/null; then
+    printf '%s' "${ref}"; return
+  fi
+  baum="$(git rev-parse -q --verify "${ref}^{tree}" 2>/dev/null)"     || { printf '%s' "${ref}"; return; }
+  treffer="$(git log --format='%H %T' "${ziel}" 2>/dev/null     | awk -v b="${baum}" '$2 == b { print $1; exit }')"
+  printf '%s' "${treffer:-${ref}}"
+}
+
+if [ -n "${PREV}" ]; then
+  RANGE="$(erreichbar "${PREV}" "${TAG}")..${TAG}"
+else
+  RANGE="${TAG}"
+fi
 
 # Felder trimmen und einheitlich mit " | " zusammensetzen. Nur so laesst sich
 # ein Eintrag spaeter zuverlaessig wiederfinden - ob jemand "Verbesserung|Geraet"
@@ -162,7 +187,7 @@ X="${TAG}"
 SCHRITTE=0
 while [ -n "${X}" ] && [ "${SCHRITTE}" -lt 20 ]; do
   P="$(vorheriger_tag "${X}")"
-  if [ -n "${P}" ]; then R="${P}..${X}"; else R="${X}"; fi
+  if [ -n "${P}" ]; then R="$(erreichbar "${P}" "${X}")..${X}"; else R="${X}"; fi
   E="$(eintraege_fuer "${R}")"
   if [ -n "${E}" ]; then
     JE_VERSION["${X}"]="${E}"
