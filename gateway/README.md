@@ -25,8 +25,12 @@ Start nach Adresse und Token und legt die `.env` selbst an (siehe
 cd gateway
 python3 -m venv .venv && source .venv/bin/activate   # optional
 pip install -r requirements.txt
-python dienst.py --einrichten    # fragt Adresse und Token ab, schreibt .env
+python dienst.py --einstellungen  # fragt alles ab und schreibt die .env
 ```
+
+Das Menü deckt alles ab, was in der `.env` stehen kann: Zugang, Simulation,
+Ruhezeit, Postausgang (auf Wunsch mit Testmail), Gerät und ein eigenes
+Zertifikatsbündel. Eigene Zusätze in der Datei bleiben dabei unangetastet.
 
 Wer die `.env` lieber selbst schreibt: `cp .env.example .env` und ausfüllen
 (`CT_BASE_URL`, `CT_LOGIN_TOKEN`).
@@ -96,8 +100,8 @@ Das war alles. Der Dienst steht danach in `services.msc` als
 Weitere Schalter derselben Datei:
 
 ```text
-Glockensteuerung-Gateway.exe --status      läuft er? was steht im Protokoll?
-Glockensteuerung-Gateway.exe --einrichten  Zugangsdaten ändern (.env)
+Glockensteuerung-Gateway.exe --status         läuft er? was steht im Protokoll?
+Glockensteuerung-Gateway.exe --einstellungen  Zugang, Simulation, Ruhezeit, E-Mail, Gerät
 Glockensteuerung-Gateway.exe --neustart    anhalten und wieder starten
 Glockensteuerung-Gateway.exe --testlauf    läuft im Fenster, löst NICHTS aus
 Glockensteuerung-Gateway.exe --diagnose    prüft die Zertifikatskette
@@ -172,7 +176,7 @@ WantedBy=multi-user.target
 | `dienst.py` | Bedienung: einrichten, Status, Protokoll (wird zur EXE gebaut) |
 | `windienst.py` | meldet den Gateway als Windows-Dienst an |
 | `pfade.py` | findet `.env`, Zustand und Protokoll neben dem Programm |
-| `einrichtung.py` | fragt Adresse und Token ab und schreibt die `.env` |
+| `einrichtung.py` | Einstellungsmenü: fragt ab, prüft und schreibt die `.env` |
 | `kv.py` | gemeinsamer Zugriff auf den Speicher der Extension |
 | `heartbeat.py` | Lebenszeichen alle 2 Minuten nach ChurchTools |
 | `ereignisse.py` | hält Verbindungen und Ausfälle im Ereignis-Log fest |

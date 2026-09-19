@@ -19,35 +19,82 @@ import os
 
 import pfade
 
-# Was in die .env geschrieben wird. Die Reihenfolge ist die der Fragen.
-VORLAGE = """# Zugangsdaten der Glockensteuerung. Diese Datei gehoert NICHT ins Internet
-# und nicht in ein Repository - sie ist der Schluessel zu ChurchTools.
-#
-# Angelegt von Glockensteuerung-Gateway.exe (Menuepunkt "Einrichten").
+# Was in der .env stehen kann - in der Reihenfolge, in der es dort landet.
+# Der Kommentar wandert mit in die Datei: Wer sie spaeter oeffnet, soll lesen
+# koennen, wozu eine Zeile gut ist, ohne im Quelltext nachzusehen.
+FELDER: list[tuple[str, str]] = [
+    ("CT_BASE_URL", "Adresse der eigenen ChurchTools-Instanz"),
+    ("CT_LOGIN_TOKEN", "Login-Token eines technischen Benutzers\n"
+                       "# (ChurchTools: Persoenliche Einstellungen -> Sicherheit -> Login-Token)"),
+    ("VOCO_SIMULATION", "1 = es wird NICHTS ausgeloest, nur protokolliert"),
+    ("VOCO_QUIET", "Ruhezeit, z. B. 22:00-06:00 - darin wird nie ausgeloest"),
+    ("VOCO_SERIAL", "Geraet: nur noetig, wenn es in der Erweiterung fehlt"),
+    ("VOCO_DEVICE_PW", "Geraetepasswort (GEHEIM)"),
+    ("SMTP_HOST", "Postausgang fuer Stoerungsmeldungen (die Erweiterung hat Vorrang)"),
+    ("SMTP_PORT", "587 fuer STARTTLS, 465 fuer SSL"),
+    ("SMTP_USER", "Benutzername am Postausgang"),
+    ("SMTP_PASS", "Passwort am Postausgang (GEHEIM)"),
+    ("SMTP_SSL", "1 = SSL (Port 465). Sonst STARTTLS"),
+    ("EMAIL_FROM", "Absender. Leer = derselbe wie SMTP_USER"),
+    ("EMAIL_TO", "Wer die Stoerungsmeldungen bekommt"),
+    ("VOCO_CA_BUNDLE", "Eigenes Zertifikatsbuendel (bei Virenscanner/Firmen-Proxy)"),
+]
+BEKANNT = {name for name, _ in FELDER}
+# Altnamen, die durch die Liste oben ersetzt werden.
+VERALTET = {"CT_API_TOKEN"}
 
-# Adresse der eigenen ChurchTools-Instanz
-CT_BASE_URL={base}
 
-# Login-Token eines technischen Benutzers
-# (ChurchTools: Persoenliche Einstellungen -> Sicherheit -> Login-Token)
-CT_LOGIN_TOKEN={token}
+def _schreibe(werte: dict[str, str]) -> str:
+    """Schreibt die .env. Leere Werte fallen weg, Unbekanntes bleibt erhalten.
 
-# Simulation: 1 = es wird NICHTS ausgeloest, nur protokolliert.
-VOCO_SIMULATION={simulation}
-{zusatz}"""
+    In der Datei koennen Dinge stehen, nach denen hier niemand fragt. Die
+    gingen sonst beim naechsten Speichern verloren - deshalb wandern sie
+    unveraendert ans Ende.
+    """
+    pfad = pfade.env_datei() or os.path.join(pfade.programmordner(), pfade.ENV_DATEI)
+    zeilen = [
+        "# Zugangsdaten der Glockensteuerung. Diese Datei gehoert NICHT ins Internet",
+        "# und nicht in ein Repository - sie ist der Schluessel zu ChurchTools.",
+        "#",
+        "# Gepflegt ueber Glockensteuerung-Gateway.exe, Menuepunkt \"Einstellungen\".",
+        "",
+    ]
+    for name, hinweis in FELDER:
+        wert = (werte.get(name) or "").strip()
+        if not wert:
+            continue
+        zeilen.append(f"# {hinweis}")
+        zeilen.append(f"{name}={wert}")
+        zeilen.append("")
+    uebrig = [f"{k}={v}" for k, v in werte.items()
+              if k not in BEKANNT and k not in VERALTET and (v or "").strip()]
+    if uebrig:
+        zeilen.append("# Weitere Einstellungen, unveraendert uebernommen:")
+        zeilen.extend(uebrig)
+        zeilen.append("")
+    with open(pfad, "w", encoding="utf-8") as f:
+        f.write("\n".join(zeilen))
+    return pfad
 
 
 def _frage(text: str, vorgabe: str = "", geheim: bool = False) -> str:
-    """Eine Frage stellen. Leere Eingabe behaelt die Vorgabe."""
+    """Eine Frage stellen. Leere Eingabe behaelt die Vorgabe, "-" loescht sie.
+
+    Das Minus ist noetig, weil sonst kein einmal gesetzter Wert mehr wegzubekommen
+    waere: Die Eingabetaste bedeutet ja "so lassen". Wer eine Ruhezeit wieder
+    abschaffen will, stuende sonst vor einer Sackgasse.
+    """
     if vorgabe:
         gezeigt = (vorgabe[:4] + "…" + vorgabe[-4:]) if geheim and len(vorgabe) > 10 else vorgabe
-        text = f"{text}\n   [{gezeigt}] "
+        text = f"{text}\n   [{gezeigt}]  (Eingabetaste = so lassen, - = loeschen) "
     else:
         text = f"{text}\n   "
     try:
         eingabe = input(text).strip()
     except (EOFError, KeyboardInterrupt):
         raise SystemExit("\nAbgebrochen - es wurde nichts geaendert.")
+    if eingabe == "-":
+        return ""
     return eingabe or vorgabe
 
 
@@ -112,30 +159,17 @@ def _vorhandene_werte() -> dict[str, str]:
     return werte
 
 
-def _zusatz_erhalten(werte: dict[str, str]) -> str:
-    """Alles, was die Vorlage nicht kennt, bleibt erhalten.
+def zugangsdaten(werte: dict[str, str] | None = None) -> bool:
+    """Fragt Adresse und Token ab und prueft sie gleich.
 
-    In der .env koennen Dinge stehen, nach denen hier niemand fragt - der
-    Postausgang fuer Fehlermeldungen, eine Ruhezeit, ein eigenes
-    Zertifikatsbuendel. Die gingen sonst beim Einrichten verloren.
+    Gibt zurueck, ob danach eine brauchbare Konfiguration vorliegt.
     """
-    bekannt = {"CT_BASE_URL", "CT_LOGIN_TOKEN", "CT_API_TOKEN", "VOCO_SIMULATION"}
-    uebrig = [f"{k}={v}" for k, v in werte.items() if k not in bekannt]
-    if not uebrig:
-        return ""
-    return "\n# Uebernommen aus der bisherigen Einrichtung:\n" + "\n".join(uebrig) + "\n"
-
-
-def assistent() -> bool:
-    """Fuehrt durch die Einrichtung. Gibt zurueck, ob eine .env vorliegt."""
-    werte = _vorhandene_werte()
-    pfad = pfade.env_datei() or os.path.join(pfade.programmordner(), pfade.ENV_DATEI)
+    werte = _vorhandene_werte() if werte is None else werte
 
     print()
-    print("Einrichtung der Glockensteuerung")
-    print("=" * 56)
-    if werte:
-        print(f"Es gibt bereits eine Konfiguration: {pfad}")
+    print("Zugang zu ChurchTools")
+    print("-" * 56)
+    if werte.get("CT_BASE_URL"):
         print("Die Eingabetaste behaelt den jeweils gezeigten Wert.")
     else:
         print("Zwei Angaben werden gebraucht. Beide stehen in ChurchTools.")
@@ -143,7 +177,7 @@ def assistent() -> bool:
 
     base = _frage("1. Adresse von ChurchTools (z. B. https://gemeinde.church.tools)",
                   werte.get("CT_BASE_URL", ""))
-    if not base.startswith("http"):
+    if base and not base.startswith("http"):
         base = "https://" + base
     base = base.rstrip("/")
 
@@ -154,38 +188,235 @@ def assistent() -> bool:
                    werte.get("CT_LOGIN_TOKEN") or werte.get("CT_API_TOKEN", ""), geheim=True)
     if not base or not token:
         print("\nOhne Adresse und Token kann der Dienst nichts tun. Abgebrochen.")
-        return False
+        return bool(pfade.env_datei())
 
     print()
     print("Verbindung wird geprueft ...")
     ok, meldung = _pruefe_churchtools(base, token)
     print(f"   {meldung}")
-    if not ok:
+    if not ok and not _ja("Trotzdem so speichern?", standard=False):
+        print("Abgebrochen - es wurde nichts geaendert.")
+        return bool(pfade.env_datei())
+
+    werte["CT_BASE_URL"] = base
+    werte["CT_LOGIN_TOKEN"] = token
+    werte.pop("CT_API_TOKEN", None)
+    if "VOCO_SIMULATION" not in werte:
         print()
-        if not _ja("Trotzdem so speichern?", standard=False):
-            print("Abgebrochen - es wurde nichts geaendert.")
-            return False
+        print("   In der Simulation plant der Dienst alles, loest aber NICHTS aus.")
+        print("   Fuer den ersten Lauf ist das die sichere Wahl.")
+        werte["VOCO_SIMULATION"] = "1" if _ja("Simulation einschalten?", standard=True) else "0"
+    pfad = _schreibe(werte)
+    print(f"\nGespeichert: {pfad}")
+    return True
 
+
+def _simulation(werte: dict[str, str]) -> None:
+    an = _ist_an(werte.get("VOCO_SIMULATION", "1"))
     print()
-    bisher_sim = werte.get("VOCO_SIMULATION", "1").strip().lower() in ("1", "true", "yes", "on")
-    print("   In der Simulation plant der Dienst alles, loest aber NICHTS aus.")
-    print("   Fuer den ersten Lauf ist das die sichere Wahl.")
-    simulation = _ja("3. Simulation einschalten?", standard=bisher_sim)
+    print(f"Simulation ist zurzeit {'EIN' if an else 'AUS'}.")
+    print("Bei eingeschalteter Simulation plant der Dienst alles, loest aber NICHTS aus.")
+    werte["VOCO_SIMULATION"] = "1" if _ja("Simulation einschalten?", standard=an) else "0"
+    if werte["VOCO_SIMULATION"] == "0":
+        print("ACHTUNG: Ab jetzt wird echt gelaeutet.")
+    _schreibe(werte)
 
-    inhalt = VORLAGE.format(base=base, token=token,
-                            simulation="1" if simulation else "0",
-                            zusatz=_zusatz_erhalten(werte))
+
+def _ruhezeit(werte: dict[str, str]) -> None:
+    print()
+    print("In der Ruhezeit wird NIE ausgeloest - auch nicht, wenn ein Termin es")
+    print("verlangt. Schreibweise: 22:00-06:00. Leer lassen = keine Ruhezeit.")
+    wert = _frage("Ruhezeit", werte.get("VOCO_QUIET", "")).strip()
+    if wert and not _ruhezeit_gueltig(wert):
+        print("Das ist keine gueltige Angabe (erwartet: 22:00-06:00). Unveraendert.")
+        return
+    werte["VOCO_QUIET"] = wert
+    _schreibe(werte)
+    print("Keine Ruhezeit mehr." if not wert else f"Ruhezeit: {wert}")
+
+
+def _ruhezeit_gueltig(wert: str) -> bool:
+    import datetime as dt
+    if "-" not in wert:
+        return False
+    a, b = wert.split("-", 1)
     try:
-        with open(pfad, "w", encoding="utf-8") as f:
-            f.write(inhalt)
-    except Exception as e:
-        print(f"\nDie Datei konnte nicht geschrieben werden: {e}")
-        print(f"Erwartet wurde: {pfad}")
+        dt.time.fromisoformat(a.strip())
+        dt.time.fromisoformat(b.strip())
+        return True
+    except Exception:
         return False
 
+
+def _email(werte: dict[str, str]) -> None:
     print()
-    print(f"Gespeichert: {pfad}")
-    if simulation:
-        print("Der Dienst laeuft in Simulation - er loest nichts aus. Zum Scharfschalten")
-        print("spaeter in dieser Datei VOCO_SIMULATION=0 setzen oder hier erneut einrichten.")
-    return True
+    print("Postausgang fuer Stoerungsmeldungen")
+    print("-" * 56)
+    print("Der Dienst meldet Stoerungen per E-Mail. Sind die Zugangsdaten in der")
+    print("Erweiterung hinterlegt (Untermenue \"E-Mail-Versand\"), haben die Vorrang -")
+    print("das hier ist der Ersatzweg fuer einen Rechner ohne solche Pflege.")
+    print("Host leer lassen = keine E-Mails, es bleibt beim Protokoll.")
+    print()
+    host = _frage("Postausgangsserver (z. B. smtp.example.de)", werte.get("SMTP_HOST", "")).strip()
+    if not host:
+        for name in ("SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS",
+                     "SMTP_SSL", "EMAIL_FROM", "EMAIL_TO"):
+            werte[name] = ""
+        _schreibe(werte)
+        print("E-Mail-Versand ausgeschaltet.")
+        return
+
+    ssl_an = _ist_an(werte.get("SMTP_SSL", "0"))
+    ssl_an = _ja("Verschluesselung ueber SSL (Port 465)? Nein = STARTTLS (Port 587)",
+                 standard=ssl_an)
+    vorgabe_port = werte.get("SMTP_PORT") or ("465" if ssl_an else "587")
+    port = _frage("Port", vorgabe_port).strip()
+    benutzer = _frage("Benutzername", werte.get("SMTP_USER", "")).strip()
+    passwort = _frage("Passwort", werte.get("SMTP_PASS", ""), geheim=True)
+    absender = _frage("Absender (leer = Benutzername)", werte.get("EMAIL_FROM", "")).strip()
+    empfaenger = _frage("Empfaenger der Meldungen", werte.get("EMAIL_TO", "")).strip()
+
+    werte.update({
+        "SMTP_HOST": host, "SMTP_PORT": port, "SMTP_USER": benutzer,
+        "SMTP_PASS": passwort, "SMTP_SSL": "1" if ssl_an else "",
+        "EMAIL_FROM": absender, "EMAIL_TO": empfaenger,
+    })
+    _schreibe(werte)
+    print("Gespeichert.")
+
+    if _ja("Gleich eine Testmail schicken?", standard=True):
+        _testmail(werte)
+
+
+def _testmail(werte: dict[str, str]) -> None:
+    """Einmal wirklich verschicken - sonst faellt ein Tippfehler erst im Ernstfall auf."""
+    for name in ("SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS",
+                 "SMTP_SSL", "EMAIL_FROM", "EMAIL_TO"):
+        if werte.get(name):
+            os.environ[name] = werte[name]
+        else:
+            os.environ.pop(name, None)
+    try:
+        from notify import EmailNotifier
+        notifier = EmailNotifier()
+        if not notifier.enabled:
+            print("Kein Postausgang eingerichtet - es wurde nichts verschickt.")
+            return
+        ok = notifier.notify("Glockensteuerung: Testmail",
+                             "Diese Nachricht bestaetigt, dass der Gateway Mails "
+                             "verschicken kann.")
+        print("Testmail verschickt." if ok else
+              "Die Testmail ging NICHT raus. Bitte Server, Port, Benutzer und "
+              "Passwort pruefen.")
+    except Exception as e:
+        print(f"Die Testmail ging nicht raus: {e}")
+
+
+def _geraet(werte: dict[str, str]) -> None:
+    print()
+    print("Geraet (Ersatzweg)")
+    print("-" * 56)
+    print("Normalerweise stehen Seriennummer und Passwort in der Erweiterung, und")
+    print("der Dienst liest sie von dort. Hier eintragen muss man sie nur, wenn")
+    print("das nicht moeglich ist. Leer lassen = aus der Erweiterung nehmen.")
+    print()
+    serie = _frage("Seriennummer (z. B. VH-000000)", werte.get("VOCO_SERIAL", "")).strip()
+    passwort = _frage("Geraetepasswort", werte.get("VOCO_DEVICE_PW", ""), geheim=True)
+    werte["VOCO_SERIAL"] = serie
+    werte["VOCO_DEVICE_PW"] = passwort
+    _schreibe(werte)
+    print("Gespeichert." if serie else "Eintrag geleert - es gilt die Erweiterung.")
+
+
+def _zertifikat(werte: dict[str, str]) -> None:
+    print()
+    print("Eigenes Zertifikatsbuendel")
+    print("-" * 56)
+    print("Nur noetig, wenn ein Virenscanner oder eine Firmen-Firewall die")
+    print("Verbindung aufbricht. Welches Zertifikat gebraucht wird, sagt die")
+    print("Verbindungspruefung (Menuepunkt \"Verbindung pruefen\").")
+    print("Leer lassen = die Zertifikate des Systems benutzen.")
+    print()
+    pfad = _frage("Pfad zur PEM-Datei", werte.get("VOCO_CA_BUNDLE", "")).strip()
+    if pfad and not os.path.exists(pfad):
+        print(f"Die Datei gibt es nicht: {pfad}")
+        if not _ja("Trotzdem eintragen?", standard=False):
+            return
+    werte["VOCO_CA_BUNDLE"] = pfad
+    _schreibe(werte)
+    print("Gespeichert." if pfad else "Eintrag geleert.")
+
+
+def _ist_an(wert: str) -> bool:
+    return (wert or "").strip().lower() in ("1", "true", "yes", "on", "ja")
+
+
+def _zustand(werte: dict[str, str]) -> list[str]:
+    """Kurzfassung fuer das Menue - was ist eingestellt, was nicht?"""
+    ct = werte.get("CT_BASE_URL", "")
+    mail = werte.get("SMTP_HOST", "")
+    return [
+        f"ChurchTools:  {ct or '(nicht eingerichtet)'}",
+        f"Simulation:   {'EIN - es wird nichts ausgeloest' if _ist_an(werte.get('VOCO_SIMULATION', '1')) else 'AUS - es wird echt gelaeutet'}",
+        f"Ruhezeit:     {werte.get('VOCO_QUIET') or '(keine)'}",
+        f"E-Mail:       {mail or '(aus)'}",
+        f"Geraet:       {werte.get('VOCO_SERIAL') or '(aus der Erweiterung)'}",
+        f"Zertifikat:   {werte.get('VOCO_CA_BUNDLE') or '(die des Systems)'}",
+    ]
+
+
+def einstellungen() -> bool:
+    """Menue fuer alles, was frueher von Hand in die .env geschrieben wurde.
+
+    Gibt zurueck, ob eine brauchbare Konfiguration vorliegt.
+    """
+    while True:
+        werte = _vorhandene_werte()
+        print()
+        print("Einstellungen")
+        print("=" * 56)
+        for zeile in _zustand(werte):
+            print("  " + zeile)
+        print()
+        print(" 1  Zugang zu ChurchTools (Adresse, Token)")
+        print(" 2  Simulation ein- oder ausschalten")
+        print(" 3  Ruhezeit")
+        print(" 4  E-Mail-Versand (Stoerungsmeldungen)")
+        print(" 5  Geraet (nur als Ersatz zur Erweiterung)")
+        print(" 6  Eigenes Zertifikatsbuendel")
+        print(" 0  Zurueck")
+        print()
+        try:
+            wahl = input("Auswahl: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            return bool(pfade.env_datei())
+        if wahl == "1":
+            zugangsdaten(werte)
+        elif wahl == "2":
+            _simulation(werte)
+        elif wahl == "3":
+            _ruhezeit(werte)
+        elif wahl == "4":
+            _email(werte)
+        elif wahl == "5":
+            _geraet(werte)
+        elif wahl == "6":
+            _zertifikat(werte)
+        else:
+            return bool(pfade.env_datei())
+
+
+def assistent() -> bool:
+    """Ersteinrichtung: ohne Konfiguration gleich fragen, sonst ins Menue."""
+    if not pfade.env_datei():
+        print()
+        print("Einrichtung der Glockensteuerung")
+        print("=" * 56)
+        print("Es fehlen noch die Zugangsdaten.")
+        if not zugangsdaten({}):
+            return False
+        print()
+        print("Alles Weitere - Ruhezeit, E-Mail, Geraet - steht im Menue")
+        print("\"Einstellungen\" bereit und kann jederzeit nachgetragen werden.")
+        return True
+    return einstellungen()
