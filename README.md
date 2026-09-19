@@ -97,8 +97,17 @@ Changelog: <Art> | <Bereich> | <Satz für Anwender>
 ```
 
 - **Art:** `Verbesserung`, `Fehler` oder `Löschung`
-- **Bereich:** frei, z. B. `Allgemein`, `Steuerung`, `Automatik`, `Gerät`,
-  `Gateway`, `Installation`
+- **Bereich:** entscheidet zugleich, in welchen **Teil** der Eintrag kommt:
+
+  | Teil | Bereiche |
+  |---|---|
+  | Gateway (Dienst auf dem Rechner) | `Automatik`, `Gateway`, `Dienst`, `Installation`, `E-Mail`, `Postausgang` |
+  | Erweiterung (in ChurchTools) | alles andere, z. B. `Steuerung`, `Gerät`, `Regeln`, `Allgemein` |
+
+  Die Release-Beschreibung führt beide Teile getrennt auf, und das Fenster
+  „Was ist neu" in ChurchTools zeigt nur den Teil der Erweiterung. Ein neuer
+  Bereich, der zum Gateway gehört, muss in `changelog.sh` ergänzt werden –
+  sonst landet er beim falschen Teil.
 - **Satz:** was sich für die Anwender ändert, nicht was am Code geschah
 
 Beispiel:
@@ -115,10 +124,34 @@ eines Pull Requests lässt sich der Changelog vorab ansehen:
 .github/scripts/changelog.sh HEAD origin/main
 ```
 
+## Versionsnummern
+
+`<Jahr>.<Mittelstelle>.<Patch>[.<Hotfix>]`, vergeben beim Merge auf `main`:
+
+| Stand | nächste Version | wann |
+|---|---|---|
+| 26.8.5 | **26.8.6** | irgendeine Neuerung |
+| 26.6.9 | **26.7.0** | der Patch läuft nur bis 9 |
+| 26.9.9 | **26.10.0** | die Mittelstelle zählt unbegrenzt weiter |
+| 26.8.9 | **26.8.9.1** | nur behobene Fehler → vierte Stelle |
+| 26.8.9.1 | **26.8.9.2** | weitere Korrektur |
+| 26.8.9.2 | **26.9.0** | wieder eine Neuerung |
+| 26.8.3 | **26.9.0** | `Version-Sprung: Mittelstelle` in der Merge-Nachricht |
+
+Ob eine Fassung „nur behobene Fehler" bringt, entscheidet `changelog.sh --art`
+an den Changelog-Zeilen – dieselbe Stelle, die auch über Ergänzen oder Ersetzen
+des Changelogs entscheidet. Zwei Stellen, die dasselbe unterschiedlich
+beantworten, wären eine sichere Fehlerquelle.
+
 Eine **Korrektur** ergänzt den Changelog der letzten Funktionsversion, eine
 **Neuerung** fängt ihn frisch an – das entscheidet `changelog.sh` selbst anhand
-der Art der Einträge. In der Release-Beschreibung steht nur der Changelog; was
-welche Datei tut, steht hier und nicht in jeder Version aufs Neue.
+der Art der Einträge. Kommen dadurch mehrere Fassungen zusammen, steht **jede
+unter ihrer eigenen Nummer**; bei einer einzelnen entfällt die Überschrift, denn
+welche das ist, sagt der Titel des Release.
+
+In der Release-Beschreibung steht nur der Changelog; was welche Datei tut,
+steht hier und nicht in jeder Version aufs Neue. Kommt eine Datei dazu oder
+fällt eine weg, steht das unter `## Dateien` – nur dann.
 
 ## Dokumentation gehört zum Pull Request
 

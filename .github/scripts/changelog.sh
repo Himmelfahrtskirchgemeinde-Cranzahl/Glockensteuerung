@@ -58,14 +58,23 @@ if [ -z "${LC_ALL:-}" ]; then
   done
 fi
 
-TAG="${1:?Aufruf: changelog.sh <tag> [<vorheriger-tag>]}"
+# Mit --art wird nichts ausgegeben ausser einem Wort: was fuer eine Art von
+# Aenderungen seit dem vorherigen Tag zusammengekommen ist. Der Workflow
+# entscheidet daran, ob die naechste Version eine Hotfix-Stelle bekommt
+# (26.8.9.1) oder weiterzaehlt (26.9.0) - und zwar mit DERSELBEN Regel, nach der
+# hier der Changelog ergaenzt oder ersetzt wird. Zwei Stellen, die dasselbe
+# unterschiedlich entscheiden, waeren eine sichere Fehlerquelle.
+NUR_ART=0
+if [ "${1:-}" = "--art" ]; then NUR_ART=1; shift; fi
+
+TAG="${1:?Aufruf: changelog.sh [--art] <tag> [<vorheriger-tag>]}"
 PREV="${2:-}"
 
 # Vorherigen Versions-Tag suchen: versionssortiert, damit v26.10.0 nach
 # v26.9.9 kommt (alphabetisch waere es umgekehrt).
 vorheriger_tag() {  # vorheriger_tag <tag>
   git tag -l 'v*' --sort=-v:refname \
-    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$' \
     | grep -A1 -x -F "$1" | tail -n +2 | head -1 || true
 }
 
@@ -128,29 +137,48 @@ nur_fehler() {  # nur_fehler <eintraege>
       END { exit gefunden ? 0 : 1 }'
 }
 
-ENTRIES="$(eintraege_fuer "${RANGE}")"
+if [ "${NUR_ART}" = "1" ]; then
+  ERSTE="$(eintraege_fuer "${RANGE}")"
+  if [ -z "${ERSTE}" ]; then
+    echo "nichts"
+  elif nur_fehler "${ERSTE}"; then
+    echo "fehler"
+  else
+    echo "neuerung"
+  fi
+  exit 0
+fi
 
 # Ein reines Fehlerbehebungs-Release ERGAENZT den Changelog, statt ihn zu
-# ersetzen.
+# ersetzen - und zeigt beides, jede Version unter ihrer eigenen Nummer.
 #
 # Sonst stuende im Fenster "Was ist neu" einer Korrektur-Version nur noch die
-# Korrektur - und alles, was die Fassung davor gebracht hat, waere fuer jeden
-# verschwunden, der erst jetzt aktualisiert. Deshalb wird der betrachtete
-# Bereich Tag um Tag zurueckgeschoben, bis er etwas anderes als Fehler enthaelt.
-# Herauskommt: die Neuerungen der letzten Funktionsversion samt aller seither
-# behobenen Fehler. Ein Release MIT Neuerungen faengt dagegen frisch an - dort
-# gehoert die neue Fassung in den Blick, nicht die alte.
-BASIS="${PREV}"
-SEIT=""
+# Korrektur, und alles, was die Fassung davor gebracht hat, waere fuer jeden
+# verschwunden, der erst jetzt aktualisiert. Gezeigt wird deshalb bis zur
+# letzten Version zurueck, die Neuerungen brachte - diese eingeschlossen.
+declare -A JE_VERSION
+VERSIONEN=()
+X="${TAG}"
 SCHRITTE=0
-while [ -n "${BASIS}" ] && [ "${SCHRITTE}" -lt 20 ] \
-      && { [ -z "${ENTRIES}" ] || nur_fehler "${ENTRIES}"; }; do
-  DAVOR="$(vorheriger_tag "${BASIS}")"
-  [ -n "${DAVOR}" ] || break
-  BASIS="${DAVOR}"
-  ENTRIES="$(eintraege_fuer "${BASIS}..${TAG}")"
-  SEIT="${BASIS}"
+while [ -n "${X}" ] && [ "${SCHRITTE}" -lt 20 ]; do
+  P="$(vorheriger_tag "${X}")"
+  if [ -n "${P}" ]; then R="${P}..${X}"; else R="${X}"; fi
+  E="$(eintraege_fuer "${R}")"
+  if [ -n "${E}" ]; then
+    JE_VERSION["${X}"]="${E}"
+    VERSIONEN+=("${X}")
+  fi
+  # Sobald eine Version etwas anderes als behobene Fehler brachte, ist die
+  # Funktionsversion erreicht - weiter zurueck gehoert nicht mehr dazu.
+  if [ -n "${E}" ] && ! nur_fehler "${E}"; then break; fi
+  X="${P}"
   SCHRITTE=$((SCHRITTE + 1))
+done
+
+ENTRIES=""
+for v in "${VERSIONEN[@]:-}"; do
+  [ -n "${v}" ] || continue
+  ENTRIES="${ENTRIES}${ENTRIES:+$'\n'}${JE_VERSION[$v]}"
 done
 
 if [ -z "${ENTRIES}" ]; then
@@ -158,12 +186,22 @@ if [ -z "${ENTRIES}" ]; then
   exit 0
 fi
 
-# Sagt, worauf sich die Liste bezieht - sonst waere unklar, warum in einer
-# Korrektur-Version Neuerungen stehen, die man schon kennt.
-if [ -n "${SEIT}" ]; then
-  printf '_Diese Liste zeigt alles seit Version %s: die Korrekturen dieser_\n' "${SEIT#v}"
-  printf '_Fassung und die Neuerungen, die seither dazugekommen sind._\n\n'
-fi
+# Getrennt nach Teil: Was in ChurchTools zu sehen ist, und was auf dem Rechner
+# der Gemeinde laeuft. Beides in einer Liste zu mischen half niemandem - wer die
+# Erweiterung hochlaedt, interessiert sich nicht fuer den Dienst, und die
+# Erweiterung zeigt im Fenster "Was ist neu" ohnehin nur ihren eigenen Teil.
+#
+# Entschieden wird am BEREICH. Die Liste hier ist die Abmachung; alles, was
+# nicht daraufsteht, gehoert zur Erweiterung. Steht ein neuer Bereich an, gehoert
+# er ergaenzt - im README steht, welche Namen ueblich sind.
+GATEWAY_BEREICHE="^(automatik|gateway|dienst|installation|e-?mail|postausgang)$"
+
+nur_teil() {  # nur_teil <gateway|erweiterung>
+  printf '%s\n' "${ENTRIES}" | awk -F'|' -v m="${GATEWAY_BEREICHE}" -v w="$1" '
+    { ber=$2; gsub(/^[ \t]+|[ \t]+$/, "", ber);
+      ist = (tolower(ber) ~ m) ? "gateway" : "erweiterung";
+      if (ist == w) print }'
+}
 
 # Nach Art gruppieren, in fester Reihenfolge. Innerhalb einer Art nach Bereich,
 # wobei "Allgemein" immer zuerst steht (der Rest alphabetisch).
@@ -171,7 +209,7 @@ emit_group() {
   local want="$1" ueberschrift="$2" gefunden=0
 
   local bereiche
-  bereiche="$(printf '%s\n' "${ENTRIES}" \
+  bereiche="$(printf '%s\n' "${AKTUELL}" \
     | awk -F'|' -v w="${want}" '
         { art=$1; gsub(/^[ \t]+|[ \t]+$/, "", art); if (tolower(art) ~ w) {
             b=$2; gsub(/^[ \t]+|[ \t]+$/, "", b); print b } }' \
@@ -181,11 +219,13 @@ emit_group() {
 
   [ -n "${bereiche}" ] || return 0
 
-  printf '### %s\n\n' "${ueberschrift}"
+  # Die Ebene richtet sich danach, ob darueber Versionsnummern stehen: So
+  # bleibt die Gliederung immer so flach wie moeglich.
+  printf '%s %s\n\n' "${GRUPPEN_EBENE:-###}" "${ueberschrift}"
   while IFS= read -r bereich; do
     [ -n "${bereich}" ] || continue
     printf '* **%s**\n' "${bereich}"
-    printf '%s\n' "${ENTRIES}" \
+    printf '%s\n' "${AKTUELL}" \
       | awk -F'|' -v w="${want}" -v b="${bereich}" '
           { art=$1; ber=$2;
             gsub(/^[ \t]+|[ \t]+$/, "", art); gsub(/^[ \t]+|[ \t]+$/, "", ber);
@@ -202,6 +242,56 @@ emit_group() {
 }
 
 # Reihenfolge wie in den ChurchTools-Release-Notes.
-emit_group 'l(o|ö)*e*schung' 'Löschungen'
-emit_group 'verbesserung|neu|funktion' 'Verbesserungen'
-emit_group 'fehler|bugfix|behoben' 'Behobene Fehler'
+alle_gruppen() {
+  emit_group 'l(o|ö)*e*schung' 'Löschungen'
+  emit_group 'verbesserung|neu|funktion' 'Verbesserungen'
+  emit_group 'fehler|bugfix|behoben' 'Behobene Fehler'
+}
+
+# Hat ein Teil in irgendeiner Version etwas beizutragen?
+teil_hat_etwas() {  # teil_hat_etwas <teil>
+  local v
+  for v in "${VERSIONEN[@]:-}"; do
+    [ -n "${v}" ] || continue
+    ENTRIES="${JE_VERSION[$v]}"
+    [ -z "$(nur_teil "$1")" ] || return 0
+  done
+  return 1
+}
+
+# Ueberschriftentiefe: ## Teil, ### Version, #### Gruppe. Die Erweiterung
+# zeigt im Fenster "Was ist neu" nur ihren eigenen Teil und stellt die
+# Versionsnummer heraus - so ist zu sehen, was in welcher Fassung kam.
+teil_ausgeben() {  # teil_ausgeben <teil> <ueberschrift>
+  teil_hat_etwas "$1" || return 0
+  printf '## %s\n\n' "$2"
+
+  # Wie viele Versionen haben in diesem Teil etwas beizutragen? Nur wenn es
+  # mehr als eine ist - eine Korrektur hat also den Changelog der
+  # Funktionsversion mitgenommen -, gehoert die Nummer als Ueberschrift dazu.
+  # Bei einer einzelnen Version stuende sie nur im Weg: Welche das ist, sagt
+  # der Titel des Release.
+  local v anzahl=0
+  for v in "${VERSIONEN[@]:-}"; do
+    [ -n "${v}" ] || continue
+    ENTRIES="${JE_VERSION[$v]}"
+    [ -z "$(nur_teil "$1")" ] || anzahl=$((anzahl + 1))
+  done
+
+  for v in "${VERSIONEN[@]:-}"; do
+    [ -n "${v}" ] || continue
+    ENTRIES="${JE_VERSION[$v]}"
+    AKTUELL="$(nur_teil "$1")"
+    [ -n "${AKTUELL}" ] || continue
+    if [ "${anzahl}" -gt 1 ]; then
+      printf '### Version %s\n\n' "${v#v}"
+      GRUPPEN_EBENE="####"
+    else
+      GRUPPEN_EBENE="###"
+    fi
+    alle_gruppen
+  done
+}
+
+teil_ausgeben erweiterung 'Erweiterung (in ChurchTools)'
+teil_ausgeben gateway 'Gateway (Dienst auf dem Rechner)'
