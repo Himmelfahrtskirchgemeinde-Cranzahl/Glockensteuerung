@@ -120,9 +120,16 @@ jobs:
           #   - Patch laeuft nur bis 9, dann Uebertrag:      v26.6.9 -> v26.7.0
           #   - Die Mittelstelle zaehlt unbegrenzt weiter:   v26.9.9 -> v26.10.0
           #   - Neues Jahr faengt wieder bei .0.0 an:        v26.12.3 -> v27.0.0
+          # Eine groessere Neuerung soll sich auch in der Nummer zeigen, nicht
+          # als neunter Patch untergehen. Traegt die Commit-Nachricht des Merges
+          # die Zeile 'Version-Sprung: Mittelstelle', zaehlt die Mittelstelle
+          # weiter statt des Patches - ohne dass jemand von Hand taggen muss.
+          NACHRICHT="$(git log -1 --format=%B)"
           if [ "$MA" -lt "$MAJOR" ]; then
             # Neues Jahr (oder alte Zaehlung wie v0.4.x) -> bei .0.0 starten.
             MA=$MAJOR; MI=0; PA=0
+          elif printf '%s' "$NACHRICHT" | grep -qiE '^Version-Sprung:[[:space:]]*Mittelstelle'; then
+            MI=$((MI + 1)); PA=0
           else
             PA=$((PA + 1))
             if [ "$PA" -gt 9 ]; then PA=0; MI=$((MI + 1)); fi
