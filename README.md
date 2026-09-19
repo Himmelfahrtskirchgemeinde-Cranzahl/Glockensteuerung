@@ -124,6 +124,25 @@ eines Pull Requests lässt sich der Changelog vorab ansehen:
 .github/scripts/changelog.sh HEAD origin/main
 ```
 
+## Versionsnummern
+
+`<Jahr>.<Mittelstelle>.<Patch>[.<Hotfix>]`, vergeben beim Merge auf `main`:
+
+| Stand | nächste Version | wann |
+|---|---|---|
+| 26.8.5 | **26.8.6** | irgendeine Neuerung |
+| 26.6.9 | **26.7.0** | der Patch läuft nur bis 9 |
+| 26.9.9 | **26.10.0** | die Mittelstelle zählt unbegrenzt weiter |
+| 26.8.9 | **26.8.9.1** | nur behobene Fehler → vierte Stelle |
+| 26.8.9.1 | **26.8.9.2** | weitere Korrektur |
+| 26.8.9.2 | **26.9.0** | wieder eine Neuerung |
+| 26.8.3 | **26.9.0** | `Version-Sprung: Mittelstelle` in der Merge-Nachricht |
+
+Ob eine Fassung „nur behobene Fehler" bringt, entscheidet `changelog.sh --art`
+an den Changelog-Zeilen – dieselbe Stelle, die auch über Ergänzen oder Ersetzen
+des Changelogs entscheidet. Zwei Stellen, die dasselbe unterschiedlich
+beantworten, wären eine sichere Fehlerquelle.
+
 Eine **Korrektur** ergänzt den Changelog der letzten Funktionsversion, eine
 **Neuerung** fängt ihn frisch an – das entscheidet `changelog.sh` selbst anhand
 der Art der Einträge. Gezeigt wird dabei **jede Version unter ihrer eigenen
