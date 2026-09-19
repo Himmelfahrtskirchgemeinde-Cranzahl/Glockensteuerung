@@ -8,7 +8,7 @@ Aufgabenplanung:
 
     Doppelklick            -> kleines Menue (einrichten, Status, Protokoll)
     --installieren         -> fragt die Zugangsdaten ab und legt den Dienst an
-    --einrichten           -> nur die Zugangsdaten (.env) aendern
+    --einstellungen        -> Zugangsdaten, Simulation, Ruhezeit, E-Mail, Geraet
     --entfernen            -> nimmt ihn wieder heraus
     --status               -> laeuft er? was steht im Protokoll?
     --neustart             -> Dienst anhalten und wieder starten
@@ -249,17 +249,32 @@ def _konfiguration_sicherstellen() -> bool:
     return einrichtung.assistent()
 
 
-def einrichten() -> int:
-    """Nur die Zugangsdaten - ohne am Dienst etwas zu aendern."""
+def einstellungen() -> int:
+    """Alles, was frueher von Hand in die .env geschrieben wurde."""
     import einrichtung
-    if not einrichtung.assistent():
-        return 1
-    if ist_windows() and windienst.zustand() == "laeuft":
+    vorher = _konfigurationsstand()
+    einrichtung.einstellungen()
+    # Der Dienst liest die Datei beim Start. Aendert sich etwas, waehrend er
+    # laeuft, merkt er davon nichts - deshalb hier gleich neu starten.
+    if ist_windows() and windienst.zustand() == "laeuft" and _konfigurationsstand() != vorher:
         print()
-        print("Der Dienst laeuft bereits - damit er die neuen Angaben benutzt,")
-        print("wird er jetzt neu gestartet.")
+        print("Der Dienst laeuft - damit er die neuen Angaben benutzt, wird er")
+        print("jetzt neu gestartet.")
         neustart()
     return 0
+
+
+def _konfigurationsstand() -> str:
+    """Fingerabdruck der .env - um zu erkennen, ob sich etwas geaendert hat."""
+    pfad = pfade.env_datei()
+    if not pfad:
+        return ""
+    try:
+        with open(pfad, "rb") as f:
+            import hashlib
+            return hashlib.sha256(f.read()).hexdigest()
+    except Exception:
+        return ""
 
 
 def installieren() -> int:
@@ -373,7 +388,7 @@ def menue() -> int:
         print("Noch nicht eingerichtet - dafuer ist Punkt 1 da.")
     print()
     print(" 1  Einrichten: Zugangsdaten abfragen und Dienst anlegen")
-    print(" 2  Nur die Zugangsdaten aendern")
+    print(" 2  Einstellungen (Zugang, Simulation, Ruhezeit, E-Mail, Geraet)")
     print(" 3  Status und Protokoll ansehen")
     print(" 4  Testlauf im Fenster (loest NICHTS aus)")
     print(" 5  Verbindung pruefen (Zertifikate)")
@@ -388,7 +403,7 @@ def menue() -> int:
     if wahl == "1":
         rc = installieren()
     elif wahl == "2":
-        rc = einrichten()
+        rc = einstellungen()
     elif wahl == "3":
         rc = status()
     elif wahl == "4":
@@ -419,8 +434,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="Nur fuer Windows: Start durch die Dienststeuerung")
     ap.add_argument("--dienst", action="store_true", help="Dauerbetrieb im Vordergrund")
     ap.add_argument("--installieren", action="store_true")
-    ap.add_argument("--einrichten", action="store_true",
-                    help="Nur die Zugangsdaten (.env) abfragen und speichern")
+    ap.add_argument("--einstellungen", "--einrichten", action="store_true",
+                    dest="einstellungen",
+                    help="Zugang, Simulation, Ruhezeit, E-Mail und Geraet pflegen")
     ap.add_argument("--entfernen", action="store_true")
     ap.add_argument("--neustart", action="store_true")
     ap.add_argument("--status", action="store_true")
@@ -439,8 +455,8 @@ def main(argv: list[str] | None = None) -> int:
         scheduler.main([])
     elif args.installieren:
         rc = installieren()
-    elif args.einrichten:
-        rc = einrichten()
+    elif args.einstellungen:
+        rc = einstellungen()
     elif args.entfernen:
         rc = entfernen()
     elif args.neustart:
