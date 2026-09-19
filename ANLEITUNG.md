@@ -303,7 +303,20 @@ behält den gezeigten Wert, ein **Minus** (`-`) löscht ihn.
 > werden solche Einträge gesucht und abgeschaltet. Sonst liefe er doppelt – und
 > es würde zweimal geläutet.
 
-### 3.5 Auf eine neue Version wechseln
+### 3.5 Aktualisierungen kommen von selbst
+
+Der Dienst sieht alle sechs Stunden nach, ob es eine neue Fassung gibt, und
+spielt sie ein – aber nur, wenn sie **ihn** betrifft und wenn gerade **nichts
+läutet** (und in der nächsten halben Stunde nichts ansteht). Der Neustart
+dauert Sekunden und erscheint im Ereignis-Log als Information, nicht als
+Störung. Meldet er sich danach binnen zehn Minuten nicht zurück, gilt das als
+Ausfall – dann kommt die übliche Meldung samt E-Mail.
+
+Die bisherige Programmdatei bleibt als `.alt` liegen, bis die neue läuft.
+
+Abschalten: **Einstellungen → 7**. Dann gilt der Weg von Hand:
+
+### 3.6 Von Hand auf eine neue Version wechseln
 
 Die Einrichtung ist einmalig. Bei einer neuen Fassung bleibt alles stehen, was
 schon da ist – Zugangsdaten, bereits ausgelöste Termine und das Protokoll:
@@ -321,7 +334,7 @@ entfällt, aber **3** ist dann Pflicht – sonst startet Windows weiter die alte
 Fassung. Ob das passiert ist, sagt `--status`: Dort steht eine Warnung, wenn der
 Dienst eine andere Datei benutzt als die gerade gestartete.
 
-### 3.6 Linux (oder eigener Python-Betrieb)
+### 3.7 Linux (oder eigener Python-Betrieb)
 
 Der Quelltext steckt in „Source code" des
 [neuesten Releases](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest)
@@ -364,7 +377,7 @@ sudo systemctl status voco-gateway      # Log prüfen
 journalctl -u voco-gateway -f           # Live-Log
 ```
 
-### 3.7 Ruhezeit & Sicherheit (empfohlen)
+### 3.8 Ruhezeit & Sicherheit (empfohlen)
 
 In der `.env`:
 
