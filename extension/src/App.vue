@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { churchtoolsClient } from '@churchtools/churchtools-client';
 import { ConfigStore, newRule, newEmailConfig } from './config';
-import type { CatKey, DeviceConfig, EmailConfig, GatewayStatus, MappingRule } from './config';
+import type { CatKey, DeviceConfig, EmailConfig, GatewayStatus, LogEntry, MappingRule } from './config';
 import { VocoMqtt, decodeName } from './voco/mqtt';
 import { reportError, submitFeedback, maskSerial, APP_VERSION, FEEDBACK_URL } from './feedback';
 import type { ReportContext, FeedbackFields } from './feedback';
@@ -11,6 +11,8 @@ import { fetchLatest, isStale, isNewer, parseChangelog, DOWNLOAD_URL, RELEASES_U
 import type { UpdateCheck } from './update';
 import type { Rights } from './perms';
 import { fitInfo } from './utils/fit-height';
+import { ohneDoppelte, zuZeilen } from './logbuch';
+import type { LogDir, Zeile } from './logbuch';
 
 const isDev = import.meta.env.MODE === 'development';
 declare const window: Window & typeof globalThis & { settings?: { base_url?: string } };
@@ -95,6 +97,23 @@ const hasAutomation = computed(() => rules.value.some((r) => r.active && r.pgsNa
 const gatewayDown = computed(() =>
     hasAutomation.value && (gatewayAgeMin.value === null || gatewayAgeMin.value > GATEWAY_STALE_MIN),
 );
+/**
+ * Ist über die Automatik überhaupt etwas bekannt?
+ *
+ * Ohne Regeln und ohne je ein Lebenszeichen gibt es nichts zu melden - dann
+ * wäre ein Kennzeichen „Automatik steht" nur verwirrend: Es steht ja nichts
+ * still, es ist schlicht keine eingerichtet.
+ */
+const gatewayBekannt = computed(() => hasAutomation.value || gatewayStatus.value !== null);
+/** Was im Tooltip des Kennzeichens steht. */
+const gatewayPillTitel = computed(() => {
+    if (gatewayDown.value) return `Die Automatik meldet sich nicht. ${gatewayDownText.value}`;
+    const s = gatewayStatus.value;
+    const teile = [gatewayDownText.value];
+    if (s?.rules != null) teile.push(`${s.rules} aktive Regel(n).`);
+    if (s?.simulation) teile.push('Der Dienst läuft in Simulation – er löst nichts aus.');
+    return teile.join(' ');
+});
 /** Erklärt, seit wann der Dienst fehlt. */
 const gatewayDownText = computed(() => {
     const age = gatewayAgeMin.value;
@@ -105,9 +124,7 @@ const gatewayDownText = computed(() => {
 });
 /** Erklärt, WARUM die Vorschau leer ist (Ladefehler, keine Treffer, Schreibweise). */
 const ringingHint = ref('');
-type LogDir = 'in' | 'out' | 'sim' | 'info' | 'gw';
-type LogEntry = { ts: Date; dir: LogDir; line: string };
-const logLines = ref<LogEntry[]>([]);
+const logLines = ref<Zeile[]>([]);
 /**
  * Ereignisse, die der Gateway-Dienst festgehalten hat.
  *
@@ -116,11 +133,36 @@ const logLines = ref<LogEntry[]>([]);
  * Nachladen Dubletten – und beim Verwerfen ginge das mit weg, was der Browser
  * selbst mitgeschrieben hat.
  */
-const gatewayEreignisse = ref<LogEntry[]>([]);
-/** Alles zusammen, neueste zuerst – so wird das Ereignis-Log angezeigt. */
+const gatewayEreignisse = ref<Zeile[]>([]);
+/**
+ * Was frühere Sitzungen mitgeschrieben haben – aus ChurchTools geladen.
+ *
+ * Ohne das begann das Log bei jedem Seitenaufruf von vorn: Wer nachsehen
+ * wollte, wer am Sonntag geläutet hat oder wann gestern ein Fehler auftrat,
+ * fand eine leere Liste. Jetzt bleiben die Zeilen erhalten – für alle, die das
+ * Untermenü „Ereignis-Log" sehen dürfen.
+ */
+const gespeicherteZeilen = ref<Zeile[]>([]);
+/** Zeilen dieser Sitzung, die noch nicht in ChurchTools stehen. */
+let logPuffer: LogEntry[] = [];
+let logTimer: number | undefined;
+/** So oft wird der Puffer weggeschrieben. */
+const LOG_SPEICHERN_MS = 15000;
+/** Wer gerade bedient – steht bei den Zeilen, die ein Mensch ausgelöst hat. */
+const werBedient = ref('');
+/** Ist das gespeicherte Log gerade nicht schreibbar? Dann nur einmal melden. */
+let logSchreibfehler = false;
+
+/**
+ * Alles zusammen, neueste zuerst – so wird das Ereignis-Log angezeigt.
+ *
+ * Drei Quellen: diese Sitzung, das gespeicherte Log und die Ereignisse des
+ * Gateways. Die erste und die zweite überschneiden sich, sobald der Puffer
+ * geschrieben wurde; doppelte Zeilen werden deshalb an Zeit und Text erkannt
+ * und fallen weg.
+ */
 const alleLogZeilen = computed(() =>
-    [...logLines.value, ...gatewayEreignisse.value]
-        .sort((a, b) => b.ts.getTime() - a.ts.getTime()));
+    ohneDoppelte(logLines.value, gespeicherteZeilen.value, gatewayEreignisse.value));
 const dlFrom = ref('');   // Log-Download: Von (datetime-local), leer = alles
 const dlTo = ref('');     // Log-Download: Bis
 const errorCount = ref(0);
@@ -146,9 +188,73 @@ function ctx(): ReportContext {
     };
 }
 
-function pushLog(line: string, dir: LogDir) {
-    logLines.value.unshift({ ts: new Date(), dir, line });
+/**
+ * Eine Zeile ins Ereignis-Log.
+ *
+ * `fluechtig` ist für das, was nur diese Sitzung angeht – die gemessene
+ * Modulhöhe etwa oder das Echo einer Broker-Nachricht. Alles andere wird
+ * gespeichert, damit es morgen noch nachzulesen ist.
+ */
+function pushLog(line: string, dir: LogDir, fluechtig = false) {
+    const zeile: Zeile = { ts: new Date(), dir, line };
+    // Wer bedient hat, gehört an die Zeilen, die ein Mensch ausgelöst hat -
+    // nicht an das, was die Anlage von sich aus meldet.
+    if (dir === 'out' || dir === 'sim') zeile.wer = werBedient.value || undefined;
+    logLines.value.unshift(zeile);
     if (logLines.value.length > 500) logLines.value.pop();
+    if (fluechtig || !canEdit('log')) return;
+    logPuffer.push({ at: zeile.ts.toISOString(), art: dir, text: line, wer: zeile.wer });
+    // Bedienung und Fehler sofort sichern: Genau die will später jemand
+    // nachlesen, und bis zum nächsten Takt kann die Seite längst zu sein.
+    if (dir === 'out' || dir === 'sim' || line.startsWith('Fehler')) void logSpeichern();
+}
+
+/**
+ * Schreibt den Puffer nach ChurchTools.
+ *
+ * Fehler bleiben nahezu still: Wer das Log nicht schreiben darf, soll die
+ * Oberfläche trotzdem benutzen können - gemeldet wird das einmal, nicht bei
+ * jedem Versuch.
+ */
+async function logSpeichern() {
+    if (!logPuffer.length) return;
+    const gehen = logPuffer;
+    logPuffer = [];
+    try {
+        const stand = await store.appendLog(gehen);
+        gespeicherteZeilen.value = zuZeilen(stand);
+        logSchreibfehler = false;
+    } catch (e) {
+        if (!logSchreibfehler) {
+            logSchreibfehler = true;
+            logLines.value.unshift({
+                ts: new Date(), dir: 'info',
+                line: 'Hinweis: Das Ereignis-Log kann nicht dauerhaft gespeichert werden '
+                    + `(${describeError(e)}). Es bleibt für diese Sitzung sichtbar.`,
+            });
+        }
+    }
+}
+
+/**
+ * Leert das Log – auch das gespeicherte.
+ *
+ * Mit Rückfrage, denn das trifft alle: Bisher räumte der Knopf nur die eigene
+ * Sitzung ab, jetzt verschwindet die Zeile für jeden. Was der Automatik-Dienst
+ * festgehalten hat, bleibt stehen – das gehört ihm.
+ */
+async function logLeeren() {
+    if (!confirm('Das gespeicherte Ereignis-Log für alle löschen?\n\n'
+        + 'Die Ereignisse des Automatik-Dienstes (verbunden, getrennt, ausgelöst) bleiben erhalten.')) return;
+    logPuffer = [];
+    logLines.value = [];
+    try {
+        await store.clearLog();
+        gespeicherteZeilen.value = [];
+        toast('Ereignis-Log geleert.');
+    } catch (e) {
+        pushLog('Das gespeicherte Log konnte nicht geleert werden: ' + describeError(e), 'info', true);
+    }
 }
 
 async function handleError(where: string, err: unknown) {
@@ -188,6 +294,10 @@ onMounted(() => {
 onUnmounted(() => {
     clearInterval(clockTimer);
     clearInterval(gatewayTimer);
+    clearInterval(logTimer);
+    // Was noch im Puffer liegt, gehört auch ins Log - sonst fehlte ausgerechnet
+    // das Letzte, was jemand getan hat, bevor er die Seite schloss.
+    void logSpeichern();
     voco?.disconnect();
 });
 
@@ -292,6 +402,12 @@ async function boot() {
             const info = await churchtoolsClient.get<{ siteName?: string }>('/info');
             if (info?.siteName) document.title = `${info.siteName} - Glockensteuerung`;
         } catch { /* Titel bleibt beim Fallback „Glockensteuerung" */ }
+        // Wer bedient gerade? Steht später bei „ausgelöst von …" im Log. Ohne
+        // Namen bliebe die wichtigste Frage offen: wer hat das Läuten ausgelöst?
+        try {
+            const ich = await churchtoolsClient.get<{ firstName?: string; lastName?: string; cmsUserId?: string }>('/whoami');
+            werBedient.value = [ich?.firstName, ich?.lastName].filter(Boolean).join(' ').trim();
+        } catch { /* ohne Namen geht es auch */ }
         await store.init();
         catIds.value = { ...store.catIds };
         rights.value = await loadRights();
@@ -305,6 +421,11 @@ async function boot() {
         // hin und das Warnbanner erschiene allein deshalb, weil die Seite offen ist.
         refreshGatewayStatus();
         gatewayTimer = window.setInterval(refreshGatewayStatus, GATEWAY_POLL_MS);
+        // Das Log früherer Sitzungen holen und den Takt zum Wegschreiben starten.
+        try {
+            gespeicherteZeilen.value = zuZeilen(await store.loadLog());
+        } catch { /* kein Leserecht auf „Ereignis-Log" -> bleibt bei dieser Sitzung */ }
+        logTimer = window.setInterval(() => void logSpeichern(), LOG_SPEICHERN_MS);
         checkForUpdate();
         // Gemerkter Status gilt nur für Berechtigte; alle anderen bleiben in Simulation.
         simulate.value = rights.value.manageExt ? (cfg.simulate ?? true) : true;
@@ -314,7 +435,7 @@ async function boot() {
         // Wie wurde die Modulhöhe ermittelt? Steht im Log, falls Kopfleiste/
         // Seitenleiste doch mitscrollen – dann sieht man sofort, woran es liegt.
         const fit = fitInfo();
-        pushLog(`Layout: ${fit.mode} – ${fit.detail} → Höhe ${fit.height}px`, 'info');
+        pushLog(`Layout: ${fit.mode} – ${fit.detail} → Höhe ${fit.height}px`, 'info', true);
         loading.value = false;
     } catch (e) {
         loading.value = false;
@@ -407,7 +528,9 @@ function downloadLog() {
         .filter((e) => e.ts.getTime() >= from && e.ts.getTime() <= to)
         .slice()
         .reverse()
-        .map((e) => `${e.ts.toLocaleString('de-DE')}\t${e.dir}\t${e.line}`);
+        // Wer es ausgeloest hat, gehoert mit in die Datei - sonst fehlt ausgerechnet
+        // die Angabe, die beim Nachvollziehen am meisten hilft.
+        .map((e) => `${e.ts.toLocaleString('de-DE')}\t${e.dir}\t${e.line}${e.wer ? '\t' + e.wer : ''}`);
     if (rows.length === 0) { toast('Keine Log-Einträge im gewählten Zeitraum.'); return; }
     const header = `Glockensteuerung – Ereignis-Log (${rows.length} Einträge)\n`;
     const blob = new Blob([header + rows.join('\n') + '\n'], { type: 'text/plain;charset=utf-8' });
@@ -718,6 +841,11 @@ async function loadNextRingings() {
         <span v-if="online === true" class="gs-pill ok"><span class="dot"></span> <span class="ptxt">Gerät </span>online</span>
         <span v-else-if="online === false" class="gs-pill warn"><span class="dot"></span> offline</span>
         <span v-else class="gs-pill muted"><span class="dot"></span> verbinde …</span>
+        <!-- Zweites Kennzeichen: Das Gerät kann online sein, während die
+             Automatik längst steht - dann läutet von allein trotzdem nichts. -->
+        <span v-if="gatewayBekannt" class="gs-pill" :class="gatewayDown ? 'warn' : 'ok'"
+              :title="gatewayPillTitel"><span class="dot"></span>
+          <span class="ptxt">Automatik </span>{{ gatewayDown ? 'steht' : 'läuft' }}</span>
         <button class="gs-btn gs-ghost" @click="requestSync">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg><span class="btxt">Aktualisieren</span></button>
         <span class="gs-vdiv"></span>
@@ -868,8 +996,8 @@ async function loadNextRingings() {
           <section v-else-if="view === 'log' && canView('log')" class="gs-card">
             <div class="gs-head"><h2>Ereignis-Log</h2><span class="gs-spacer"></span>
               <span class="gs-count">ℹ Info · ▶ gesendet · ◀ Antwort · ⚙ Simulation · ⚠ Automatik</span>
-              <button class="gs-btn gs-ghost sm" style="margin-left:10px" @click="logLines = []"
-                      title="Leert nur die Zeilen dieser Sitzung. Was der Automatik-Dienst festgehalten hat, bleibt stehen.">Leeren</button></div>
+              <button v-if="canEdit('log')" class="gs-btn gs-ghost sm" style="margin-left:10px" @click="logLeeren"
+                      title="Löscht das gespeicherte Ereignis-Log für alle. Was der Automatik-Dienst festgehalten hat, bleibt stehen.">Leeren</button></div>
             <div class="gs-body">
               <div class="gs-dltools">
                 <label>Von <input type="datetime-local" v-model="dlFrom"></label>
@@ -879,7 +1007,8 @@ async function loadNextRingings() {
               </div>
               <div class="gs-log">
                 <span v-if="alleLogZeilen.length === 0" style="color:#7c8b99">(noch keine Ereignisse – „Aktualisieren" drücken oder Gerät verbinden)</span>
-                <div v-for="(e, i) in alleLogZeilen" :key="i"><span class="ts">{{ zeitstempel(e.ts) }}</span> <span :class="e.dir">{{ logIcon(e.dir) }}</span> {{ e.line }}</div>
+                <div v-if="!canEdit('log') && alleLogZeilen.length" class="gs-loghint">Nur mitlesen: Zeilen dieser Sitzung werden nicht dauerhaft gespeichert.</div>
+                <div v-for="(e, i) in alleLogZeilen" :key="i"><span class="ts">{{ zeitstempel(e.ts) }}</span> <span :class="e.dir">{{ logIcon(e.dir) }}</span> {{ e.line }}<span v-if="e.wer" class="wer"> – {{ e.wer }}</span></div>
               </div>
             </div>
           </section>
