@@ -36,5 +36,7 @@ gateway/state.json
 # entsteht auf jedem Rechner neu und gehoert nicht ins Repository.
 gateway/zwischenzertifikat.pem
 gateway/gateway.log
+# Sperrdatei des laufenden Dienstes (siehe gateway/sperre.py)
+gateway/gateway.lock
 gateway/state.json
 gateway/version.py
