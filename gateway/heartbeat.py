@@ -31,7 +31,8 @@ class Heartbeat:
         # zwei Minuten dieselbe Zeile ins Log (und der Notifier mailt sie).
         self._failing = False
 
-    def send(self, *, rules: int, simulation: bool, device: str, mail: bool = False) -> bool:
+    def send(self, *, rules: int, simulation: bool, device: str, mail: bool = False,
+             update_bis: dt.datetime | None = None) -> bool:
         """Schreibt einen Schlag. Gibt zurueck, ob es geklappt hat.
 
         Wirft NIE - ein fehlendes Lebenszeichen darf den Laeutebetrieb nicht
@@ -47,6 +48,11 @@ class Heartbeat:
             # 'email', die normale Benutzer nicht lesen duerfen.
             "mail": mail,
         }
+        # Bis dahin ist Schweigen erwartet: Der Dienst startet gerade mit einer
+        # neuen Fassung neu. Die Extension meldet in dieser Zeit keine Stoerung
+        # - ein geplanter Neustart ist keiner.
+        if update_bis is not None:
+            payload["updateBis"] = update_bis.isoformat(timespec="seconds")
         try:
             self.kv.schreiben(SCHLUESSEL, payload)
             if self._failing:

@@ -29,9 +29,11 @@ import json
 import logging
 import logging.handlers
 import os
+import sys
 import threading
 import time
 
+import aktualisierung
 from churchtools import ChurchTools
 from config import EXT_KEY, GatewayConfig, Rule, load_dotenv, load_from_churchtools
 from ereignisse import Ereignisse, LogWaechter, Zustandswaechter
@@ -58,6 +60,17 @@ WIEDERANLAUF_MAX_S = 300
 # Ab wann ein Lauf als "hat getragen" gilt und die Wartezeit wieder von vorn
 # beginnt.
 GELUNGEN_AB_S = 600
+# Selbstaktualisierung: so oft wird nachgesehen, ob es etwas Neues gibt.
+UPDATE_PRUEFUNG_S = 6 * 3600
+# So viel Ruhe muss um eine Ausloesung herum sein, damit getauscht wird. Ein
+# Neustart dauert Sekunden - aber die falschen Sekunden waeren die vor dem
+# Gottesdienst.
+UPDATE_RUHE_S = 1800
+# So lange darf der Neustart dauern, ohne dass es als Ausfall gilt. Die
+# Erweiterung schlaegt in dieser Zeit keinen Alarm: Ein geplanter Neustart ist
+# keine Stoerung.
+UPDATE_FRIST_MIN = 10
+
 # So lange darf die MQTT-Verbindung weg sein, bevor alles neu aufgebaut wird.
 # paho verbindet selbst neu; hilft das nicht, liegt es meist tiefer (Rechner war
 # im Standby, Zertifikatskontext veraltet) - dann hilft nur ein sauberer Start.
@@ -294,6 +307,19 @@ def einmal_laufen(dry: bool, notifier: EmailNotifier, erster_start: bool) -> Non
     lese_stoerung_seit: float | None = None
     mqtt_weg_seit: float | None = None
     beenden = False
+    # Selbstaktualisierung: Erst pruefen, dann warten, bis nichts brennt.
+    auto_update = (getattr(sys, "frozen", False)
+                   and os.environ.get("VOCO_AUTO_UPDATE", "1").strip().lower()
+                   not in ("0", "false", "nein", "off"))
+    letzte_update_pruefung = 0.0
+    update_bereit: tuple[str, str] | None = None
+
+    # Steht die beiseitegeschobene Fassung noch daneben, ist dieser Start der
+    # erste nach einer Aktualisierung - und damit der Beweis, dass sie laeuft.
+    if getattr(sys, "frozen", False) and os.path.exists(sys.executable + ".alt"):
+        aktualisierung.aufraeumen()
+        ereignisse.melde("an", f"Aktualisierung abgeschlossen - Fassung "
+                               f"{pfade.version()} laeuft.")
 
     try:
         while not STOPP.is_set():
@@ -363,6 +389,19 @@ def einmal_laufen(dry: bool, notifier: EmailNotifier, erster_start: bool) -> Non
                         ereignisse.melde("aus", f"ChurchTools nicht erreichbar: {e}")
                     else:
                         log.warning("Konfig/Termine weiterhin nicht ladbar: %s", e)
+
+            # --- Selbstaktualisierung --------------------------------
+            if auto_update and now - letzte_update_pruefung > UPDATE_PRUEFUNG_S:
+                letzte_update_pruefung = now
+                update_bereit = aktualisierung.steht_bereit(pfade.version())
+                if update_bereit:
+                    log.info("Fassung %s liegt bereit.", update_bereit[0])
+            if update_bereit and aktualisierung_versuchen(
+                    voco, plan, ereignisse, beat, cfg, notifier, dry,
+                    update_bereit, now):
+                # Der Helfer haelt den Dienst gleich an. Bis dahin nichts mehr
+                # anfangen - erst recht nichts ausloesen.
+                return
 
             for p in plan:
                 if p["key"] in fired:
@@ -441,6 +480,78 @@ def dienstschleife(dry: bool, notifier: EmailNotifier) -> None:
             warte = min(warte * 2, WIEDERANLAUF_MAX_S)
             erster_start = False
     log.info("Beendet.")
+
+
+def nichts_brennt(voco, plan: list[dict], now: float) -> tuple[bool, str]:
+    """Darf der Dienst gerade neu starten?
+
+    Zwei Gruende sprechen dagegen, und beide waeren im Nachhinein nicht mehr
+    gutzumachen: Es laeutet gerade, oder es soll gleich laeuten.
+    """
+    try:
+        if voco.stop_raw:
+            return False, "es laeutet gerade"
+    except Exception:
+        pass
+    for p in plan:
+        abstand = p["ts"] - now
+        if -UPDATE_RUHE_S < abstand < UPDATE_RUHE_S:
+            wann = time.strftime("%H:%M", time.localtime(p["ts"]))
+            return False, f"um {wann} steht eine Ausloesung an"
+    return True, ""
+
+
+def aktualisierung_versuchen(voco, plan, ereignisse, beat, cfg, notifier, dry,
+                             bereit: tuple[str, str], now: float) -> bool:
+    """Spielt eine bereitliegende Fassung ein. Gibt zurueck, ob neu gestartet wird.
+
+    Die Meldungen gehen bewusst als Information ins Ereignis-Log, nicht als
+    Stoerung: Ein geplanter Neustart ist keiner. Gemeldet wird erst, wenn der
+    Dienst sich danach nicht wieder zurueckmeldet - und das sieht die
+    Erweiterung, nicht er selbst.
+    """
+    version, url = bereit
+    frei, grund = nichts_brennt(voco, plan, now)
+    if not frei:
+        log.info("Aktualisierung auf %s wartet: %s.", version, grund)
+        return False
+
+    log.info("Aktualisierung auf %s wird geladen.", version)
+    datei = aktualisierung.herunterladen(url)
+    if not datei:
+        ereignisse.melde("info", f"Fassung {version} konnte nicht geladen werden. "
+                                 "Es bleibt vorerst beim bisherigen Stand.")
+        return False
+
+    # Kurz davor noch einmal nachsehen: Der Download hat gedauert, und in der
+    # Zwischenzeit kann eine Ausloesung naeher gerueckt sein.
+    frei, grund = nichts_brennt(voco, plan, time.time())
+    if not frei:
+        log.info("Aktualisierung auf %s verschoben: %s.", version, grund)
+        return False
+
+    if not aktualisierung.einspielen(datei):
+        ereignisse.melde("info", f"Fassung {version} liess sich nicht einsetzen. "
+                                 "Es bleibt beim bisherigen Stand.")
+        return False
+
+    # Das Lebenszeichen traegt die Frist: Bis dahin ist Schweigen erwartet und
+    # loest in der Erweiterung keine Stoerungsmeldung aus.
+    beat.send(rules=len([r for r in cfg.rules if r.active and r.pgs_name]),
+              simulation=dry,
+              device=mask_serial(cfg.device.serial if cfg.device else ""),
+              mail=notifier.enabled and bool(cfg.email and cfg.email.send_feedback),
+              update_bis=dt.datetime.now(dt.timezone.utc)
+              + dt.timedelta(minutes=UPDATE_FRIST_MIN))
+    ereignisse.melde("info", f"Aktualisierung auf Fassung {version} eingespielt. "
+                             "Der Dienst startet jetzt neu und meldet sich gleich "
+                             "wieder.")
+    log.info("Aktualisierung auf %s eingespielt - Neustart wird angestossen.", version)
+    if not aktualisierung.neustart_anstossen():
+        ereignisse.melde("info", "Der Neustart liess sich nicht anstossen. Die neue "
+                                 "Fassung wird beim naechsten Start benutzt.")
+        return False
+    return True
 
 
 def main(argv: list[str] | None = None):

@@ -124,6 +124,14 @@ export interface GatewayStatus {
      * die normale Benutzer nicht lesen dürfen.
      */
     mail?: boolean;
+    /**
+     * Bis wann ein Neustart erwartet ist (ISO).
+     *
+     * Der Dienst setzt das, bevor er sich für eine Aktualisierung beendet.
+     * Solange die Frist läuft, ist sein Schweigen kein Ausfall, sondern der
+     * angekündigte Neustart — und darf keine Störungsmeldung auslösen.
+     */
+    updateBis?: string;
 }
 
 /**
