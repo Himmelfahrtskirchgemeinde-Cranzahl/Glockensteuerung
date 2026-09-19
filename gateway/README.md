@@ -60,13 +60,57 @@ python voco_mqtt.py status        # Verbindung + startbare PGS anzeigen
 python scheduler.py --dry-run     # plant und zeigt Auslösungen, löst NICHT aus
 ```
 
-## Dauerbetrieb
+## Dauerbetrieb unter Windows (empfohlen)
+
+Für den Rund-um-die-Uhr-Betrieb gibt es eine fertige Programmdatei:
+**`Glockensteuerung-Gateway.exe`** aus dem
+[neuesten Release](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest).
+Sie braucht kein Python und keine virtuelle Umgebung.
+
+1. Die EXE in den Ordner legen, in dem die `.env` liegt (die bleibt unverändert).
+2. Doppelklick → **1 (Dienst einrichten)** → die Windows-Abfrage bestätigen.
+
+Das war alles. Der Dienst steht danach in `services.msc` als
+**Glockensteuerung Gateway** und
+
+- startet beim Hochfahren des Rechners, **ohne dass sich jemand anmeldet**,
+- wird von Windows nach einem Absturz selbst neu gestartet,
+- baut Verbindungen, die abreißen, eigenständig wieder auf,
+- schreibt mit, was passiert (`gateway.log` neben der EXE, umlaufend).
+
+Weitere Schalter derselben Datei:
+
+```text
+Glockensteuerung-Gateway.exe --status      läuft er? was steht im Protokoll?
+Glockensteuerung-Gateway.exe --neustart    anhalten und wieder starten
+Glockensteuerung-Gateway.exe --testlauf    läuft im Fenster, löst NICHTS aus
+Glockensteuerung-Gateway.exe --diagnose    prüft die Zertifikatskette
+Glockensteuerung-Gateway.exe --entfernen   Dienst wieder abmelden
+```
+
+Beim Einrichten werden **alte Einträge der Aufgabenplanung** gesucht, die
+denselben Gateway starten, und abgeschaltet – sonst liefe er doppelt und es
+würde zweimal geläutet.
+
+> Beim ersten Start meldet sich Windows mit „Der Computer wurde durch Windows
+> geschützt“. Das liegt daran, dass die Datei nicht mit einem gekauften
+> Zertifikat signiert ist. Über *Weitere Informationen → Trotzdem ausführen*
+> geht es weiter.
+
+### Warum ein Dienst und keine Aufgabenplanung
+
+Die Aufgabenplanung ist dafür gemacht, etwas zu einem Zeitpunkt zu **starten** –
+nicht, etwas dauerhaft am Leben zu **halten**. Sie meldet „erfolgreich“, auch
+wenn der Prozess Sekunden später gestorben ist, kennt ein Ausführungszeitlimit
+und startet im Systemverzeichnis, wo keine `.env` liegt. Ein Dienst kennt diese
+Fallen nicht.
+
+## Dauerbetrieb unter Linux
 
 ```bash
 python scheduler.py
 ```
 
-Für Autostart als Dienst: systemd-Unit (Linux) oder Aufgabenplanung (Windows).
 Beispiel systemd `/etc/systemd/system/voco-gateway.service`:
 
 ```ini
@@ -92,6 +136,12 @@ WantedBy=multi-user.target
 - **Fail-safe:** verpasste Auslösungen (> 2,5 min zu spät) werden übersprungen,
   nicht nachgeholt.
 - 🔐 `.env` und `state.json` nicht committen (via `.gitignore` ausgeschlossen).
+- **Gibt nicht auf:** Fällt das Netz aus, läuft die ChurchTools-Sitzung ab oder
+  ist beim Hochfahren noch keine Verbindung da, wartet der Dienst und versucht
+  es erneut – statt sich zu beenden.
+- **Plan bleibt stehen:** Ist ChurchTools vorübergehend nicht erreichbar, wird
+  der zuletzt gelesene Plan weiter abgearbeitet. Ein Aussetzer der API lässt
+  kein Geläut ausfallen.
 
 ## Dateien
 
@@ -103,6 +153,9 @@ WantedBy=multi-user.target
 | `voco_mqtt.py` | MQTT-Client + CLI (`list`/`status`/`start`/`stop`) |
 | `tls.py` | Wurzelzertifikate für MQTT und E-Mail |
 | `diagnose.py` | prüft, warum eine verschlüsselte Verbindung scheitert |
+| `dienst.py` | Bedienung: einrichten, Status, Protokoll (wird zur EXE gebaut) |
+| `windienst.py` | meldet den Gateway als Windows-Dienst an |
+| `pfade.py` | findet `.env`, Zustand und Protokoll neben dem Programm |
 
 ## Wenn die Verbindung am Zertifikat scheitert
 

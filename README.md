@@ -14,7 +14,7 @@ manuelle Programmwahl entfällt. Bedienung und Konfiguration laufen als
 | Teil | Was | Läuft |
 |---|---|---|
 | **[`extension/`](extension/)** | ChurchTools-Modul (Vue 3 + Vite): Status, manuell läuten, Regeln pflegen | im Browser, in ChurchTools |
-| **[`gateway/`](gateway/)** | Python-Dienst: löst Programme **automatisch** zur Termin-Zeit aus | auf einem dauerhaft laufenden Rechner mit Internet |
+| **[`gateway/`](gateway/)** | Python-Dienst: löst Programme **automatisch** zur Termin-Zeit aus | auf einem dauerhaft laufenden Rechner mit Internet — unter Windows als [fertige Programmdatei](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest) und echter Dienst |
 
 ```
   ChurchTools-Extension ──┐   Regeln + Gerät        ┌── Gateway-Dienst
