@@ -175,7 +175,9 @@ gekostet hätte.
 
 - Geräte-Passwort, ChurchTools-Token & Login-Daten sind **Geheimnisse** – niemals
   ins Repository. Lokal nur in `.env` (per `.gitignore` ausgeschlossen).
-- Modulzugriff in ChurchTools einschränken: Wer das Modul öffnen kann, kann läuten.
+- **Modulzugriff einschränken: Wer das Modul öffnen kann, kann läuten.** Welche
+  Rechte es gibt, was sie bewirken und wie man sie vergibt, steht in
+  [`ANLEITUNG.md`, Teil 4](ANLEITUNG.md#teil-4--wer-darf-was-rechte-in-churchtools).
 
 ## Hinweise
 
