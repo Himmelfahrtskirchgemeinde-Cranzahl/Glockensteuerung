@@ -11,8 +11,8 @@ import { fetchLatest, isStale, isNewer, parseChangelog, DOWNLOAD_URL, RELEASES_U
 import type { UpdateCheck } from './update';
 import type { Rights } from './perms';
 import { fitInfo } from './utils/fit-height';
-import { ohneDoppelte, zuZeilen } from './logbuch';
-import type { LogDir, Zeile } from './logbuch';
+import { ohneDoppelte, zuZeilen, filtern, schwere, leererFilter, filterAktiv } from './logbuch';
+import type { LogDir, Zeile, LogFilter } from './logbuch';
 
 const isDev = import.meta.env.MODE === 'development';
 declare const window: Window & typeof globalThis & { settings?: { base_url?: string } };
@@ -179,8 +179,49 @@ let logSchreibfehler = false;
  */
 const alleLogZeilen = computed(() =>
     ohneDoppelte(logLines.value, gespeicherteZeilen.value, gatewayEreignisse.value));
-const dlFrom = ref('');   // Log-Download: Von (datetime-local), leer = alles
-const dlTo = ref('');     // Log-Download: Bis
+const dlFrom = ref('');   // Zeitraum: Von (datetime-local), leer = offen
+const dlTo = ref('');     // Zeitraum: Bis
+/**
+ * Suche und Filter im Ereignis-Log.
+ *
+ * Das Log hält mehrere Wochen. Ohne Eingrenzung scrollt man durch hunderte
+ * Betriebszeilen, um die eine zu finden, die zählt – „wann war der Ausfall?",
+ * „wer hat am Sonntag von Hand geläutet?".
+ */
+const logSuche = ref('');
+const logArten = ref<Set<LogDir>>(new Set());
+const nurAuffaellig = ref(false);
+/** Die Arten, nach denen sich filtern lässt – Reihenfolge wie in der Legende. */
+const LOG_ARTEN: Array<{ key: LogDir; name: string; icon: string }> = [
+    { key: 'out', name: 'Gesendet', icon: '▶' },
+    { key: 'in', name: 'Antwort', icon: '◀' },
+    { key: 'sim', name: 'Simulation', icon: '⚙' },
+    { key: 'info', name: 'Info', icon: 'ℹ' },
+    { key: 'gw', name: 'Automatik', icon: '⚠' },
+];
+/** Der Filter, wie ihn die Liste und das Herunterladen benutzen. */
+const logFilter = computed<LogFilter>(() => ({
+    suche: logSuche.value,
+    arten: logArten.value,
+    nurAuffaellig: nurAuffaellig.value,
+    von: dlFrom.value ? new Date(dlFrom.value).getTime() : -Infinity,
+    bis: dlTo.value ? new Date(dlTo.value).getTime() : Infinity,
+}));
+const gefilterteZeilen = computed(() => filtern(alleLogZeilen.value, logFilter.value));
+const logFilterAktiv = computed(() => filterAktiv(logFilter.value));
+function artUmschalten(a: LogDir) {
+    const naechste = new Set(logArten.value);
+    if (naechste.has(a)) naechste.delete(a); else naechste.add(a);
+    logArten.value = naechste;   // neue Menge, sonst merkt Vue die Änderung nicht
+}
+function filterZuruecksetzen() {
+    const leer = leererFilter();
+    logSuche.value = leer.suche;
+    logArten.value = leer.arten;
+    nurAuffaellig.value = leer.nurAuffaellig;
+    dlFrom.value = '';
+    dlTo.value = '';
+}
 const errorCount = ref(0);
 const loading = ref(true);
 const bootError = ref('');
@@ -634,8 +675,6 @@ function setDuration(displayName: string, minutes: number) {
  * neuesten. Wer eine Datei für den letzten Monat zieht, will sie vollständig.
  */
 async function downloadLog() {
-    const from = dlFrom.value ? new Date(dlFrom.value).getTime() : -Infinity;
-    const to = dlTo.value ? new Date(dlTo.value).getTime() : Infinity;
     let bestand = alleLogZeilen.value;
     try {
         bestand = ohneDoppelte(logLines.value, zuZeilen(await store.loadLog(Infinity)),
@@ -644,14 +683,15 @@ async function downloadLog() {
         // Nicht ladbar -> die angezeigten Zeilen tun es auch. Eine Datei mit
         // dem, was da ist, hilft mehr als eine Fehlermeldung.
     }
-    const rows = bestand
-        .filter((e) => e.ts.getTime() >= from && e.ts.getTime() <= to)
+    // Heruntergeladen wird, was auf dem Bildschirm steht: Wer nach „Ausfall"
+    // sucht und dann speichert, will diese Zeilen - nicht wieder alles.
+    const rows = filtern(bestand, logFilter.value)
         .slice()
         .reverse()
         // Wer es ausgeloest hat, gehoert mit in die Datei - sonst fehlt ausgerechnet
         // die Angabe, die beim Nachvollziehen am meisten hilft.
         .map((e) => `${e.ts.toLocaleString('de-DE')}\t${e.dir}\t${e.line}${e.wer ? '\t' + e.wer : ''}`);
-    if (rows.length === 0) { toast('Keine Log-Einträge im gewählten Zeitraum.'); return; }
+    if (rows.length === 0) { toast('Keine Einträge, auf die die Suche passt.'); return; }
     const header = `Glockensteuerung – Ereignis-Log (${rows.length} Einträge)\n`;
     const blob = new Blob([header + rows.join('\n') + '\n'], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -1129,16 +1169,34 @@ async function loadNextRingings() {
               <button v-if="canEdit('log')" class="gs-btn gs-ghost sm" style="margin-left:10px" @click="logLeeren"
                       title="Löscht das gespeicherte Ereignis-Log für alle. Was der Automatik-Dienst festgehalten hat, bleibt stehen.">Leeren</button></div>
             <div class="gs-body">
-              <div class="gs-dltools">
+              <div class="gs-logsuche">
+                <span class="lupe"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
+                <input type="search" v-model="logSuche" placeholder="Suchen … Text oder Name, mehrere Wörter möglich">
+              </div>
+              <div class="gs-logfilter">
+                <button v-for="a in LOG_ARTEN" :key="a.key" type="button"
+                        :class="['gs-chip', a.key, { an: logArten.has(a.key) }]"
+                        :aria-pressed="logArten.has(a.key)" @click="artUmschalten(a.key)"
+                        :title="`Nur ${a.name} zeigen – noch einmal klicken hebt es auf`">{{ a.icon }} {{ a.name }}</button>
+                <button type="button" :class="['gs-chip', 'auffaellig', { an: nurAuffaellig }]"
+                        :aria-pressed="nurAuffaellig" @click="nurAuffaellig = !nurAuffaellig"
+                        title="Nur Störungen (rot) und Hinweise (gelb)">⚠ Nur Auffälliges</button>
+                <span class="gs-spacer"></span>
                 <label>Von <input type="datetime-local" v-model="dlFrom"></label>
                 <label>Bis <input type="datetime-local" v-model="dlTo"></label>
-                <button class="gs-btn gs-ghost sm" @click="downloadLog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 19h16"/></svg>Herunterladen</button>
-                <span class="hint">leer = alles</span>
+                <button v-if="logFilterAktiv" class="gs-btn gs-ghost sm" @click="filterZuruecksetzen">Zurücksetzen</button>
+                <button class="gs-btn gs-ghost sm" @click="downloadLog"
+                        :title="logFilterAktiv ? 'Speichert genau die Zeilen, die gerade zu sehen sind.' : 'Speichert das ganze gespeicherte Log als Textdatei.'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 19h16"/></svg>Herunterladen</button>
+              </div>
+              <div v-if="logFilterAktiv" class="gs-loghint">
+                {{ gefilterteZeilen.length }} von {{ alleLogZeilen.length }} Zeilen –
+                „Herunterladen“ speichert genau diese Auswahl.
               </div>
               <div class="gs-log">
                 <span v-if="alleLogZeilen.length === 0" style="color:#7c8b99">(noch keine Ereignisse – „Aktualisieren" drücken oder Gerät verbinden)</span>
+                <span v-else-if="gefilterteZeilen.length === 0" style="color:#7c8b99">(keine Zeile passt – Suche ändern oder „Zurücksetzen“)</span>
                 <div v-if="!canEdit('log') && alleLogZeilen.length" class="gs-loghint">Nur mitlesen: Zeilen dieser Sitzung werden nicht dauerhaft gespeichert.</div>
-                <div v-for="(e, i) in alleLogZeilen" :key="i"><span class="ts">{{ zeitstempel(e.ts) }}</span> <span :class="e.dir">{{ logIcon(e.dir) }}</span> {{ e.line }}<span v-if="e.wer" class="wer"> – {{ e.wer }}</span></div>
+                <div v-for="(e, i) in gefilterteZeilen" :key="i" :class="schwere(e)"><span class="ts">{{ zeitstempel(e.ts) }}</span> <span :class="e.dir">{{ logIcon(e.dir) }}</span> {{ e.line }}<span v-if="e.wer" class="wer"> – {{ e.wer }}</span></div>
               </div>
             </div>
           </section>
