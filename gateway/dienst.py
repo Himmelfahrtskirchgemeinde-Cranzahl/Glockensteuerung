@@ -88,6 +88,13 @@ def programmdatei() -> str:
     return os.path.abspath(__file__)
 
 
+# Rueckgabewert von als_admin_neu_starten(): Die Arbeit laeuft ab jetzt in
+# einem zweiten, erhoehten Fenster. Dieses hier hat nichts mehr zu tun und darf
+# NICHT ins Menue zurueckkehren - sonst staenden zwei Menues offen und man
+# bediente das falsche.
+IM_ANDEREN_FENSTER = 99
+
+
 def als_admin_neu_starten(argumente: list[str]) -> int:
     """Dasselbe Programm noch einmal starten, diesmal mit Adminrechten (UAC).
 
@@ -112,7 +119,7 @@ def als_admin_neu_starten(argumente: list[str]) -> int:
               "Administrator ausfuehren' oeffnen und es dort erneut versuchen.")
         return 1
     print("Es geht im neuen Fenster weiter.")
-    return 0
+    return IM_ANDEREN_FENSTER
 
 
 # --- Alte Eintraege in der Aufgabenplanung --------------------------------
@@ -717,10 +724,43 @@ def protokoll(zeilen: int = 40) -> int:
 
 
 def menue() -> int:
-    """Was bei einem Doppelklick passiert."""
+    """Was bei einem Doppelklick passiert.
+
+    Das Menue bleibt stehen: Nach jedem Punkt kommt es zurueck, bis jemand 0
+    waehlt oder das Fenster schliesst. Vorher endete das Programm nach einer
+    einzigen Aktion - wer nach dem Status noch einen Testlauf wollte, musste
+    die Programmdatei erneut oeffnen.
+    """
+    while True:
+        rc = _menue_einmal()
+        if rc is None:          # 0 oder Fenster zu
+            return 0
+        if rc == IM_ANDEREN_FENSTER:
+            # Dort steht gleich dasselbe Menue - mit Adminrechten.
+            try:
+                input("\nDieses Fenster kann zu. Eingabetaste ...")
+            except (EOFError, KeyboardInterrupt):
+                pass
+            return 0
+        try:
+            input("\nWeiter mit der Eingabetaste ...")
+        except (EOFError, KeyboardInterrupt):
+            return rc
+        print()
+        print()
+
+
+def _menue_einmal() -> int | None:
+    """Zeigt das Menue und fuehrt EINEN Punkt aus.
+
+    Gibt None zurueck, wenn Schluss ist (Punkt 0 oder geschlossenes Fenster),
+    sonst den Rueckgabewert der Aktion.
+    """
     print(f"Glockensteuerung-Gateway {pfade.version()}")
     print("=" * 56)
     if ist_windows():
+        # Bei jedem Durchgang frisch: Nach "anhalten" soll hier auch
+        # "angehalten" stehen, nicht der Stand von vor fuenf Minuten.
         print(f"Dienst: {windienst.zustand()}")
     if not pfade.env_datei():
         print("Noch nicht eingerichtet - dafuer ist Punkt 1 da.")
@@ -738,7 +778,7 @@ def menue() -> int:
     try:
         wahl = input("Auswahl: ").strip()
     except (EOFError, KeyboardInterrupt):
-        return 0
+        return None
     if wahl == "1":
         rc = installieren()
     elif wahl == "2":
@@ -759,13 +799,11 @@ def menue() -> int:
         rc = anhalten()
     elif wahl == "8":
         rc = entfernen()
+    elif wahl in ("0", ""):
+        return None
     else:
-        return 0
-    if not ist_admin():         # im erhoehten Fenster wartet bereits --warten
-        try:
-            input("\nMit der Eingabetaste schliessen ...")
-        except Exception:
-            pass
+        print(f"'{wahl}' kenne ich nicht - bitte eine Zahl von 0 bis 8.")
+        rc = 0
     return rc
 
 
@@ -821,10 +859,17 @@ def main(argv: list[str] | None = None) -> int:
         return menue()
 
     if args.warten:
+        # Das erhoehte Fenster hat seine Aufgabe erledigt - und bleibt jetzt
+        # offen, mit dem Menue. Dort gelten Adminrechte, die Punkte 1, 6, 7
+        # und 8 fragen also nicht noch einmal nach. Vorher schloss es sich
+        # nach der einen Aktion, und fuer die naechste ging alles von vorn los.
         try:
-            input("\nMit der Eingabetaste schliessen ...")
-        except Exception:
-            pass
+            input("\nWeiter mit der Eingabetaste ...")
+        except (EOFError, KeyboardInterrupt):
+            return rc
+        print()
+        print()
+        return menue()
     return rc
 
 

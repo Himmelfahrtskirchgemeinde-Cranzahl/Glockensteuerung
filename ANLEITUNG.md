@@ -309,6 +309,16 @@ Dieselbe Datei beantwortet alle Fragen zum Betrieb:
 | 6 | `--neustart` | Anhalten und wieder starten |
 | 7 | `--anhalten` | Anhalten, um die Programmdatei ersetzen zu können |
 | 8 | `--entfernen` | Dienst wieder abmelden |
+| 0 | | schließen |
+
+**Das Menü bleibt offen.** Nach jedem Punkt kommt es zurück – Status ansehen,
+dann Testlauf, dann Einstellungen, alles nacheinander im selben Fenster. Erst
+**0** (oder das Schließen des Fensters) beendet es. Oben steht dabei immer der
+aktuelle Zustand des Dienstes, frisch gelesen.
+
+Fragt Windows für einen Punkt nach **Administratorrechten** (1, 6, 7, 8), geht
+es in einem zweiten Fenster weiter – dort steht dasselbe Menü, nur mit den
+nötigen Rechten. Das erste Fenster kann dann zu.
 
 Zeigt der **Testlauf** die richtigen Auslösungen, ist alles richtig verdrahtet.
 In ChurchTools steht dann unter **Ereignis-Log**, wann der Dienst gestartet ist

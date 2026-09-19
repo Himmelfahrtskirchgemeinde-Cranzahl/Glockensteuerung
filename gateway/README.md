@@ -83,7 +83,8 @@ Sie braucht kein Python und keine virtuelle Umgebung.
 
 1. Die EXE in einen eigenen Ordner legen. Liegt dort schon eine `.env`, bleibt
    sie unverändert und wird benutzt.
-2. Doppelklick → **1 (Einrichten)**. Gibt es noch keine `.env`, fragt das
+2. Doppelklick → **1 (Einrichten)**. Das Menü bleibt danach offen; erst **0**
+   schließt es. Gibt es noch keine `.env`, fragt das
    Programm nach der ChurchTools-Adresse und dem Login-Token, probiert beides
    sofort aus und legt die Datei selbst an.
 3. Die Windows-Abfrage nach Administratorrechten bestätigen – die braucht es
