@@ -257,7 +257,8 @@ Dieselbe Datei beantwortet alle Fragen zum Betrieb:
 | 4 | `--testlauf` | Läuft sichtbar im Fenster und löst **nichts** aus |
 | 5 | `--diagnose` | Prüft die verschlüsselte Verbindung zum Broker |
 | 6 | `--neustart` | Anhalten und wieder starten |
-| 7 | `--entfernen` | Dienst wieder abmelden |
+| 7 | `--anhalten` | Anhalten, um die Programmdatei ersetzen zu können |
+| 8 | `--entfernen` | Dienst wieder abmelden |
 
 Zeigt der **Testlauf** die richtigen Auslösungen, ist alles richtig verdrahtet.
 In ChurchTools steht dann unter **Ereignis-Log**, wann der Dienst gestartet ist
