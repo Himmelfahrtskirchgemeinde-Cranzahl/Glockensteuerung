@@ -60,3 +60,148 @@ export function ohneDoppelte(...quellen: Zeile[][]): Zeile[] {
     }
     return raus.sort((a, b) => b.ts.getTime() - a.ts.getTime());
 }
+
+/* ---------------------------------------------------------------------------
+ * Wochenblöcke
+ *
+ * ChurchTools begrenzt jeden Eintrag im Schlüssel-Wert-Speicher auf **10 000
+ * Zeichen**. Das Log lag bisher als EIN Eintrag dort – bei 300 Zeilen sind das
+ * rund 35 000. Die Folge war kein halb gespeichertes Log, sondern gar keines:
+ * Jeder Schreibversuch endete mit „400 – Eingabe muss ein Text sein, der
+ * zwischen 0 und 10000 Zeichen enthält", und das Log lebte wieder nur in der
+ * geöffneten Seite.
+ *
+ * Deshalb liegt es jetzt in Blöcken – einer je Kalenderwoche (`log-2026-W38`).
+ * Das löst zwei Dinge auf einmal: Jeder Block bleibt klein genug, und alte
+ * Wochen lassen sich als Ganzes wegräumen, ohne im Bestand zu schneiden.
+ *
+ * Gelesen wird trotzdem in EINER Abfrage: Die API liefert alle Einträge einer
+ * Kategorie zusammen.
+ * ------------------------------------------------------------------------ */
+
+/** Vorsilbe aller Wochenblöcke. Der alte Schlüssel hieß schlicht `log`. */
+export const LOG_PRAEFIX = 'log-';
+/** Der Schlüssel, unter dem das Log vor den Wochenblöcken lag. */
+export const LOG_ALT = 'log';
+
+/**
+ * Kalenderwoche nach ISO 8601 – gerechnet in der Zeit des Betrachters.
+ *
+ * Bewusst lokal und nicht UTC: Wer sonntags um 23:30 Uhr läutet, erwartet das
+ * in der Woche dieses Sonntags, nicht in der nächsten.
+ */
+function isoWoche(d: Date): { jahr: number; woche: number } {
+    // Auf UTC-Mitternacht des lokalen Kalendertags normieren. Damit spielt die
+    // Sommerzeit keine Rolle mehr - die Differenz zweier Tage ist dann immer
+    // ein Vielfaches von 24 Stunden.
+    const tag = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+    const t = new Date(tag);
+    const wochentag = t.getUTCDay() || 7;            // Mo = 1 … So = 7
+    t.setUTCDate(t.getUTCDate() + 4 - wochentag);    // auf den Donnerstag
+    const jahresanfang = Date.UTC(t.getUTCFullYear(), 0, 1);
+    const woche = Math.ceil(((t.getTime() - jahresanfang) / 86400000 + 1) / 7);
+    return { jahr: t.getUTCFullYear(), woche };
+}
+
+/** Schlüssel des Blocks, in den ein Zeitstempel gehört: `log-2026-W38`. */
+export function wochenSchluessel(at: string): string {
+    const d = new Date(at);
+    if (!Number.isFinite(d.getTime())) return `${LOG_PRAEFIX}unbekannt`;
+    const { jahr, woche } = isoWoche(d);
+    return `${LOG_PRAEFIX}${jahr}-W${String(woche).padStart(2, '0')}`;
+}
+
+/** Ist das ein Eintrag des Logs? (Wochenblock oder der alte Sammel-Eintrag) */
+export function istLogSchluessel(key: string): boolean {
+    return key === LOG_ALT || key.startsWith(LOG_PRAEFIX);
+}
+
+/**
+ * Die Woche zu einem Schlüssel: `log-2026-W38-2` -> `2026-W38`.
+ *
+ * Eine Woche kann auf mehrere Einträge verteilt sein (siehe `aufteilen`).
+ * Aufbewahrt und weggeräumt wird trotzdem in Wochen, nicht in Einträgen.
+ */
+export function wocheVon(key: string): string {
+    if (key === LOG_ALT) return '';
+    const m = /^log-(\d{4}-W\d{2})(?:-\d+)?$/.exec(key);
+    return m ? m[1] : 'unbekannt';
+}
+
+/** Schlüssel des n-ten Teils einer Woche – der erste heißt wie die Woche. */
+export function teilSchluessel(woche: string, nr: number): string {
+    return nr <= 1 ? `${LOG_PRAEFIX}${woche}` : `${LOG_PRAEFIX}${woche}-${nr}`;
+}
+
+/**
+ * Wochen nach Alter – die neueste zuerst.
+ *
+ * Die Schlüssel sind so gebaut, dass alphabetisch = chronologisch gilt
+ * (vierstelliges Jahr, zweistellige Woche). Der alte Sammel-Eintrag und alles
+ * Unlesbare zählen als das Älteste: Was dort liegt, stammt aus der Zeit davor.
+ */
+export function wochenNachAlter(schluessel: string[]): string[] {
+    const wochen = [...new Set(schluessel.map(wocheVon))];
+    return wochen.sort((a, b) => {
+        const rang = (w: string) => (/^\d{4}-W\d{2}$/.test(w) ? 1 : 0);
+        if (rang(a) !== rang(b)) return rang(b) - rang(a);
+        return a < b ? 1 : a > b ? -1 : 0;
+    });
+}
+
+/** Einträge auf die Wochen verteilen, in die sie gehören. */
+export function nachWochen(eintraege: LogEntry[]): Map<string, LogEntry[]> {
+    const raus = new Map<string, LogEntry[]>();
+    for (const e of eintraege) {
+        const key = wochenSchluessel(e.at);
+        const liste = raus.get(key);
+        if (liste) liste.push(e);
+        else raus.set(key, [e]);
+    }
+    return raus;
+}
+
+/**
+ * Verteilt die Zeilen einer Woche auf so viele Einträge, wie sie braucht.
+ *
+ * Ein Eintrag fasst höchstens `maxZeichen`; ist die Woche voller, entsteht ein
+ * zweiter (`log-2026-W38-2`). Das ist der Unterschied zwischen „das Log ist
+ * voll" und „diese Woche war viel los": Eine Festwoche mit Christvesper,
+ * Silvester und Neujahr passt sonst nicht in einen einzigen Eintrag, und die
+ * ältesten Zeilen fielen ausgerechnet dann weg.
+ *
+ * Nach `maxTeile` ist Schluss – irgendwo muss die Grenze sein, sonst füllte
+ * ein Fehler, der sich im Minutentakt wiederholt, den Speicher der Gemeinde.
+ * Dann fallen die ältesten Zeilen dieser Woche weg.
+ *
+ * Gemessen wird an genau der Zeichenkette, die später geschrieben wird. Alles
+ * andere wäre geraten: Ein Umlaut oder ein langer Termin-Titel verschiebt die
+ * Rechnung sofort.
+ */
+export function aufteilen(
+    woche: string, eintraege: LogEntry[], maxZeichen: number, maxTeile: number,
+): Map<string, LogEntry[]> {
+    const raus = new Map<string, LogEntry[]>();
+    const laenge = (key: string, liste: LogEntry[]) => JSON.stringify({ key, data: liste }).length;
+    let rest = eintraege;
+    for (let nr = 1; nr <= maxTeile && rest.length; nr++) {
+        const key = teilSchluessel(woche, nr);
+        let passt: LogEntry[] = [];
+        for (const e of rest) {
+            const versuch = [...passt, e];
+            if (laenge(key, versuch) > maxZeichen) break;
+            passt = versuch;
+        }
+        // Eine einzelne Zeile, die für sich schon zu lang ist, würde die
+        // Schleife ewig drehen lassen - sie wird gekürzt statt übersprungen,
+        // damit nichts stumm verschwindet.
+        if (!passt.length) {
+            const zuLang = rest[0];
+            const platz = Math.max(0, maxZeichen - laenge(key, [{ ...zuLang, text: '' }]) - 3);
+            passt = [{ ...zuLang, text: zuLang.text.slice(0, platz) + '...' }];
+        }
+        raus.set(key, passt);
+        rest = rest.slice(passt.length);
+    }
+    return raus;
+}

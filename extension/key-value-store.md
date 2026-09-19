@@ -441,6 +441,14 @@ try {
 
 ### 4. Keep Values Small
 
+**Hard limit: a `value` may contain at most 10 000 characters.** Anything
+longer is rejected with `400 – Eingabe muss ein Text sein, der zwischen 0 und
+10000 Zeichen enthält`. The limit counts the whole JSON string, including the
+`{"key":…,"data":…}` wrapper. Nothing is truncated for you – the write simply
+fails, so a growing list (a log, a history) stops being saved at some point
+without anyone noticing. This module splits its event log into one value per
+calendar week for exactly that reason (`src/logbuch.ts`).
+
 Store only necessary data. Large objects should be split into multiple values:
 
 ```typescript

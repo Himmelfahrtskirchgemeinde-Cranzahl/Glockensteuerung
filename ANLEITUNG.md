@@ -176,6 +176,21 @@ trifft deshalb **nur** Termine, die genau so heißen, und **nicht** zusätzlich
 > Regeln übernehmen den alten Eintrag automatisch als Termin-Titel; bitte
 > einmal prüfen, ob er mit dem Titel im Kalender übereinstimmt.
 
+### 2.4 Ereignis-Log: was aufgehoben wird
+
+Unter **„Ereignis-Log"** steht, was passiert ist – wer geläutet hat, was die
+Anlage geantwortet hat, wann die Automatik weg war. Das Log lebt **nicht** nur
+in der geöffneten Seite: Es liegt in ChurchTools und ist nach dem Neuladen und
+an jedem anderen Rechner wieder da.
+
+- Gespeichert wird **wochenweise**, aufgehoben werden die letzten **acht
+  Wochen**. Ältere Wochen fallen von selbst weg – dazu ist nichts zu tun.
+- **Herunterladen** speichert das Ganze als Textdatei, auf Wunsch eingegrenzt
+  auf „Von/Bis". Die Datei enthält **alles Gespeicherte**, nicht nur die Zeilen
+  auf dem Bildschirm – für ein Archiv über die acht Wochen hinaus.
+- **Leeren** löscht das Log für alle. Was der Gateway-Dienst festgehalten hat,
+  bleibt stehen; das gehört ihm.
+
 ---
 
 ## Teil 3 – Automatik-Gateway einrichten
