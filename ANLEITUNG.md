@@ -252,26 +252,67 @@ Dieselbe Datei beantwortet alle Fragen zum Betrieb:
 
 | Menü | Befehl | Wofür |
 |---|---|---|
+| 2 | `--einstellungen` | Zugang, Simulation, Ruhezeit, E-Mail, Gerät, Zertifikat |
 | 3 | `--status` | Läuft der Dienst? Was steht zuletzt im Protokoll? |
 | 4 | `--testlauf` | Läuft sichtbar im Fenster und löst **nichts** aus |
 | 5 | `--diagnose` | Prüft die verschlüsselte Verbindung zum Broker |
 | 6 | `--neustart` | Anhalten und wieder starten |
-| 2 | `--einrichten` | Zugangsdaten ändern (Token gewechselt, Instanz umgezogen) |
-| 7 | `--entfernen` | Dienst wieder abmelden |
+| 7 | `--anhalten` | Anhalten, um die Programmdatei ersetzen zu können |
+| 8 | `--entfernen` | Dienst wieder abmelden |
 
 Zeigt der **Testlauf** die richtigen Auslösungen, ist alles richtig verdrahtet.
 In ChurchTools steht dann unter **Ereignis-Log**, wann der Dienst gestartet ist
 und ob er verbunden war.
 
-Zum Scharfschalten: Menüpunkt **2** und bei „Simulation einschalten?" **n**
-antworten – oder in der `.env` `VOCO_SIMULATION=0` setzen und den Dienst neu
-starten.
+Zum Scharfschalten: Menüpunkt **2 → 2** und bei „Simulation einschalten?" **n**
+antworten. Der Dienst wird danach von selbst neu gestartet, damit die Änderung
+gilt.
+
+### Alles, was sich einstellen lässt
+
+Menüpunkt **2** zeigt zuerst, was gerade gilt, und führt dann durch die
+einzelnen Punkte:
+
+| Punkt | Wofür | Wenn nichts eingestellt ist |
+|---|---|---|
+| Zugang zu ChurchTools | Adresse und Login-Token | – (wird gebraucht) |
+| Simulation | löst der Dienst wirklich aus? | ein: es wird nichts ausgelöst |
+| Ruhezeit | z. B. `22:00-06:00` – darin wird **nie** ausgelöst | keine |
+| E-Mail-Versand | Postausgang für Störungsmeldungen, auf Wunsch mit Testmail | aus, es bleibt beim Protokoll |
+| Gerät | Seriennummer und Gerätepasswort | werden aus der Erweiterung gelesen |
+| Zertifikatsbündel | nur bei Virenscanner oder Firmen-Firewall nötig | die Zertifikate des Systems |
+
+Die Datei `.env` muss dafür nie geöffnet werden – das Programm schreibt sie,
+mit Kommentaren, und lässt eigene Zusätze darin unangetastet. Die Eingabetaste
+behält den gezeigten Wert, ein **Minus** (`-`) löscht ihn.
+
+> Die **E-Mail-Zugangsdaten** werden bevorzugt in der Erweiterung gepflegt
+> (Untermenü „E-Mail-Versand"); der Gateway liest sie von dort. Hier einzutragen
+> sind sie nur, wenn das nicht möglich ist.
 
 > Wer den Gateway vorher in der **Aufgabenplanung** hatte: Beim Einrichten
 > werden solche Einträge gesucht und abgeschaltet. Sonst liefe er doppelt – und
 > es würde zweimal geläutet.
 
-### 3.5 Linux (oder eigener Python-Betrieb)
+### 3.5 Auf eine neue Version wechseln
+
+Die Einrichtung ist einmalig. Bei einer neuen Fassung bleibt alles stehen, was
+schon da ist – Zugangsdaten, bereits ausgelöste Termine und das Protokoll:
+
+1. Programmdatei starten → **7 (Dienst anhalten)**. Windows sperrt die Datei
+   eines laufenden Dienstes; ohne diesen Schritt lässt sie sich nicht ersetzen
+   („Zugriff verweigert").
+2. Die neue `Glockensteuerung-Gateway.exe` über die alte kopieren.
+3. Neue Datei starten → **1**. Sie meldet, was sie vorgefunden hat
+   („Vorhandene Einrichtung gefunden … Nichts davon wird überschrieben"),
+   trägt den Dienst auf die neue Datei ein und startet ihn.
+
+Wer die neue Datei lieber **daneben** legt (anderer Name oder Ordner): Schritt 1
+entfällt, aber **3** ist dann Pflicht – sonst startet Windows weiter die alte
+Fassung. Ob das passiert ist, sagt `--status`: Dort steht eine Warnung, wenn der
+Dienst eine andere Datei benutzt als die gerade gestartete.
+
+### 3.6 Linux (oder eigener Python-Betrieb)
 
 Der Quelltext steckt in „Source code" des
 [neuesten Releases](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest)
@@ -314,7 +355,7 @@ sudo systemctl status voco-gateway      # Log prüfen
 journalctl -u voco-gateway -f           # Live-Log
 ```
 
-### 3.6 Ruhezeit & Sicherheit (empfohlen)
+### 3.7 Ruhezeit & Sicherheit (empfohlen)
 
 In der `.env`:
 
