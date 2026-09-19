@@ -29,6 +29,11 @@
 # stets die Datei des neuesten Releases. Ein eigenes, rollierendes
 # "latest"-Release braucht es dafuer nicht mehr.
 #
+# Ausgeschrieben stehen diese Links im README, nicht mehr in jeder
+# Release-Beschreibung: Dort wiederholten sie bei jeder Version dasselbe und
+# schoben den Changelog - das Einzige, was sich aendert - nach unten aus dem
+# Blick.
+#
 # Aufruf:  release.sh <tag> <zip> [<zip> ...]
 set -euo pipefail
 
@@ -43,20 +48,8 @@ NOTES_FILE="$(mktemp)"
 ARBEIT="$(mktemp -d)"
 trap 'rm -rf "${NOTES_FILE}" "${ARBEIT}"' EXIT
 
-# Der Dauerlink wird in jeder Beschreibung genannt. Auf die Reihenfolge kommt es
-# an: '/releases/latest/download/<datei>' liefert die Datei des NEUESTEN Release,
-# '/releases/download/latest/<datei>' dagegen die eines Release mit dem Tag
-# "latest" - also eine feste, alte Datei. Die beiden Formen sehen fast gleich
-# aus; steht der richtige in jeder Beschreibung, wird der falsche nicht
-# weitergegeben.
-REPO="${GITHUB_REPOSITORY:-}"
-if [ -z "${REPO}" ]; then
-  REPO="$(git remote get-url origin 2>/dev/null \
-    | sed -E 's#^.*github\.com[:/]##; s#\.git$##')"
-fi
-
 {
-  printf 'Automatisch gebauter Stand. Unten liegen zwei Archive:\n\n'
+  printf 'Automatisch gebauter Stand. Unten liegen drei Dateien:\n\n'
   printf '* **glockensteuerung.zip** - die Erweiterung. Unveraendert in ChurchTools\n'
   printf '  hochladen, kein Entpacken noetig.\n'
   printf '* **Glockensteuerung-Gateway.exe** - der Dienst fuer Windows, fertig\n'
@@ -64,15 +57,6 @@ fi
   printf '  danach laeuft er als Windows-Dienst, auch ohne Anmeldung.\n'
   printf '* **glockensteuerung-gateway.zip** - derselbe Dienst als Quelltext,\n'
   printf '  fuer Linux oder eigenen Python-Betrieb (siehe README darin).\n\n'
-  if [ -n "${REPO}" ]; then
-    printf 'Dauerlinks zur jeweils neuesten Fassung (bleiben immer gleich):\n\n'
-    printf '* Erweiterung fuer ChurchTools:\n'
-    printf '  https://github.com/%s/releases/latest/download/glockensteuerung.zip\n' "${REPO}"
-    printf '* Gateway-Dienst fuer Windows (fertige Programmdatei):\n'
-    printf '  https://github.com/%s/releases/latest/download/Glockensteuerung-Gateway.exe\n' "${REPO}"
-    printf '* Gateway-Dienst als Quelltext:\n'
-    printf '  https://github.com/%s/releases/latest/download/glockensteuerung-gateway.zip\n\n' "${REPO}"
-  fi
   # Ab hier beginnt der Changelog. Die Extension zeigt beim Klick auf die
   # Versionsnummer nur den Teil hinter dieser Marke - Einleitung und Dauerlink
   # gehoeren nicht in das Fenster "Was ist neu".
