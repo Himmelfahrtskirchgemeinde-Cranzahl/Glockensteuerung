@@ -79,6 +79,9 @@ KV-Store; der Zugriff auf dieses Modul sollte auf Berechtigte beschränkt werden
 Die Verbindung zum HEW-Broker läuft direkt aus dem Browser per MQTT-over-WSS
 (wie die offizielle HEW-Web-App).
 
+> **Schritt für Schritt, mit Rollenvorschlägen:**
+> [`../ANLEITUNG.md`, Teil 4](../ANLEITUNG.md#teil-4--wer-darf-was-rechte-in-churchtools)
+
 Die Extension nutzt die **vorhandenen ChurchTools-Rechte** des Custom-Modules –
 und zwar **pro Untermenü**. Jedes Untermenü ist eine eigene **Kategorie**, deren
 Rechte ein Admin in der Rechteverwaltung (→ „Glockensteuerung") einzeln vergibt:
