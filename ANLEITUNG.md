@@ -314,6 +314,18 @@ Ausfall – dann kommt die übliche Meldung samt E-Mail.
 
 Die bisherige Programmdatei bleibt als `.alt` liegen, bis die neue läuft.
 
+> **Wie schnell fällt ein Ausfall auf?** Der Dienst hinterlegt alle **40
+> Sekunden** ein Lebenszeichen. Bleibt es **2 Minuten** aus, schaltet die
+> Erweiterung auf „Automatik steht", schreibt es ins Ereignis-Log und schickt
+> die dringende E-Mail. So bleibt noch Zeit, von Hand zu läuten, wenn es kurz
+> vor einem Gottesdienst passiert.
+>
+> Bemerken kann das allerdings nur eine **geöffnete** Seite – die Erweiterung
+> läuft im Browser, nicht auf einem Server. Wer sichergehen will, lässt das
+> Modul auf dem Gemeindebüro-Rechner offen stehen. Unabhängig davon startet
+> Windows den Dienst nach einem Absturz von selbst neu; das ist die
+> eigentliche Absicherung.
+
 Abschalten: **Einstellungen → 7**. Dann gilt der Weg von Hand:
 
 ### 3.6 Von Hand auf eine neue Version wechseln
