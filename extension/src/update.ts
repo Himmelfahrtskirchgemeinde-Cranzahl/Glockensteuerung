@@ -160,6 +160,41 @@ const MARKER = '<!-- changelog -->';
  * nicht braucht. Die Vorlage erzeugt ohnehin nur vier Formen (Version, Gruppe,
  * Bereich, Eintrag); alles andere wird als schlichter Text durchgereicht.
  */
+/**
+ * Überschrift des Abschnitts, der die Erweiterung betrifft.
+ *
+ * Die Release-Beschreibung führt beide Teile getrennt auf. Im Fenster „Was ist
+ * neu" hat der Dienst nichts zu suchen: Wer hier liest, hat gerade die
+ * Erweiterung in ChurchTools aktualisiert und kann mit „der Gateway startet
+ * jetzt schneller" nichts anfangen.
+ */
+const TEIL_ERWEITERUNG = /^##\s+Erweiterung\b/im;
+
+/** Überschrift des Abschnitts, der den Dienst betrifft. */
+const TEIL_GATEWAY = /^##\s+Gateway\b/im;
+
+/** Schneidet den Abschnitt der Erweiterung heraus, wenn es ihn gibt. */
+function nurErweiterung(text: string): string {
+    const treffer = TEIL_ERWEITERUNG.exec(text);
+    if (!treffer) {
+        // Steht dort nur ein Gateway-Teil, bringt diese Fassung für die
+        // Erweiterung nichts Neues. Das gehört gesagt - sonst liest jemand die
+        // Änderungen am Dienst und sucht sie vergeblich in der Oberfläche.
+        if (TEIL_GATEWAY.test(text)) {
+            return 'An der Erweiterung selbst hat sich nichts geändert – diese '
+                + 'Fassung betrifft den Gateway-Dienst auf dem Rechner der Gemeinde.';
+        }
+        return text;                  // ältere Fassung ohne Teile
+    }
+    // Ab der ZEILE nach der Überschrift - sonst bliebe ihr Rest („(in
+    // ChurchTools)") als eigene Zeile im Fenster stehen.
+    const abTreffer = text.slice(treffer.index);
+    const zeilenende = abTreffer.indexOf('\n');
+    const ab = zeilenende >= 0 ? abTreffer.slice(zeilenende + 1) : '';
+    const naechster = ab.search(/^##\s+/m);
+    return naechster >= 0 ? ab.slice(0, naechster) : ab;
+}
+
 export function parseChangelog(md: string): ChangelogZeile[] {
     let text = String(md ?? '');
     // Neue Form: Der Changelog steht oben, die Endmarke schließt ihn ab.
@@ -181,15 +216,30 @@ export function parseChangelog(md: string): ChangelogZeile[] {
         if (h > 0) text = text.slice(h);
     }
 
+    text = nurErweiterung(text);
+    const tiefeMitVersionen = /^####\s+/m.test(text);
+
     const raus: ChangelogZeile[] = [];
     for (const roh of text.split(/\r?\n/)) {
         const zeile = roh.trimEnd();
         if (!zeile.trim()) continue;
         // Sterne der Auszeichnung entfernen – sie werden nicht gerendert.
-        const ohneFett = (t: string) => t.replace(/\*\*/g, '').trim();
+        // Auszeichnungen entfernen - sie werden nicht gerendert und stuenden
+        // sonst als Sternchen und Unterstriche im Text.
+        const ohneFett = (t: string) => t.replace(/\*\*/g, '').replace(/(^|\s)_|_(\s|$)/g, '$1$2').trim();
 
-        if (/^##\s+/.test(zeile)) { raus.push({ art: 'version', text: ohneFett(zeile.replace(/^##\s+/, '')) }); continue; }
-        if (/^###\s+/.test(zeile)) { raus.push({ art: 'gruppe', text: ohneFett(zeile.replace(/^###\s+/, '')) }); continue; }
+        // Reihenfolge: erst die tiefste Ebene prüfen, sonst schluckt `##`
+        // jede Überschrift.
+        if (/^####\s+/.test(zeile)) { raus.push({ art: 'gruppe', text: ohneFett(zeile.replace(/^#+\s+/, '')) }); continue; }
+        if (/^###\s+/.test(zeile)) {
+            // Seit 26.10 gliedert die Beschreibung nach Version (###) und
+            // darunter nach Gruppe (####). Vorher war ### die Gruppe - daran
+            // zu erkennen, dass es gar keine vierte Ebene gibt.
+            raus.push({ art: tiefeMitVersionen ? 'version' : 'gruppe',
+                        text: ohneFett(zeile.replace(/^#+\s+/, '')) });
+            continue;
+        }
+        if (/^##\s+/.test(zeile)) { raus.push({ art: 'version', text: ohneFett(zeile.replace(/^#+\s+/, '')) }); continue; }
         // Eingerückter Punkt = Eintrag, Punkt am Zeilenanfang = Bereich.
         const punkt = /^(\s*)[*-]\s+(.*)$/.exec(zeile);
         if (punkt) {

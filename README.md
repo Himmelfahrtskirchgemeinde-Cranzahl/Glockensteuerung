@@ -97,8 +97,17 @@ Changelog: <Art> | <Bereich> | <Satz für Anwender>
 ```
 
 - **Art:** `Verbesserung`, `Fehler` oder `Löschung`
-- **Bereich:** frei, z. B. `Allgemein`, `Steuerung`, `Automatik`, `Gerät`,
-  `Gateway`, `Installation`
+- **Bereich:** entscheidet zugleich, in welchen **Teil** der Eintrag kommt:
+
+  | Teil | Bereiche |
+  |---|---|
+  | Gateway (Dienst auf dem Rechner) | `Automatik`, `Gateway`, `Dienst`, `Installation`, `E-Mail`, `Postausgang` |
+  | Erweiterung (in ChurchTools) | alles andere, z. B. `Steuerung`, `Gerät`, `Regeln`, `Allgemein` |
+
+  Die Release-Beschreibung führt beide Teile getrennt auf, und das Fenster
+  „Was ist neu" in ChurchTools zeigt nur den Teil der Erweiterung. Ein neuer
+  Bereich, der zum Gateway gehört, muss in `changelog.sh` ergänzt werden –
+  sonst landet er beim falschen Teil.
 - **Satz:** was sich für die Anwender ändert, nicht was am Code geschah
 
 Beispiel:
@@ -117,8 +126,12 @@ eines Pull Requests lässt sich der Changelog vorab ansehen:
 
 Eine **Korrektur** ergänzt den Changelog der letzten Funktionsversion, eine
 **Neuerung** fängt ihn frisch an – das entscheidet `changelog.sh` selbst anhand
-der Art der Einträge. In der Release-Beschreibung steht nur der Changelog; was
-welche Datei tut, steht hier und nicht in jeder Version aufs Neue.
+der Art der Einträge. Gezeigt wird dabei **jede Version unter ihrer eigenen
+Nummer**, sodass zu sehen ist, was in welcher Fassung kam.
+
+In der Release-Beschreibung steht nur der Changelog; was welche Datei tut,
+steht hier und nicht in jeder Version aufs Neue. Kommt eine Datei dazu oder
+fällt eine weg, steht das unter `## Dateien` – nur dann.
 
 ## Dokumentation gehört zum Pull Request
 
