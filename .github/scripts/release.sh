@@ -21,6 +21,11 @@
 # an jedes Release ohnehin "Source code" an, und darin steckt der Ordner
 # gateway/ vollstaendig. Zwei Wege zum selben Quelltext verwirren nur.
 #
+# In der BESCHREIBUNG steht nur der Changelog - und, falls eine Datei dazukommt
+# oder wegfaellt, dieser eine Unterschied. Was welche Datei tut, steht im README
+# und aendert sich nicht von Version zu Version; in einer Release-Beschreibung
+# verstellte es nur den Blick auf das, was neu ist.
+#
 # Ohne Versionsnummer im Dateinamen: Das Release heisst "Version 26.6.7", damit
 # ist die Zuordnung eindeutig. Zwei Dateien mit demselben Inhalt und nur anderem
 # Namen danebenzulegen, brachte niemandem etwas. Die gebauten Archive tragen die
@@ -51,20 +56,52 @@ NOTES_FILE="$(mktemp)"
 ARBEIT="$(mktemp -d)"
 trap 'rm -rf "${NOTES_FILE}" "${ARBEIT}"' EXIT
 
+# Welche Dateien trug das vorherige Release? Kommt eine dazu oder faellt eine
+# weg, ist das eine Aenderung wie jede andere - und die einzige Angabe zu den
+# Dateien, die in einer Release-Beschreibung etwas zu suchen hat. Die immer
+# gleiche Aufzaehlung, was welche Datei tut, stand frueher hier und half
+# niemandem: Wer aktualisiert, will wissen, was sich geaendert hat.
+vorheriger_tag() {
+  git tag -l 'v*' --sort=-v:refname \
+    | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+    | grep -A1 -x -F "$1" | tail -n +2 | head -1 || true
+}
+
+JETZT_NAMEN="$(for d in "${DATEIEN[@]}"; do basename "${d}"; done | sort -u)"
+VORHER="$(vorheriger_tag "${TAG}")"
+VORHER_NAMEN=""
+if [ -n "${VORHER}" ]; then
+  VORHER_NAMEN="$(gh release view "${VORHER}" --json assets \
+    --jq '.assets[].name' 2>/dev/null | sort -u || true)"
+fi
+
+DAZU=""
+WEG=""
+if [ -n "${VORHER_NAMEN}" ]; then
+  DAZU="$(comm -23 <(printf '%s\n' "${JETZT_NAMEN}") <(printf '%s\n' "${VORHER_NAMEN}") || true)"
+  WEG="$(comm -13 <(printf '%s\n' "${JETZT_NAMEN}") <(printf '%s\n' "${VORHER_NAMEN}") || true)"
+fi
+
 {
-  printf 'Automatisch gebauter Stand. Unten liegen zwei Dateien:\n\n'
-  printf '* **glockensteuerung.zip** - die Erweiterung. Unveraendert in ChurchTools\n'
-  printf '  hochladen, kein Entpacken noetig.\n'
-  printf '* **Glockensteuerung-Gateway.exe** - der Dienst fuer Windows, fertig\n'
-  printf '  gebaut. Neben die vorhandene .env legen, Doppelklick, "1" waehlen -\n'
-  printf '  danach laeuft er als Windows-Dienst, auch ohne Anmeldung.\n\n'
-  printf 'Wer den Dienst unter Linux oder mit eigenem Python betreiben will,\n'
-  printf 'nimmt "Source code" ganz unten - der Ordner gateway/ steckt darin.\n\n'
-  # Ab hier beginnt der Changelog. Die Extension zeigt beim Klick auf die
-  # Versionsnummer nur den Teil hinter dieser Marke - Einleitung und Dauerlink
-  # gehoeren nicht in das Fenster "Was ist neu".
-  printf '<!-- changelog -->\n\n'
+  # Nur der Changelog. Er ist das, worum es in einem Release geht.
   bash "${HIER}/changelog.sh" "${TAG}"
+  if [ -n "${DAZU}" ] || [ -n "${WEG}" ]; then
+    printf '\n### Dateien\n\n'
+    while IFS= read -r name; do
+      [ -n "${name}" ] || continue
+      printf '* **Neu:** `%s`\n' "${name}"
+    done <<< "${DAZU}"
+    while IFS= read -r name; do
+      [ -n "${name}" ] || continue
+      printf '* **Entfällt:** `%s`\n' "${name}"
+    done <<< "${WEG}"
+  fi
+  # Hier endet der Changelog. Die Extension zeigt beim Klick auf die
+  # Versionsnummer den Teil VOR dieser Marke. Sie bleibt stehen, auch wenn
+  # danach nichts mehr folgt: Ohne sie muesste die Extension raten, wo der
+  # Changelog anfaengt - und schnitte die einleitende Zeile einer
+  # Korrektur-Version mit ab.
+  printf '\n<!-- changelog-ende -->\n'
 } > "${NOTES_FILE}"
 
 # Die Versionsnummer aus dem Dateinamen nehmen: Nur unter festem Namen bleibt der
