@@ -70,9 +70,38 @@ PGS-Namen können Steuerbytes statt Umlauten enthalten (Mapping aus dem JS):
 > 24, 25, … 29, 30, 31 weiterzählt, trifft bei den letzten beiden daneben.
 
 Die Namen kommen als rohe Bytes. Gelesen werden sie **Byte für Byte**
-(Latin-1), weil die Längenangaben im Listenformat Bytes zählen – erst der
-fertig geschnittene Name wird als UTF-8 gelesen, falls er gültiges UTF-8
-ergibt.
+(Latin-1), weil die Längenangaben im Listenformat Bytes zählen. Erst der fertig
+geschnittene Name wird zurechtgerückt, und zwar in dieser Reihenfolge:
+
+1. **UTF-8**, wenn die Bytefolge als solche aufgeht.
+2. **DOS (CP437/CP850)**, sobald ein Byte aus `0x80`–`0x9F` vorkommt.
+3. Sonst bleibt es bei **Latin-1**.
+
+### Umlaute kommen als DOS-Bytes
+
+Die Steuerbyte-Tabelle oben ist nicht der einzige Weg, auf dem Umlaute
+ankommen. In der Praxis schickt die Anlage sie im **DOS-Zeichensatz**:
+
+| Zeichen | Byte | | Zeichen | Byte |
+|---|---|---|---|---|
+| `Ä` | `0x8E` | | `ä` | `0x84` |
+| `Ö` | `0x99` | | `ö` | `0x94` |
+| `Ü` | `0x9A` | | `ü` | `0x81` |
+| `ß` | `0xE1` | | | |
+
+„TESTLÄUTEN" kommt also als `TESTL` + `0x8E` + `UTEN` an. In Latin-1 ist `0x8E`
+ein **unsichtbares Steuerzeichen** – die Anzeige zeigte deshalb ein leeres
+Kästchen, obwohl der Name vollständig übertragen wurde.
+
+Der Bereich `0x80`–`0x9F` ist der verlässliche Fingerzeig: Dort stehen in
+Latin-1 ausschließlich Steuerzeichen, die in einem Programmnamen nie vorkommen.
+Taucht eines auf, ist der Text DOS-kodiert. CP437 und CP850 sind in diesem
+Bereich identisch, ebenso beim `ß` – sie müssen also nicht auseinandergehalten
+werden.
+
+Bleibt trotzdem ein Zeichen übrig, das sich nicht zuordnen lässt, nennt das
+Ereignis-Log seinen Zahlenwert. Dann lässt sich die Tabelle gezielt ergänzen,
+statt erneut zu raten.
 → **Zum Anzeigen** dekodieren, **zum Senden** den **rohen** Namen (wie empfangen)
 unverändert verwenden. Der Referenz-Client macht genau das.
 

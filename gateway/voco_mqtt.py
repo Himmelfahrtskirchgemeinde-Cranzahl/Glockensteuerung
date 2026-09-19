@@ -54,19 +54,32 @@ DECODE = {0x24: ":", 0x25: "ß", 0x26: "Ä", 0x27: "Ö",
 
 
 def _als_text(roh: str) -> str:
-    """Umlaute richtigstellen, falls die Anlage UTF-8 spricht.
+    """Umlaute richtigstellen - egal, welchen Zeichensatz die Anlage spricht.
 
     Gelesen wird zuerst latin-1 (ein Byte = ein Zeichen), weil die
-    Laengenangaben im Listenformat Bytes zaehlen. Ergibt dieselbe Bytefolge
-    gueltiges UTF-8 mit Zeichen jenseits von ASCII, war sie UTF-8 - anders
-    kommt so eine Folge praktisch nicht zustande.
+    Laengenangaben im Listenformat Bytes zaehlen. Danach der Reihe nach:
+
+    1. UTF-8, wenn die Folge als solches aufgeht.
+    2. DOS (cp850), sobald ein Zeichen aus 0x80-0x9F auftaucht. Genau so
+       schickt die Anlage ihre Umlaute: "TESTLAEUTEN" kommt als TESTL + 0x8E +
+       UTEN an. In latin-1 ist 0x8E ein unsichtbares Steuerzeichen - die
+       Anzeige blieb deshalb leer. Der Bereich 0x80-0x9F ist der verlaessliche
+       Fingerzeig: Dort stehen in latin-1 nur Steuerzeichen, die in einem
+       Programmnamen nie vorkommen.
+    3. Sonst bleibt es bei latin-1.
     """
     if all(ord(c) < 0x80 for c in roh):
         return roh
     try:
         return roh.encode("latin-1").decode("utf-8")
     except Exception:
-        return roh
+        pass
+    if any(0x80 <= ord(c) <= 0x9F for c in roh):
+        try:
+            return roh.encode("latin-1").decode("cp850")
+        except Exception:
+            pass
+    return roh
 
 
 def decode_name(raw: str) -> str:
