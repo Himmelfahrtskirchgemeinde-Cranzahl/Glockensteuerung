@@ -626,11 +626,25 @@ function setDuration(displayName: string, minutes: number) {
     store.saveDurations(map).catch((e) => handleError('saveDurations', e));
 }
 
-/** Log als Textdatei herunterladen; optional auf Zeitraum [von,bis] eingegrenzt. */
-function downloadLog() {
+/**
+ * Log als Textdatei herunterladen; optional auf Zeitraum [von,bis] eingegrenzt.
+ *
+ * Geladen wird dafür der GANZE gespeicherte Bestand, nicht nur die angezeigten
+ * Zeilen: In ChurchTools liegen mehrere Wochen, auf dem Bildschirm stehen die
+ * neuesten. Wer eine Datei für den letzten Monat zieht, will sie vollständig.
+ */
+async function downloadLog() {
     const from = dlFrom.value ? new Date(dlFrom.value).getTime() : -Infinity;
     const to = dlTo.value ? new Date(dlTo.value).getTime() : Infinity;
-    const rows = alleLogZeilen.value
+    let bestand = alleLogZeilen.value;
+    try {
+        bestand = ohneDoppelte(logLines.value, zuZeilen(await store.loadLog(Infinity)),
+                               gatewayEreignisse.value);
+    } catch {
+        // Nicht ladbar -> die angezeigten Zeilen tun es auch. Eine Datei mit
+        // dem, was da ist, hilft mehr als eine Fehlermeldung.
+    }
+    const rows = bestand
         .filter((e) => e.ts.getTime() >= from && e.ts.getTime() <= to)
         .slice()
         .reverse()
