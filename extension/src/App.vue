@@ -444,14 +444,16 @@ function gatewayZustandMelden() {
     const erster = gatewayZuletztGesehen === null;
     gatewayZuletztGesehen = steht;
     if (erster) {
+        // Kein „Antwort"-Zeichen (◀): Das steht für echtes Läuten. Ob die
+        // Automatik erreichbar ist, ist eine Information über den Betrieb.
         pushLog(steht
             ? `Automatik meldet sich nicht. ${gatewayDownText.value}`
-            : `Automatik läuft. ${gatewayDownText.value}`, steht ? 'gw' : 'in', true);
+            : `Automatik läuft. ${gatewayDownText.value}`, steht ? 'gw' : 'info', true);
         return;
     }
     pushLog(steht
         ? `Automatik antwortet nicht mehr. ${gatewayDownText.value}`
-        : 'Automatik meldet sich wieder.', steht ? 'gw' : 'in');
+        : 'Automatik meldet sich wieder.', steht ? 'gw' : 'info');
     if (steht) {
         void stoerungMelden(
             'Die Automatik antwortet nicht mehr',
@@ -480,7 +482,10 @@ async function refreshGatewayStatus() {
         gatewayEreignisse.value = roh
             .map((e) => ({
                 ts: new Date(e.at),
-                dir: (e.art === 'an' ? 'in' : e.art === 'aus' ? 'gw' : 'info') as LogDir,
+                // 'an' ist eine hergestellte Verbindung, kein Läuten - deshalb
+                // das Informationszeichen. Nur der Ausfall ('aus') bekommt das
+                // Warnzeichen, damit er zwischen den übrigen Zeilen auffällt.
+                dir: (e.art === 'aus' ? 'gw' : 'info') as LogDir,
                 line: e.text,
             }))
             .filter((e) => Number.isFinite(e.ts.getTime()));
@@ -786,20 +791,29 @@ const logIcon = (d: string) =>
 
 /** Steuerung zeigt nur ausgedünnte, wichtige Ereignisse: die eigenen Befehle
  *  (Läuten, Stoppen), echtes Läuten (Start/Ende), Simulationswechsel und
- *  Verbindungs-Infos (z. B. neu verbunden). Der ausführliche Verlauf (inkl.
- *  Status- und Katalog-Meldungen) steht im Ereignis-Log.
+ *  Verbindungs-Infos (z. B. neu verbunden) und Ausfälle der Automatik. Der
+ *  ausführliche Verlauf (inkl. Status- und Katalog-Meldungen) steht im
+ *  Ereignis-Log.
+ *
+ *  Gelesen wird aus ALLEN Quellen, nicht nur aus dieser Sitzung: Was der Dienst
+ *  nachts festgehalten hat, gehört am Morgen auf die Startseite - sonst müsste
+ *  man erst ins Log wechseln, um zu sehen, dass etwas war.
  *
  *  „out" MUSS dabei sein: Das sind die gesendeten Befehle – also genau das, was
  *  der Bedienende gerade getan hat. Ohne sie blieb das Läuten und Stoppen hier
  *  unsichtbar, und zwar ausgerechnet im scharfen Betrieb: In der Simulation
  *  wird stattdessen „sim" geloggt, das war zu sehen. */
 const steuerungLog = computed(() =>
-    logLines.value.filter(
+    alleLogZeilen.value.filter(
         (e) =>
             e.dir === 'in' ||
             e.dir === 'out' ||
             e.dir === 'sim' ||
-            (e.dir === 'info' && /verbind|verbunden|unterbroch|broker|fehler/i.test(e.line)),
+            // Ausfälle der Automatik gehören hierher, und zwar dringend: Sie
+            // fehlten bisher ganz, weil der Filter ihre Kennzeichnung nicht
+            // kannte - ausgerechnet die Zeile, wegen der man hinsieht.
+            e.dir === 'gw' ||
+            (e.dir === 'info' && /verbind|verbunden|unterbroch|broker|fehler|automatik/i.test(e.line)),
     ),
 );
 
@@ -1084,7 +1098,7 @@ async function loadNextRingings() {
             <!-- Ereignis-Log (abgespeckt) – voller Log unter „Ereignis-Log" -->
             <section v-if="steuerungLog.length" class="gs-card">
               <div class="gs-head"><h2>Letzte Ereignisse</h2><span class="gs-spacer"></span>
-                <span class="gs-count">ℹ Info · ▶ Befehl · ◀ Läuten · ⚙ Simulation</span>
+                <span class="gs-count">ℹ Info · ▶ Befehl · ◀ Läuten · ⚙ Simulation · ⚠ Automatik</span>
                 <button v-if="canView('log')" class="gs-btn gs-ghost sm" style="margin-left:10px" @click="view = 'log'">Ganzes Log</button></div>
               <div class="gs-body">
                 <div class="gs-log" style="max-height:160px">
