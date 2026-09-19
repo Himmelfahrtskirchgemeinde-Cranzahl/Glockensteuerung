@@ -218,13 +218,27 @@ class Voco:
             log.warning("Zustandsmeldung fehlgeschlagen: %s", e)
 
     def _on_message(self, client, userdata, msg):
-        topic = msg.topic[len(self.base):]  # fuehrendes Basis-Topic abschneiden
-        payload = msg.payload.decode("latin1", "replace")
-        if topic == "/connection":
-            self.online = (payload == "1")
-        elif topic == "/sendpgsD":
-            self._parse_pgs_list(payload)
-            self._got_list = True
+        # Wie bei _melde_zustand laeuft auch das hier im Netzwerk-Faden von
+        # paho. Eine Ausnahme landete dort, wo sie niemand faengt - und im
+        # schlimmsten Fall stuende die Verbindung danach still, ohne dass es
+        # jemandem auffiele: Der Dienst gilt weiter als verbunden, erfaehrt
+        # aber nichts mehr von der Anlage.
+        #
+        # Mitgehoert wird ALLES unter der eigenen Adresse (das Abonnement
+        # endet auf '/#'), also auch das, was andere schicken - die Anlage,
+        # die Erweiterung im Browser oder die App des Herstellers. Worauf man
+        # da trifft, hat man nicht in der Hand.
+        try:
+            topic = msg.topic[len(self.base):]  # fuehrendes Basis-Topic abschneiden
+            payload = msg.payload.decode("latin1", "replace")
+            if topic == "/connection":
+                self.online = (payload == "1")
+            elif topic == "/sendpgsD":
+                self._parse_pgs_list(payload)
+                self._got_list = True
+        except Exception as e:
+            log.warning("Nachricht von der Anlage nicht verarbeitbar (%s): %s",
+                        getattr(msg, "topic", "?"), e)
 
     # --- Befehle ---
     def _pub(self, subtopic, payload):

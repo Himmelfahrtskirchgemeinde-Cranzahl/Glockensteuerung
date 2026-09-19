@@ -136,6 +136,19 @@ export interface GatewayStatus {
      * angekündigte Neustart — und darf keine Störungsmeldung auslösen.
      */
     updateBis?: string;
+    /**
+     * Bis wann der Dienst gerade neu aufbaut (ISO).
+     *
+     * Er setzt das, wenn ihm etwas dazwischengekommen ist – die Verbindung zur
+     * Anlage, zu ChurchTools oder zum Netz – und er gleich einen neuen Anlauf
+     * nimmt. Der Wiederanlauf dauert 15 Sekunden bis 5 Minuten; gemeldet wird
+     * ein Ausfall aber schon nach zwei. Ohne diese Angabe stünde also bei jedem
+     * Aussetzer „Automatik steht" samt E-Mail, obwohl der Dienst läuft und sich
+     * gerade selbst hilft.
+     */
+    pauseBis?: string;
+    /** Warum er neu aufbaut – für die Anzeige, ungekürzt im Log. */
+    grund?: string;
 }
 
 /**

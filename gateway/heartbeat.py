@@ -32,7 +32,8 @@ class Heartbeat:
         self._failing = False
 
     def send(self, *, rules: int, simulation: bool, device: str, mail: bool = False,
-             update_bis: dt.datetime | None = None) -> bool:
+             update_bis: dt.datetime | None = None,
+             pause_bis: dt.datetime | None = None, grund: str = "") -> bool:
         """Schreibt einen Schlag. Gibt zurueck, ob es geklappt hat.
 
         Wirft NIE - ein fehlendes Lebenszeichen darf den Laeutebetrieb nicht
@@ -53,6 +54,15 @@ class Heartbeat:
         # - ein geplanter Neustart ist keiner.
         if update_bis is not None:
             payload["updateBis"] = update_bis.isoformat(timespec="seconds")
+        # Der Dienst baut gerade neu auf. Auch das ist angekuendigtes Schweigen:
+        # Er lebt, hat aber die Verbindung verloren und wartet auf den naechsten
+        # Versuch. Ohne diese Angabe sah die Erweiterung nur, dass kein
+        # Lebenszeichen mehr kommt, und meldete einen Ausfall - samt E-Mail -,
+        # waehrend der Dienst laengst wieder hochkam.
+        if pause_bis is not None:
+            payload["pauseBis"] = pause_bis.isoformat(timespec="seconds")
+            if grund:
+                payload["grund"] = grund[:200]
         try:
             self.kv.schreiben(SCHLUESSEL, payload)
             if self._failing:

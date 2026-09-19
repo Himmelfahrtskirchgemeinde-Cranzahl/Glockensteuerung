@@ -118,10 +118,25 @@ const gatewayAktualisiert = computed(() => {
     const t = new Date(bis).getTime();
     return Number.isFinite(t) && now.value < t;
 });
+/**
+ * Baut der Dienst gerade neu auf?
+ *
+ * Auch das ist angekündigtes Schweigen: Ihm ist etwas dazwischengekommen, er
+ * wartet auf den nächsten Anlauf und hat gesagt, bis wann. Der Wiederanlauf
+ * dauert 15 Sekunden bis 5 Minuten – gemeldet würde ein Ausfall schon nach
+ * zwei. Ohne diese Ausnahme stünde bei jedem Aussetzer „Automatik steht",
+ * samt E-Mail, obwohl der Dienst läuft und sich gerade selbst hilft.
+ */
+const gatewayBautNeuAuf = computed(() => {
+    const bis = gatewayStatus.value?.pauseBis;
+    if (!bis) return false;
+    const t = new Date(bis).getTime();
+    return Number.isFinite(t) && now.value < t;
+});
 
 /** Kein Lebenszeichen oder zu altes -> Automatik läuft nicht. */
 const gatewayDown = computed(() =>
-    hasAutomation.value && !gatewayAktualisiert.value
+    hasAutomation.value && !gatewayAktualisiert.value && !gatewayBautNeuAuf.value
     && (gatewayAgeMin.value === null || gatewayAgeMin.value > GATEWAY_STALE_MIN),
 );
 /**
@@ -135,6 +150,10 @@ const gatewayBekannt = computed(() => hasAutomation.value || gatewayStatus.value
 /** Was im Tooltip des Kennzeichens steht. */
 const gatewayPillTitel = computed(() => {
     if (gatewayAktualisiert.value) return 'Der Dienst startet gerade mit einer neuen Fassung neu.';
+    if (gatewayBautNeuAuf.value) {
+        const g = gatewayStatus.value?.grund;
+        return 'Der Dienst baut die Verbindung gerade neu auf.' + (g ? ` Grund: ${g}` : '');
+    }
     if (gatewayDown.value) return `Die Automatik meldet sich nicht. ${gatewayDownText.value}`;
     const s = gatewayStatus.value;
     const teile = [gatewayDownText.value];
@@ -496,6 +515,9 @@ function gatewayZustandMelden() {
     // Log noch per E-Mail. Das ist der Kern der Sache: Ein geplanter Neustart
     // darf sich nicht wie ein Ausfall anfühlen.
     if (gatewayAktualisiert.value) return;
+    // Dasselbe gilt für den Wiederanlauf: Der Dienst hat gesagt, dass er gleich
+    // wieder da ist. Das ist keine Störung, sondern seine Selbsthilfe.
+    if (gatewayBautNeuAuf.value) return;
     const steht = gatewayDown.value;
     if (gatewayZuletztGesehen === steht) return;
     const erster = gatewayZuletztGesehen === null;
@@ -1032,9 +1054,9 @@ async function loadNextRingings() {
         <!-- Zweites Kennzeichen: Das Gerät kann online sein, während die
              Automatik längst steht - dann läutet von allein trotzdem nichts. -->
         <span v-if="gatewayBekannt" class="gs-pill"
-              :class="gatewayAktualisiert ? 'blue' : (gatewayDown ? 'warn' : 'ok')"
+              :class="(gatewayAktualisiert || gatewayBautNeuAuf) ? 'blue' : (gatewayDown ? 'warn' : 'ok')"
               :title="gatewayPillTitel"><span class="dot"></span>
-          <span class="ptxt">Automatik </span>{{ gatewayAktualisiert ? 'aktualisiert' : (gatewayDown ? 'steht' : 'läuft') }}</span>
+          <span class="ptxt">Automatik </span>{{ gatewayAktualisiert ? 'aktualisiert' : (gatewayBautNeuAuf ? 'verbindet neu' : (gatewayDown ? 'steht' : 'läuft')) }}</span>
         <button class="gs-btn gs-ghost" @click="requestSync">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg><span class="btxt">Aktualisieren</span></button>
         <span class="gs-vdiv"></span>
