@@ -39,6 +39,7 @@ from heartbeat import Heartbeat, mask_serial
 from notify import EmailNotifier
 import outbox
 import pfade
+import sperre
 from voco_mqtt import Voco, decode_name
 
 HORIZON_HOURS = 26          # so weit im Voraus planen
@@ -446,6 +447,17 @@ def main(argv: list[str] | None = None):
     sim_env = os.environ.get("VOCO_SIMULATION", "").strip().lower() in ("1", "true", "yes", "on")
     dry = args.dry_run or sim_env
 
+    # Erst sichern, dass kein zweiter Gateway laeuft. Zwei gleichzeitig loesen
+    # dasselbe Gelaeut zweimal aus - und das faellt nicht im Protokoll auf,
+    # sondern im Dorf.
+    if not sperre.belegen():
+        log.error("Es laeuft bereits ein Gateway auf diesem Rechner. Dieser Start "
+                  "wird beendet, damit nicht doppelt gelaeutet wird.")
+        log.error("Laeuft noch eine alte Einrichtung? Eine Aufgabe in der "
+                  "Aufgabenplanung oder ein von Hand gestartetes 'python "
+                  "scheduler.py' sind die haeufigsten Gruende.")
+        return
+
     log.info("Glockensteuerung-Gateway %s startet.", pfade.version())
     log.info("Programmordner: %s", pfade.programmordner())
     log.info("Konfiguration: %s", env or "KEINE .env gefunden")
@@ -456,7 +468,10 @@ def main(argv: list[str] | None = None):
     notifier = EmailNotifier()
     log.addHandler(notifier.log_handler())
 
-    dienstschleife(dry, notifier)
+    try:
+        dienstschleife(dry, notifier)
+    finally:
+        sperre.freigeben()
 
 
 if __name__ == "__main__":

@@ -89,6 +89,18 @@ Sie braucht kein Python und keine virtuelle Umgebung.
 3. Die Windows-Abfrage nach Administratorrechten bestätigen – die braucht es
    für das Anlegen des Dienstes.
 
+Beim Einrichten wird nach dem **Ordner** gefragt, in dem die Datei dauerhaft
+liegen soll – dieser Pfad landet im Dienst. Liegt sie im Download-, Desktop-
+oder Temp-Ordner, schlägt das Programm `C:\Glockensteuerung` vor und nimmt
+`.env` und `state.json` mit. Aus solchen Ordnern wird aufgeräumt; der Dienst
+zeigte danach ins Leere und schwiege, ohne dass jemand einen Zusammenhang sieht.
+
+Beim Installieren entsteht dabei alles, was gebraucht wird: der Ordner (falls
+er noch nicht da ist), die Programmdatei darin, die `.env` mit den
+Zugangsdaten, der Windows-Dienst – und eine Verknüpfung **„Glockensteuerung"**
+im Startmenü, über die sich Einstellungen, Status und Protokoll später
+jederzeit öffnen lassen.
+
 Das war alles. Der Dienst steht danach in `services.msc` als
 **Glockensteuerung Gateway** und
 
@@ -128,6 +140,31 @@ würde zweimal geläutet.
 > geschützt“. Das liegt daran, dass die Datei nicht mit einem gekauften
 > Zertifikat signiert ist. Über *Weitere Informationen → Trotzdem ausführen*
 > geht es weiter.
+
+### Was den Dienst nicht stört
+
+Er läuft als `LocalSystem` und hängt an keiner Benutzersitzung:
+
+| Vorgang | Dienst läuft weiter |
+|---|---|
+| Niemand angemeldet (nach dem Hochfahren) | ja |
+| Abmelden, Benutzerwechsel, neuer Benutzer | ja |
+| Rechner sperren (Win+L) | ja |
+| Bildschirm aus | ja |
+| **Energiesparmodus / Ruhezustand** | **nein** |
+
+Die letzte Zeile ist die einzige echte Lücke: Ein schlafender Rechner läutet
+nicht. Beim Einrichten wird deshalb geprüft, ob er im Netzbetrieb von selbst
+schlafen geht, und angeboten, das abzuschalten (`powercfg`). `--status` weist
+später erneut darauf hin, falls es doch eingeschaltet ist.
+
+### Nur ein Gateway zur selben Zeit
+
+Beim Start belegt der Dienst eine systemweite Sperre. Ein zweiter Gateway –
+eine übriggebliebene Aufgabe in der Aufgabenplanung, ein von Hand gestartetes
+`python scheduler.py`, ein zweites Fenster – zieht sich zurück und schreibt den
+Grund ins Protokoll. Ohne das löst dasselbe Geläut zweimal aus, und das fällt
+nicht im Protokoll auf, sondern im Dorf.
 
 ### Warum ein Dienst und keine Aufgabenplanung
 
@@ -189,6 +226,7 @@ WantedBy=multi-user.target
 | `windienst.py` | meldet den Gateway als Windows-Dienst an |
 | `pfade.py` | findet `.env`, Zustand und Protokoll neben dem Programm |
 | `einrichtung.py` | Einstellungsmenü: fragt ab, prüft und schreibt die `.env` |
+| `sperre.py` | verhindert, dass zwei Gateways gleichzeitig läuten |
 | `kv.py` | gemeinsamer Zugriff auf den Speicher der Extension |
 | `heartbeat.py` | Lebenszeichen alle 2 Minuten nach ChurchTools |
 | `ereignisse.py` | hält Verbindungen und Ausfälle im Ereignis-Log fest |
