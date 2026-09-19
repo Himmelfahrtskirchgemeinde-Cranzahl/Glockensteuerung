@@ -56,7 +56,7 @@ Diese drei Links liefern stets die **neueste** veröffentlichte Fassung – sie
 |---|---|
 | Erweiterung für ChurchTools | [`glockensteuerung.zip`](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest/download/glockensteuerung.zip) |
 | Gateway-Dienst für Windows (fertig gebaut) | [`Glockensteuerung-Gateway.exe`](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest/download/Glockensteuerung-Gateway.exe) |
-| Gateway-Dienst als Quelltext | [`glockensteuerung-gateway.zip`](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest/download/glockensteuerung-gateway.zip) |
+| Gateway-Dienst als Quelltext (Linux, eigenes Python) | „Source code" im [neuesten Release](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest) – der Ordner `gateway/` steckt darin |
 
 Welche Version dahintersteckt, sagt der Titel des
 [neuesten Releases](https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung/releases/latest).

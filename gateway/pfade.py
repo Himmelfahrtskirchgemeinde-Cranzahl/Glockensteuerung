@@ -115,7 +115,18 @@ def protokolldatei() -> str:
 
 
 def version() -> str:
-    """Versionsnummer aus der Datei VERSION im Archiv, sonst '(unbekannt)'."""
+    """Welcher Stand laeuft hier?
+
+    In der fertigen Programmdatei steckt die Nummer als Modul 'version' - beim
+    Bauen hineingeschrieben. Im Quelltextbetrieb gibt es das Modul nicht; dann
+    wird eine Datei VERSION gesucht, wie sie frueher im Archiv lag.
+    """
+    try:
+        from version import VERSION       # nur in der gebauten Programmdatei
+        if VERSION:
+            return str(VERSION)
+    except Exception:
+        pass
     pfad = finde("VERSION")
     if pfad:
         try:

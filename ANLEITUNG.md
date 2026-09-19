@@ -225,7 +225,7 @@ Weiter bei **3.5 Dauerbetrieb einrichten** – die Programmdatei erledigt den Re
 #### Linux oder eigener Python-Betrieb
 
 ```bash
-# Projekt holen (oder als ZIP von GitHub herunterladen)
+# Projekt holen (oder „Source code" aus dem neuesten Release herunterladen)
 git clone https://github.com/Himmelfahrtskirchgemeinde-Cranzahl/Glockensteuerung.git
 cd Glockensteuerung/gateway
 
