@@ -62,12 +62,24 @@ const calendars = ref<{ id: number; name: string }[]>([]);
 const email = ref<EmailConfig>(newEmailConfig());
 const emailGeladen = ref(false);
 const nextRingings = ref<Array<{ when: Date; program: string; source: string }>>([]);
-/** Letztes Lebenszeichen des Gateway-Dienstes (schreibt er alle 2 Minuten). */
+/** Letztes Lebenszeichen des Gateway-Dienstes (schreibt er alle 40 Sekunden). */
 const gatewayStatus = ref<GatewayStatus | null>(null);
-/** Ab wann gilt der Dienst als weg? Er meldet sich alle 2 min – 10 min sind großzügig. */
-const GATEWAY_STALE_MIN = 10;
-/** So oft das Lebenszeichen nachgeladen wird (der Dienst schreibt alle 2 min). */
-const GATEWAY_POLL_MS = 120000;
+/**
+ * Ab wann gilt der Dienst als weg?
+ *
+ * Zwei Minuten – vorher waren es zehn, und das ist für den einen Fall zu lang,
+ * auf den es ankommt: Fällt der Dienst fünf Minuten vor dem Gottesdienst aus,
+ * bleibt bei zehn Minuten Karenz keine Zeit mehr, von Hand zu läuten. Man
+ * verließe sich auf eine Automatik, die längst steht.
+ *
+ * Tragfähig ist die kurze Frist nur, weil beide Seiten schneller geworden
+ * sind: Der Dienst schreibt alle 40 Sekunden, die Seite liest alle 30 – ein
+ * Lebenszeichen ist im Normalbetrieb also keine 90 Sekunden alt. Ein
+ * einzelner verpasster Schlag löst noch keinen Alarm aus, zwei schon.
+ */
+const GATEWAY_STALE_MIN = 2;
+/** So oft das Lebenszeichen nachgeladen wird (der Dienst schreibt alle 40 s). */
+const GATEWAY_POLL_MS = 30000;
 let gatewayTimer: number | undefined;
 /** Minuten seit dem letzten Lebenszeichen; null = noch nie eines gesehen. */
 const gatewayAgeMin = computed<number | null>(() => {
@@ -134,6 +146,10 @@ const gatewayPillTitel = computed(() => {
 const gatewayDownText = computed(() => {
     const age = gatewayAgeMin.value;
     if (age === null) return 'Es ist noch nie ein Lebenszeichen eingegangen.';
+    // Unter anderthalb Minuten ist der Dienst schlicht da. Eine gerundete
+    // Minutenzahl las sich dort wie eine Verspätung, obwohl sie nur den Takt
+    // wiedergab, in dem er sich meldet.
+    if (age < 1.5) return 'Letztes Lebenszeichen gerade eben.';
     if (age < 90) return `Letztes Lebenszeichen vor ${Math.round(age)} Minuten.`;
     const h = Math.round(age / 60);
     return h < 48 ? `Letztes Lebenszeichen vor ${h} Stunden.` : `Letztes Lebenszeichen vor ${Math.round(h / 24)} Tagen.`;
@@ -444,11 +460,14 @@ function gatewayZustandMelden() {
     const erster = gatewayZuletztGesehen === null;
     gatewayZuletztGesehen = steht;
     if (erster) {
+        // Dass alles in Ordnung ist, ist kein Ereignis: Der erste Befund wird
+        // nur gemeldet, wenn er ein schlechter ist. Sonst entstand bei JEDEM
+        // Neuladen der Seite die Zeile „Automatik läuft. Letztes Lebenszeichen
+        // vor 2 Minuten." - die Seite kennt den vorigen Stand ja nicht. Wie es
+        // um die Automatik steht, sagt das Kennzeichen oben, laufend.
         // Kein „Antwort"-Zeichen (◀): Das steht für echtes Läuten. Ob die
         // Automatik erreichbar ist, ist eine Information über den Betrieb.
-        pushLog(steht
-            ? `Automatik meldet sich nicht. ${gatewayDownText.value}`
-            : `Automatik läuft. ${gatewayDownText.value}`, steht ? 'gw' : 'info', true);
+        if (steht) pushLog(`Automatik meldet sich nicht. ${gatewayDownText.value}`, 'gw', true);
         return;
     }
     pushLog(steht
