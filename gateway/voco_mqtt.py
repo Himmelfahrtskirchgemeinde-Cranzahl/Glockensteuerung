@@ -25,9 +25,11 @@ import logging
 import os
 import ssl
 
-import tls
 import sys
 import time
+
+from config import load_dotenv
+import tls
 
 try:
     import paho.mqtt.client as mqtt
@@ -36,15 +38,8 @@ except ImportError:
 
 log = logging.getLogger("voco-gateway")
 
-# Optionales .env-Laden (ohne Zusatzpaket)
-def load_dotenv(path=".env"):
-    if os.path.exists(path):
-        for line in open(path, encoding="utf-8"):
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k, v = line.split("=", 1)
-                os.environ.setdefault(k.strip(), v.strip())
-
+# Optionales .env-Laden. Dieselbe Funktion wie im Dienst: Sie sucht die Datei
+# neben dem Programm, nicht im Arbeitsverzeichnis (siehe pfade.py).
 load_dotenv()
 
 # Sonderzeichen-Mapping (Steuerbyte -> Zeichen), nur fuer die ANZEIGE
@@ -108,8 +103,13 @@ class Voco:
         self.on_zustand = None
 
     def connect(self, timeout=10):
+        # Alle 60 s ein Lebenszeichen zum Broker. Vorher stand hier 600: Bei
+        # einem stillen Abriss (WLAN weg, Router-Neustart) blieb die Verbindung
+        # dann zehn Minuten lang scheinbar in Ordnung - lange genug, um ein
+        # Laeuten zu verpassen. Bricht sie ab, baut paho sie selbst wieder auf.
+        self.c.reconnect_delay_set(min_delay=1, max_delay=60)
         try:
-            self.c.connect(self.host, self.port, keepalive=600)
+            self.c.connect(self.host, self.port, keepalive=60)
         except ssl.SSLCertVerificationError as e:
             # Haeufigster Stolperstein unter Windows - die blosse
             # OpenSSL-Meldung hilft dabei niemandem weiter.
@@ -133,7 +133,13 @@ class Voco:
         while self.c.is_connected() is False and time.time() - t0 < timeout:
             time.sleep(0.1)
         if not self.c.is_connected():
-            raise SystemExit("Verbindung zum Broker fehlgeschlagen")
+            # Bewusst kein SystemExit: Das beendete den ganzen Prozess. Der
+            # Dienst soll den Aufbau stattdessen gleich noch einmal versuchen -
+            # beim Hochfahren des Rechners ist das Netz oft noch nicht bereit.
+            self.close()
+            raise RuntimeError(
+                f"Verbindung zum Broker {self.host}:{self.port} kam nicht zustande "
+                f"(nach {timeout} s). Meist fehlt noch die Internetverbindung.")
 
     def close(self):
         try:
