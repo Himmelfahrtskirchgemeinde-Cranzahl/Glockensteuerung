@@ -152,6 +152,7 @@ jobs:
           --hidden-import diagnose
           --hidden-import einrichtung
           --hidden-import sperre
+          --hidden-import aktualisierung
           --hidden-import win32timezone
           --hidden-import servicemanager
           gateway/dienst.py
