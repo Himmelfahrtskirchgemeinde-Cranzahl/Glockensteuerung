@@ -17,6 +17,7 @@ import {
     updateCustomDataValue,
 } from './utils/kv-store';
 import type { UpdateCheck } from './update';
+import { zusammenfuehren } from './logbuch';
 
 export const EXT_KEY: string = import.meta.env.VITE_KEY;
 
@@ -132,6 +133,31 @@ export interface GatewayEvent {
     art: 'an' | 'aus' | 'info';      // verbunden / getrennt / sonstiges
     text: string;
 }
+
+/**
+ * Eine Zeile des dauerhaften Ereignis-Logs.
+ *
+ * „Dauerhaft" heißt: in ChurchTools, nicht im Browser. Das Log lebte bisher nur
+ * im Speicher der geöffneten Seite – ein Neuladen, und alles war weg. Damit war
+ * nicht mehr nachzuvollziehen, wer wann geläutet hat oder wann ein Fehler
+ * auftrat; genau dafür ist ein Log aber da.
+ */
+export interface LogEntry {
+    at: string;                  // ISO-Zeitstempel
+    art: string;                 // 'in' | 'out' | 'sim' | 'info' | 'gw'
+    text: string;
+    /** Wer es ausgelöst hat – nur bei Bedienung durch einen Menschen. */
+    wer?: string;
+}
+
+/**
+ * So viele Zeilen werden aufgehoben.
+ *
+ * Der Eintrag wird bei jedem Seitenaufruf mitgeladen, deshalb kein
+ * unbegrenztes Wachstum: 300 Zeilen decken mehrere Wochen Betrieb ab und
+ * bleiben klein genug, um nicht zu stören.
+ */
+export const LOG_MAX = 300;
 
 export interface AppConfig {
     device: DeviceConfig | null;
@@ -277,6 +303,35 @@ export class ConfigStore {
             holder.v = Array.isArray(d) ? (d as GatewayEvent[]) : [];
         });
         return holder.v;
+    }
+
+    /** Das dauerhafte Ereignis-Log – neueste Zeile zuerst. */
+    async loadLog(): Promise<LogEntry[]> {
+        const holder: { v: LogEntry[] } = { v: [] };
+        await this.loadFrom('log', 'log', (d) => {
+            holder.v = Array.isArray(d) ? (d as LogEntry[]) : [];
+        });
+        return holder.v;
+    }
+
+    /**
+     * Hängt Zeilen an das gespeicherte Log an und gibt den neuen Stand zurück.
+     *
+     * Vor dem Schreiben wird frisch gelesen und zusammengeführt. Ohne das
+     * verlöre jede zweite offene Seite die Zeilen der anderen: Wer zuletzt
+     * schreibt, überschriebe sonst den ganzen Eintrag. Doppelte werden dabei
+     * an Zeitstempel und Text erkannt und fallen weg.
+     */
+    async appendLog(neue: LogEntry[]): Promise<LogEntry[]> {
+        if (!neue.length) return this.loadLog();
+        const zusammen = zusammenfuehren(await this.loadLog(), neue, LOG_MAX);
+        await this.upsert('log', 'log', zusammen);
+        return zusammen;
+    }
+
+    /** Leert das gespeicherte Log (nicht die Ereignisse des Gateways). */
+    async clearLog(): Promise<void> {
+        await this.upsert('log', 'log', []);
     }
 
     /**
