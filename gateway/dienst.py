@@ -691,11 +691,12 @@ def status() -> int:
         if eingerichtet:
             print(f"Startet:       {windienst.starttyp()}")
             if windienst.starttyp().startswith("automatisch (verz"):
-                # Sonst haelt man ihn nach einem Neustart des Rechners fuer
-                # kaputt, waehrend Windows nur noch nicht so weit ist.
-                print("               (nach dem Hochfahren dauert es ein bis")
-                print("               zwei Minuten - das ist so gewollt, damit")
-                print("               das Netzwerk vorher bereit ist)")
+                # Alter Eintrag aus frueheren Fassungen: Windows laesst solche
+                # Dienste erst 120 Sekunden nach den uebrigen anlaufen.
+                print("               ACHTUNG: verzoegert - nach dem Hochfahren")
+                print("               dauert es zwei Minuten, bis wieder")
+                print("               gelaeutet werden kann. Punkt 1 stellt das")
+                print("               auf sofortigen Start um.")
             if not windienst.startet_von_selbst():
                 print("ACHTUNG:       Nach einem Neustart des Rechners bleibt der")
                 print("               Dienst aus - es wird dann nicht gelaeutet.")

@@ -123,10 +123,17 @@ def einrichten() -> int:
             print(f"Der Dienst konnte nicht angelegt werden: {e}")
             return 1
 
-    # Verspaeteter Start: Beim Hochfahren ist das Netz oft noch nicht da. Der
-    # Dienst faengt sich zwar selbst, aber so beginnt sein Protokoll nicht mit
-    # einer Fehlermeldung.
-    _sc("config", NAME, "start=", "delayed-auto")
+    # Sofort mit dem Hochfahren starten - NICHT "delayed-auto". Windows laesst
+    # verzoegerte Dienste erst 120 Sekunden nach den uebrigen anlaufen; zwei
+    # Minuten, in denen nicht gelaeutet wuerde und in denen der Dienst wie
+    # ausgefallen aussieht.
+    #
+    # Der frueher dafuer angefuehrte Grund - beim Hochfahren ist das Netz oft
+    # noch nicht da - traegt nicht mehr: Die Dienstschleife faengt genau das ab
+    # und versucht es nach 15 Sekunden erneut. Damit es gar nicht erst dazu
+    # kommt, haengt der Dienst jetzt an den Netzwerkdiensten: Windows startet
+    # ihn erst, wenn TCP/IP und die Namensaufloesung stehen.
+    _sc("config", NAME, "start=", "auto", "depend=", "Tcpip/Dnscache")
     # Faellt der Dienst aus, startet Windows ihn nach einer Minute neu - immer
     # wieder, nicht nur die ersten drei Male ("reset= 0" setzt den Zaehler nie
     # zurueck, also gilt die dritte Regel dauerhaft).
