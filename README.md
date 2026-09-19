@@ -115,6 +115,29 @@ eines Pull Requests lässt sich der Changelog vorab ansehen:
 .github/scripts/changelog.sh HEAD origin/main
 ```
 
+Eine **Korrektur** ergänzt den Changelog der letzten Funktionsversion, eine
+**Neuerung** fängt ihn frisch an – das entscheidet `changelog.sh` selbst anhand
+der Art der Einträge. In der Release-Beschreibung steht nur der Changelog; was
+welche Datei tut, steht hier und nicht in jeder Version aufs Neue.
+
+## Dokumentation gehört zum Pull Request
+
+Wer etwas ändert, prüft im selben Pull Request, ob die Markdown-Dateien noch
+stimmen, und zieht sie mit:
+
+| Datei | Wofür |
+|---|---|
+| [`ANLEITUNG.md`](ANLEITUNG.md) | Schritt für Schritt für die Gemeinde |
+| [`README.md`](README.md) | Überblick, Downloads, Arbeitsweise |
+| [`gateway/README.md`](gateway/README.md) | Betrieb des Dienstes, Dateien, Fehlersuche |
+| [`extension/README.md`](extension/README.md) | Modul, Rechte, Entwicklung |
+| [`docs/`](docs/) | VOCO-Protokoll und ChurchTools-API |
+
+Besonders leicht veralten Dinge, die nur *nebenbei* mitwandern: Menüpunkte mit
+Nummern, Dateinamen, Schalter auf der Kommandozeile, Rechte-Tabellen. Eine
+Anleitung, die einmal in die Irre führt, kostet mehr Zeit als das Nachziehen
+gekostet hätte.
+
 ## 🔐 Sicherheit
 
 - Geräte-Passwort, ChurchTools-Token & Login-Daten sind **Geheimnisse** – niemals
