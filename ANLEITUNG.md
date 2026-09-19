@@ -288,7 +288,9 @@ des Dienstes nötig. Danach steht er in `services.msc` als
 Was dann von selbst passiert:
 
 - Der Dienst startet **beim Hochfahren des Rechners**, ohne dass sich jemand
-  anmeldet.
+  anmeldet. Er ist dabei als *verzögert* eingetragen und braucht deshalb **ein
+  bis zwei Minuten** – das ist Absicht, damit das Netzwerk vorher bereit ist.
+  Wer gleich nach dem Neustart nachsieht, hält ihn sonst für ausgefallen.
 - Er läuft weiter, wenn der Rechner **gesperrt** wird (Win+L), sich jemand
   **abmeldet**, ein **anderer Benutzer** sich anmeldet oder ein neuer Benutzer
   angelegt wird – er hängt an keiner Anmeldung.

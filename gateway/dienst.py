@@ -685,8 +685,23 @@ def status() -> int:
     print(f"Protokoll:     {pfade.protokolldatei()}")
     if ist_windows():
         print(f"Dienst:        {windienst.zustand()}")
-        if windienst.VERFUEGBAR and windienst.zustand() != "nicht eingerichtet" \
-                and not windienst.zeigt_auf(programmdatei()):
+        # Die wichtigere Frage als "laeuft er gerade": Faengt er nach einem
+        # Neustart des Rechners von selbst wieder an? Stand bisher nirgends.
+        eingerichtet = windienst.VERFUEGBAR and windienst.zustand() != "nicht eingerichtet"
+        if eingerichtet:
+            print(f"Startet:       {windienst.starttyp()}")
+            if windienst.starttyp().startswith("automatisch (verz"):
+                # Sonst haelt man ihn nach einem Neustart des Rechners fuer
+                # kaputt, waehrend Windows nur noch nicht so weit ist.
+                print("               (nach dem Hochfahren dauert es ein bis")
+                print("               zwei Minuten - das ist so gewollt, damit")
+                print("               das Netzwerk vorher bereit ist)")
+            if not windienst.startet_von_selbst():
+                print("ACHTUNG:       Nach einem Neustart des Rechners bleibt der")
+                print("               Dienst aus - es wird dann nicht gelaeutet.")
+                print("               Punkt 1 (Installieren) stellt das richtig;")
+                print("               Zugangsdaten bleiben dabei erhalten.")
+        if eingerichtet and not windienst.zeigt_auf(programmdatei()):
             print(f"ACHTUNG:       Der Dienst startet eine ANDERE Datei:")
             print(f"               {windienst.programmpfad()}")
             print("               Diese hier wird also nicht benutzt. Mit "

@@ -262,6 +262,50 @@ def zeigt_auf(datei: str) -> bool:
     return os.path.normcase(os.path.abspath(teil)) == os.path.normcase(os.path.abspath(datei))
 
 
+def starttyp() -> str:
+    """Startet der Dienst beim Hochfahren von selbst? Klartext.
+
+    Das ist die wichtigste Frage ueberhaupt: Ein Dienst, der nur laeuft, weil
+    ihn jemand gestartet hat, ist nach dem naechsten Neustart des Rechners weg
+    - und niemand merkt es, bis ein Gottesdienst ungelaeutet bleibt. Im Status
+    stand bisher nur, ob er GERADE laeuft.
+    """
+    if not VERFUEGBAR:
+        return "unbekannt (pywin32 fehlt)"
+    import win32service
+    try:
+        h_scm = win32service.OpenSCManager(None, None, win32service.SC_MANAGER_CONNECT)
+        try:
+            h = win32service.OpenService(h_scm, NAME, win32service.SERVICE_QUERY_CONFIG)
+            try:
+                cfg = win32service.QueryServiceConfig(h)
+                typ = cfg[1]
+                verzoegert = False
+                try:
+                    verzoegert = bool(win32service.QueryServiceConfig2(
+                        h, win32service.SERVICE_CONFIG_DELAYED_AUTO_START_INFO))
+                except Exception:
+                    pass
+            finally:
+                win32service.CloseServiceHandle(h)
+        finally:
+            win32service.CloseServiceHandle(h_scm)
+    except Exception:
+        return "nicht eingerichtet"
+    if typ == win32service.SERVICE_AUTO_START:
+        return "automatisch (verzoegert)" if verzoegert else "automatisch"
+    if typ == win32service.SERVICE_DEMAND_START:
+        return "nur von Hand"
+    if typ == win32service.SERVICE_DISABLED:
+        return "deaktiviert"
+    return f"Typ {typ}"
+
+
+def startet_von_selbst() -> bool:
+    """Faengt der Dienst beim Hochfahren von selbst an zu laufen?"""
+    return starttyp().startswith("automatisch")
+
+
 def zustand() -> str:
     """Kurzer Klartext: laeuft er, steht er, gibt es ihn ueberhaupt?"""
     if not VERFUEGBAR:
