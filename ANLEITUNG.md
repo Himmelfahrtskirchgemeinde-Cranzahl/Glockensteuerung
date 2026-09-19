@@ -383,7 +383,7 @@ Angehängt werden nur technische Angaben (Instanz-Host, Version, letzte Ereignis
 | Es läutet doppelt | Es läuft noch ein zweiter Gateway, meist ein alter Eintrag in der Aufgabenplanung. `--status` nennt solche Einträge; `--installieren` schaltet sie ab. |
 | Windows meldet „Der Computer wurde durch Windows geschützt" | Die Programmdatei ist nicht signiert. *Weitere Informationen → Trotzdem ausführen*. |
 | Keine Programme in der Liste | Am Gerät sind (noch) keine **Sofort-PGS** angelegt. |
-| `--dry-run` zeigt keine Auslösungen | Der Gateway schreibt den Grund ins Log: keine Termine im Zeitraum, oder kein Titel passt exakt (er nennt dann Gesuchtes **und** Vorhandenes). Danach Schreibweise bzw. Kalender der Regel korrigieren. |
+| Der Testlauf (`--testlauf`, Menüpunkt 4) zeigt keine Auslösungen | Der Gateway schreibt den Grund ins Log: keine Termine im Zeitraum, oder kein Titel passt exakt (er nennt dann Gesuchtes **und** Vorhandenes). Danach Schreibweise bzw. Kalender der Regel korrigieren. |
 | ChurchTools-Login schlägt fehl | `CT_BASE_URL`/`CT_LOGIN_TOKEN` prüfen; Benutzer braucht Leserechte. |
 | Extension lädt lokal nicht (`npm run dev`) | CORS in ChurchTools erlauben: System-Einstellungen → Integrationen → API → CORS → Origin `http://localhost:5173`. |
 | Endpunkte/Feldnamen weichen ab | ChurchTools-API-Versionen unterscheiden sich – gegen `https://<gemeinde>.church.tools/api` (Swagger) prüfen; ggf. `gateway/churchtools.py` anpassen. |

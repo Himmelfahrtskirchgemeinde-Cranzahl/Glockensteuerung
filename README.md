@@ -45,7 +45,9 @@ Zum Einrichten und Testen, ohne dass wirklich geläutet wird:
 - **Extension:** startet immer im **Simulationsmodus** – „Läuten“ sendet nichts,
   sondern zeigt im **Ereignis-Log**, was passieren *würde* (und die echten
   Antworten der Anlage). Erst nach bewusstem Ausschalten wird real geläutet.
-- **Gateway:** `python scheduler.py --dry-run` bzw. dauerhaft `VOCO_SIMULATION=1`.
+- **Gateway:** `Glockensteuerung-Gateway.exe --testlauf` (bzw.
+  `python scheduler.py --dry-run`) – oder dauerhaft `VOCO_SIMULATION=1`, was die
+  Einrichtung beim ersten Mal von selbst vorschlägt.
 
 ## Schnellstart
 

@@ -9,17 +9,27 @@ vorhandener Dauer-PC. (Steuerung und ChurchTools laufen über das Internet.)
 
 > **📖 Komplette Einrichtung Schritt für Schritt: [`../ANLEITUNG.md`](../ANLEITUNG.md)**
 
-> **🛡️ Simulation:** `python scheduler.py --dry-run` plant und protokolliert,
+> **🛡️ Simulation:** `Glockensteuerung-Gateway.exe --testlauf` bzw.
+> `python scheduler.py --dry-run` plant und protokolliert,
 > löst aber **nicht** aus. Dauerhaft: `VOCO_SIMULATION=1` in der `.env`.
 
 ## Einrichtung
+
+**Windows:** gar nichts von Hand – die fertige Programmdatei fragt beim ersten
+Start nach Adresse und Token und legt die `.env` selbst an (siehe
+„Dauerbetrieb unter Windows" weiter unten).
+
+**Linux / eigener Python-Betrieb:**
 
 ```bash
 cd gateway
 python3 -m venv .venv && source .venv/bin/activate   # optional
 pip install -r requirements.txt
-cp .env.example .env      # und ausfüllen (CT_BASE_URL, CT_LOGIN_TOKEN)
+python dienst.py --einrichten    # fragt Adresse und Token ab, schreibt .env
 ```
+
+Wer die `.env` lieber selbst schreibt: `cp .env.example .env` und ausfüllen
+(`CT_BASE_URL`, `CT_LOGIN_TOKEN`).
 
 `CT_LOGIN_TOKEN` = Login-Token eines (technischen) ChurchTools-Benutzers.
 
@@ -153,7 +163,7 @@ WantedBy=multi-user.target
 
 | Datei | Zweck |
 |---|---|
-| `scheduler.py` | Hauptdienst (Planung + Auslösung) |
+| `scheduler.py` | Hauptdienst (Planung + Auslösung, hält sich selbst am Leben) |
 | `churchtools.py` | ChurchTools-API-Client (Kalender-Termine) |
 | `config.py` | lädt Gerät + Regeln aus ChurchTools (oder .env) |
 | `voco_mqtt.py` | MQTT-Client + CLI (`list`/`status`/`start`/`stop`) |
@@ -163,6 +173,11 @@ WantedBy=multi-user.target
 | `windienst.py` | meldet den Gateway als Windows-Dienst an |
 | `pfade.py` | findet `.env`, Zustand und Protokoll neben dem Programm |
 | `einrichtung.py` | fragt Adresse und Token ab und schreibt die `.env` |
+| `kv.py` | gemeinsamer Zugriff auf den Speicher der Extension |
+| `heartbeat.py` | Lebenszeichen alle 2 Minuten nach ChurchTools |
+| `ereignisse.py` | hält Verbindungen und Ausfälle im Ereignis-Log fest |
+| `outbox.py` | arbeitet den Postausgang der Extension ab |
+| `notify.py` | verschickt Fehlermeldungen per E-Mail |
 
 ## Wenn die Verbindung am Zertifikat scheitert
 
