@@ -371,7 +371,8 @@ def einmal_laufen(dry: bool, notifier: EmailNotifier, erster_start: bool) -> Non
                     notifier.uebernehmen(cfg.email)
                     plan = build_schedule(ct, cfg)
                     last_refresh = now
-                    upcoming = [f"{time.strftime('%H:%M', time.localtime(p['ts']))} → {p['pgs_name']}"
+                    upcoming = [f"{time.strftime('%H:%M', time.localtime(p['ts']))} "
+                                f"→ {decode_name(p['pgs_name'])}"
                                 for p in plan[:5]]
                     log.info("Plan aktualisiert: %d Ausloesung(en). Naechste: %s",
                              len(plan), ", ".join(upcoming) or "keine")
@@ -408,8 +409,9 @@ def einmal_laufen(dry: bool, notifier: EmailNotifier, erster_start: bool) -> Non
                     continue
                 if now >= p["ts"] and now < p["ts"] + FIRE_WINDOW_S:
                     if quiet_now():
-                        log.warning("Ruhezeit aktiv – ueberspringe %s (%s)", p["pgs_name"], p["title"])
-                        ereignisse.melde("info", f"Ruhezeit aktiv – „{p['pgs_name']}“ "
+                        log.warning("Ruhezeit aktiv – ueberspringe %s (%s)",
+                                    decode_name(p["pgs_name"]), p["title"])
+                        ereignisse.melde("info", f"Ruhezeit aktiv – „{decode_name(p['pgs_name'])}“ "
                                                  f"für „{p['title']}“ übersprungen.")
                         fired.add(p["key"]); save_state(fired)
                         continue
