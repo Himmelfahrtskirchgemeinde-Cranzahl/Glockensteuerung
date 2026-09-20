@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { churchtoolsClient } from '@churchtools/churchtools-client';
 import { ConfigStore, newRule, newEmailConfig } from './config';
-import type { CatKey, DeviceConfig, EmailConfig, GatewayStatus, LogEntry, MappingRule } from './config';
+import type { CatKey, DeviceConfig, EmailConfig, GatewayEvent, GatewayStatus, LogEntry, MappingRule } from './config';
 import { VocoMqtt, decodeName } from './voco/mqtt';
 import { reportError, submitFeedback, maskSerial, APP_VERSION, FEEDBACK_URL } from './feedback';
 import type { ReportContext, FeedbackFields } from './feedback';
@@ -556,6 +556,20 @@ function gatewayZustandMelden() {
     }
 }
 
+/**
+ * Welches Zeichen ein Gateway-Ereignis im Log bekommt.
+ *
+ * Der Dienst sagt selbst, was er getan hat; die Zuordnung steht hier an
+ * einer Stelle, damit Dienst und Anzeige nicht auseinanderlaufen.
+ */
+const GW_ART: Record<GatewayEvent['art'], LogDir> = {
+    laeuten: 'out',
+    sim: 'sim',
+    an: 'info',
+    aus: 'gw',
+    info: 'info',
+};
+
 /** Holt das Lebenszeichen erneut. Fehler bleiben still: Der alte Wert altert
  *  dann weiter, und genau das soll das Banner ja anzeigen. */
 async function refreshGatewayStatus() {
@@ -569,10 +583,13 @@ async function refreshGatewayStatus() {
         gatewayEreignisse.value = roh
             .map((e) => ({
                 ts: new Date(e.at),
-                // 'an' ist eine hergestellte Verbindung, kein Läuten - deshalb
-                // das Informationszeichen. Nur der Ausfall ('aus') bekommt das
-                // Warnzeichen, damit er zwischen den übrigen Zeilen auffällt.
-                dir: (e.art === 'aus' ? 'gw' : 'info') as LogDir,
+                // Ein vom Dienst ausgeloestes Laeuten ist Gesendetes und
+                // bekommt dasselbe Zeichen wie ein Laeuten von Hand - sonst
+                // stuende die wichtigste Zeile als blasse Information da.
+                // 'an' ist nur eine hergestellte Verbindung, kein Laeuten;
+                // der Ausfall ('aus') bekommt das Warnzeichen, damit er
+                // zwischen den uebrigen Zeilen auffaellt.
+                dir: GW_ART[e.art] ?? 'info',
                 line: e.text,
             }))
             .filter((e) => Number.isFinite(e.ts.getTime()));

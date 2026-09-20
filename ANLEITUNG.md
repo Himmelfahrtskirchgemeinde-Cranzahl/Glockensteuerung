@@ -196,7 +196,7 @@ an jedem anderen Rechner wieder da.
 | | |
 |---|---|
 | **Suchfeld** | Freitext über Ereignis **und** Name. Mehrere Wörter müssen alle vorkommen, die Reihenfolge ist egal – „läuten anna" findet die Zeile, in der beides steht. Groß- und Kleinschreibung spielt keine Rolle. |
-| **Art-Schalter** | ▶ Gesendet, ◀ Antwort, ⚙ Simulation, ℹ Info, ⚠ Automatik. Mehrere lassen sich gleichzeitig anschalten; nochmal klicken hebt es auf. |
+| **Art-Schalter** | ▶ Gesendet, ◀ Antwort, ⚙ Simulation, ℹ Info, ⚠ Automatik. Mehrere lassen sich gleichzeitig anschalten; nochmal klicken hebt es auf. Was die Automatik auslöst, steht ebenfalls unter ▶ Gesendet – ein Läuten ist ein Läuten, gleich ob von Hand oder zum Termin. ⚠ bleibt den Störungen der Automatik vorbehalten. |
 | **⚠ Nur Auffälliges** | zeigt allein Störungen und Hinweise – der schnellste Weg zu „was war da los?". |
 | **Von/Bis** | grenzt den Zeitraum ein. |
 

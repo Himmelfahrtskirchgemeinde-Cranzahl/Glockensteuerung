@@ -39,7 +39,16 @@ class Ereignisse:
         self._letzter_fehler = False
 
     def melde(self, art: str, text: str) -> bool:
-        """Ein Ereignis anhaengen. 'art' ist 'an', 'aus' oder 'info'."""
+        """Ein Ereignis anhaengen.
+
+        'art' bestimmt, wie es in der Erweiterung erscheint:
+
+          "laeuten"  echtes Laeuten - das Zeichen fuer Gesendetes
+          "sim"      dasselbe in Simulation
+          "an"       Verbindung hergestellt, Dienst gestartet
+          "aus"      Stoerung, Ausfall
+          "info"     alles Uebrige
+        """
         eintrag = {
             "at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
             "art": art,
