@@ -22,6 +22,35 @@ export type Zeile = { ts: Date; dir: LogDir; line: string; wer?: string };
 
 const ARTEN: LogDir[] = ['in', 'out', 'sim', 'info', 'gw'];
 
+/** Zeichen je Ereignisart, die der Gateway-Dienst festhaelt. */
+const GW_ART: Record<string, LogDir> = {
+    laeuten: 'out',
+    sim: 'sim',
+    an: 'info',
+    aus: 'gw',
+    info: 'info',
+};
+
+/**
+ * Aeltere Dienste (bis einschliesslich 26.10.1) kannten die Art „laeuten"
+ * noch nicht und legten jedes Ausloesen als „info" ab. Solche Zeilen stehen
+ * noch wochenlang im gespeicherten Log - und ein Dienst, der noch nicht
+ * aktualisiert wurde, schreibt sie weiter. Am Satzanfang sind sie eindeutig,
+ * deshalb werden sie daran erkannt statt als blasse Information stehen zu
+ * bleiben.
+ */
+const ALT_LAEUTEN = /^Ausgel(ö|oe)st:/;
+const ALT_SIM = /^Simulation:/;
+
+/** Welches Zeichen ein Gateway-Ereignis bekommt. */
+export function gatewayArt(art: string, text: string): LogDir {
+    if (art === 'info') {
+        if (ALT_LAEUTEN.test(text)) return 'out';
+        if (ALT_SIM.test(text)) return 'sim';
+    }
+    return GW_ART[art] ?? 'info';
+}
+
 /** Neue Zeilen an den gespeicherten Stand anfügen, neueste zuerst. */
 export function zusammenfuehren(vorhanden: LogEntry[], neue: LogEntry[], max: number): LogEntry[] {
     const schluessel = (e: LogEntry) => `${e.at}|${e.text}`;
