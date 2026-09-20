@@ -532,7 +532,10 @@ Läuten-Untermenü gar nicht sichtbar.
 - **Nur „sehen"** → das Untermenü ist da, aber schreibgeschützt; Eingabefelder
   sind gesperrt, und es steht „nur lesen" daneben.
 - **Kein „Erweiterung verwalten"** → der Schalter zum Scharfschalten ist nicht
-  sichtbar. Diese Person kann ausschließlich **testen**, also in Simulation.
+  sichtbar. Den **Zustand** der Anlage sieht diese Person trotzdem: Steht sie
+  auf scharf, läutet ihr Knopf wirklich; steht sie auf Simulation, testet er
+  nur. Simulation ist ein Zustand der **Anlage**, nicht der Person – sie gilt
+  für die Automatik und für jeden geöffneten Bildschirm gleichermaßen.
 - **Hilfe und Feedback** sind immer für alle offen.
 
 Wichtig: Die Oberfläche blendet nur passend aus. **Erzwungen werden die Rechte
