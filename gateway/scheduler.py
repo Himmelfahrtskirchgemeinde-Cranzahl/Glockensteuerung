@@ -46,7 +46,10 @@ from voco_mqtt import Voco, decode_name
 
 HORIZON_HOURS = 26          # so weit im Voraus planen
 CONFIG_REFRESH_S = 300      # Konfig/Termine alle 5 min neu laden
-TICK_S = 20                 # so oft pruefen, ob etwas ansteht
+# So oft wird geprueft, ob etwas ansteht - laengstens. Steht eine Ausloesung
+# frueher an, wacht die Schleife genau dann auf (siehe Ende der Schleife),
+# damit auf die Sekunde gelaeutet wird und nicht bis zu TICK_S spaeter.
+TICK_S = 20
 OUTBOX_S = 60               # so oft den Postausgang der Extension abarbeiten
 FIRE_WINDOW_S = 150         # Toleranz: bis 2,5 min nach Soll noch ausloesen
 # So oft ein Lebenszeichen nach ChurchTools geschrieben wird. Zusammen mit
@@ -460,13 +463,13 @@ def einmal_laufen(dry: bool, notifier: EmailNotifier, erster_start: bool) -> Non
                     raw = voco.resolve(p["pgs_name"]) or p["pgs_name"]
                     if dry:
                         log.info("[SIMULATION] wuerde ausloesen: %s (%s)", decode_name(raw), p["title"])
-                        ereignisse.melde("info", f"Simulation: „{decode_name(raw)}“ wäre jetzt "
+                        ereignisse.melde("sim", f"Simulation: „{decode_name(raw)}“ wäre jetzt "
                                                  f"für „{p['title']}“ ausgelöst worden.")
                     else:
                         try:
                             voco.start(raw)
                             log.info("AUSGELOEST: %s  (Termin: %s)", decode_name(raw), p["title"])
-                            ereignisse.melde("an", f"Ausgelöst: „{decode_name(raw)}“ "
+                            ereignisse.melde("laeuten", f"Ausgelöst: „{decode_name(raw)}“ "
                                                    f"für „{p['title']}“.")
                         except Exception as e:
                             log.error("Ausloesen fehlgeschlagen: %s (%s): %s", decode_name(raw), p["title"], e)
@@ -474,7 +477,22 @@ def einmal_laufen(dry: bool, notifier: EmailNotifier, erster_start: bool) -> Non
                                                     f"für „{p['title']}“ ({e}).")
                     fired.add(p["key"]); save_state(fired)
 
-            if STOPP.wait(TICK_S):
+            # Bis zum naechsten Durchgang warten - aber keine Sekunde ueber
+            # die naechste faellige Ausloesung hinaus. Frueher wurde stur
+            # TICK_S gewartet; eine Ausloesung um 9:00:01 kam dann erst beim
+            # naechsten Durchgang dran und die Glocke schlug bis zu 20 s zu
+            # spaet. Die Anlage laeutet erst, wenn der Dienst sendet - deshalb
+            # erschien auch in der Erweiterung erst dann „laeuft".
+            jetzt = time.time()
+            naechste = min((p["ts"] for p in plan
+                            if p["key"] not in fired and p["ts"] > jetzt),
+                           default=None)
+            warte = TICK_S
+            if naechste is not None:
+                # Nie ganz auf null: Sonst drehte die Schleife im Leerlauf,
+                # falls eine Ausloesung im selben Augenblick faellig wird.
+                warte = max(0.2, min(TICK_S, naechste - jetzt))
+            if STOPP.wait(warte):
                 beenden = True
                 break
     except KeyboardInterrupt:

@@ -172,7 +172,16 @@ export interface GatewayStatus {
  */
 export interface GatewayEvent {
     at: string;                      // ISO-Zeitstempel
-    art: 'an' | 'aus' | 'info';      // verbunden / getrennt / sonstiges
+    /**
+     * Was fuer ein Ereignis es ist – bestimmt das Zeichen in der Anzeige:
+     *
+     *   'laeuten'  echtes Laeuten (das Zeichen fuer Gesendetes)
+     *   'sim'      dasselbe in Simulation
+     *   'an'       Verbindung hergestellt, Dienst gestartet
+     *   'aus'      Stoerung, Ausfall
+     *   'info'     alles Uebrige
+     */
+    art: 'laeuten' | 'sim' | 'an' | 'aus' | 'info';
     text: string;
 }
 
