@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { churchtoolsClient } from '@churchtools/churchtools-client';
 import { ConfigStore, newRule, newEmailConfig } from './config';
-import type { CatKey, DeviceConfig, EmailConfig, GatewayEvent, GatewayStatus, LogEntry, MappingRule } from './config';
+import type { CatKey, DeviceConfig, EmailConfig, GatewayStatus, LogEntry, MappingRule } from './config';
 import { VocoMqtt, decodeName } from './voco/mqtt';
 import { reportError, submitFeedback, maskSerial, APP_VERSION, FEEDBACK_URL } from './feedback';
 import type { ReportContext, FeedbackFields } from './feedback';
@@ -11,7 +11,7 @@ import { fetchLatest, isStale, isNewer, parseChangelog, DOWNLOAD_URL, RELEASES_U
 import type { UpdateCheck } from './update';
 import type { Rights } from './perms';
 import { fitInfo } from './utils/fit-height';
-import { ohneDoppelte, zuZeilen, filtern, schwere, leererFilter, filterAktiv } from './logbuch';
+import { ohneDoppelte, zuZeilen, filtern, schwere, leererFilter, filterAktiv, gatewayArt } from './logbuch';
 import type { LogDir, Zeile, LogFilter } from './logbuch';
 
 const isDev = import.meta.env.MODE === 'development';
@@ -562,20 +562,6 @@ function gatewayZustandMelden() {
     }
 }
 
-/**
- * Welches Zeichen ein Gateway-Ereignis im Log bekommt.
- *
- * Der Dienst sagt selbst, was er getan hat; die Zuordnung steht hier an
- * einer Stelle, damit Dienst und Anzeige nicht auseinanderlaufen.
- */
-const GW_ART: Record<GatewayEvent['art'], LogDir> = {
-    laeuten: 'out',
-    sim: 'sim',
-    an: 'info',
-    aus: 'gw',
-    info: 'info',
-};
-
 /** Holt das Lebenszeichen erneut. Fehler bleiben still: Der alte Wert altert
  *  dann weiter, und genau das soll das Banner ja anzeigen. */
 async function refreshGatewayStatus() {
@@ -590,12 +576,10 @@ async function refreshGatewayStatus() {
             .map((e) => ({
                 ts: new Date(e.at),
                 // Ein vom Dienst ausgeloestes Laeuten ist Gesendetes und
-                // bekommt dasselbe Zeichen wie ein Laeuten von Hand - sonst
-                // stuende die wichtigste Zeile als blasse Information da.
-                // 'an' ist nur eine hergestellte Verbindung, kein Laeuten;
-                // der Ausfall ('aus') bekommt das Warnzeichen, damit er
-                // zwischen den uebrigen Zeilen auffaellt.
-                dir: GW_ART[e.art] ?? 'info',
+                // bekommt dasselbe Zeichen wie ein Laeuten von Hand. Welche
+                // Art zu welchem Zeichen gehoert - und wie ein noch nicht
+                // aktualisierter Dienst zu lesen ist - steht in „logbuch".
+                dir: gatewayArt(e.art, e.text),
                 line: e.text,
             }))
             .filter((e) => Number.isFinite(e.ts.getTime()));
