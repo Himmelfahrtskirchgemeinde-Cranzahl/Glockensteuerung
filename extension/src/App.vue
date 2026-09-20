@@ -46,6 +46,12 @@ const showEinstellungen = computed(() => canView('regeln') || rights.value.manag
 const canSeeView = (v: View): boolean =>
     (v === 'geraet' || v === 'email' ? rights.value.manageExt : canView(v));
 const allCatalogNames = computed(() => [...catalog.value.sPGS, ...catalog.value.melodies, ...catalog.value.programsteps]);
+/**
+ * Steht die Anlage auf Simulation? Der Wert kommt aus ChurchTools und gilt
+ * fuer alle - fuer die Automatik ebenso wie fuer jede geoeffnete Seite.
+ * Umstellen darf ihn nur „Erweiterung verwalten"; sehen soll ihn jeder, der
+ * laeuten kann, sonst weiss er nicht, was sein Knopf ausloest.
+ */
 const simulate = ref(true);
 const online = ref<boolean | null>(null);
 const playable = ref<string[]>([]);
@@ -637,8 +643,15 @@ async function boot() {
         } catch { /* kein Leserecht auf „Ereignis-Log" -> bleibt bei dieser Sitzung */ }
         logTimer = window.setInterval(() => void logSpeichern(), LOG_SPEICHERN_MS);
         checkForUpdate();
-        // Gemerkter Status gilt nur für Berechtigte; alle anderen bleiben in Simulation.
-        simulate.value = rights.value.manageExt ? (cfg.simulate ?? true) : true;
+        // Simulation ist ein Zustand der ANLAGE, kein persoenlicher: Sie liegt in
+        // ChurchTools und gilt fuer die Automatik wie fuer jeden Browser.
+        // Deshalb sieht ihn jeder gleich. Frueher bekam jeder ohne
+        // „Erweiterung verwalten" hier stur Simulation - der Kuesterin stand
+        // dann „Es wird nichts an die Anlage gesendet", waehrend scharf
+        // geschaltet war, und ihr Laeuten-Knopf hiess „Testen" und tat nichts.
+        // Wer nicht umschalten darf, sieht den Zustand trotzdem; verwehrt
+        // bleibt ihm nur der Schalter (siehe setSimulate).
+        simulate.value = cfg.simulate ?? true;
         try { calendars.value = await churchtoolsClient.get<{ id: number; name: string }[]>('/calendars'); } catch { calendars.value = []; }
         loadNextRingings();
         if (device.value.serial && device.value.devicePw) connectVoco();
