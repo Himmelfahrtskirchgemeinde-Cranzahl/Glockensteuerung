@@ -741,7 +741,12 @@ def main(argv: list[str] | None = None):
     # Erst sichern, dass kein zweiter Gateway laeuft. Zwei gleichzeitig loesen
     # dasselbe Gelaeut zweimal aus - und das faellt nicht im Protokoll auf,
     # sondern im Dorf.
-    if not sperre.belegen():
+    #
+    # Ein Testlauf ist davon ausgenommen: Er loest nichts aus und kann deshalb
+    # auch nichts doppelt ausloesen. Er belegt die Sperre auch nicht - sonst
+    # muesste man den Dienst anhalten, um einmal nachsehen zu koennen, und
+    # genau dann wird nicht gelaeutet.
+    if not dry and not sperre.belegen():
         log.error("Es laeuft bereits ein Gateway auf diesem Rechner. Dieser Start "
                   "wird beendet, damit nicht doppelt gelaeutet wird.")
         log.error("Laeuft noch eine alte Einrichtung? Eine Aufgabe in der "
