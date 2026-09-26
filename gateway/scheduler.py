@@ -37,6 +37,7 @@ import aktualisierung
 from churchtools import ChurchTools
 from config import EXT_KEY, GatewayConfig, Rule, load_dotenv, load_from_churchtools
 from ereignisse import Ereignisse, LogWaechter, Zustandswaechter
+import geheim
 from heartbeat import Heartbeat, mask_serial
 from notify import EmailNotifier
 import outbox
@@ -247,14 +248,15 @@ def protokoll_einrichten(ausfuehrlich: bool = False) -> str:
 
     konsole = logging.StreamHandler()
     konsole.setFormatter(form)
-    wurzel.addHandler(konsole)
+    # Jede Zeile laeuft durch die Maskierung - siehe geheim.py.
+    wurzel.addHandler(geheim.schuetzen(konsole))
 
     datei = pfade.protokolldatei()
     try:
         in_datei = logging.handlers.RotatingFileHandler(
             datei, maxBytes=1_000_000, backupCount=3, encoding="utf-8")
         in_datei.setFormatter(form)
-        wurzel.addHandler(in_datei)
+        wurzel.addHandler(geheim.schuetzen(in_datei))
     except Exception as e:                      # z. B. kein Schreibrecht
         log.warning("Protokolldatei '%s' nicht nutzbar: %s", datei, e)
         return ""
@@ -317,7 +319,8 @@ def einmal_laufen(dry: bool, notifier: EmailNotifier, erster_start: bool) -> Non
     # und keinen Hinweis, woran es lag - der Grund stand allein im Protokoll auf
     # dem Rechner der Gemeinde.
     log_waechter = LogWaechter(ereignisse)
-    log.addHandler(log_waechter)
+    # Das Ereignis-Log liest die ganze Gemeinde - hier erst recht maskieren.
+    log.addHandler(geheim.schuetzen(log_waechter))
 
     voco = Voco(serial=cfg.device.serial, device_pw=cfg.device.device_pw,
                 broker_url=cfg.device.broker_url)
@@ -768,7 +771,7 @@ def main(argv: list[str] | None = None):
 
     # Automatische Fehler-E-Mails (an EMAIL_TO, Standard josua.hess@icloud.com)
     notifier = EmailNotifier()
-    log.addHandler(notifier.log_handler())
+    log.addHandler(geheim.schuetzen(notifier.log_handler()))
 
     try:
         dienstschleife(dry, notifier)

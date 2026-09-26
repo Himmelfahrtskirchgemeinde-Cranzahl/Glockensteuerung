@@ -121,6 +121,13 @@ Beim Einrichten meldet das Programm, was es vorgefunden hat, und dass nichts
 davon überschrieben wird. Zeigt der Dienst noch auf eine andere Programmdatei,
 sagt `--status` das ausdrücklich – sonst liefe unbemerkt die alte Fassung weiter.
 
+Traegt die Anmeldung nicht ueber den ersten Aufruf hinaus - manche Instanzen liefern
+kein brauchbares Sitzungs-Cookie -, weist sich der Dienst bei jeder Anfrage neu aus:
+bevorzugt im Kopf der Anfrage (`Authorization: Login ...`), sonst in der Adresse.
+Welchen Weg er nimmt, steht im Protokoll. Ein Token kann dabei nie ins Protokoll,
+ins Ereignis-Log oder in eine Störungsmail geraten: Jede Zeile läuft vorher durch
+die Maskierung in `geheim.py`.
+
 `--status` nennt außerdem unter „Instanz“ die Adresse der ChurchTools-Instanz
 aus der `.env` (ohne Token). Das ist der schnellste Weg zur häufigsten Ursache für
 ein ausbleibendes Lebenszeichen: Der Dienst spricht mit einer anderen Instanz als
@@ -289,6 +296,7 @@ WantedBy=multi-user.target
 | `voco_mqtt.py` | MQTT-Client + CLI (`list`/`status`/`start`/`stop`) |
 | `tls.py` | Wurzelzertifikate für MQTT und E-Mail |
 | `diagnose.py` | prüft, warum eine verschlüsselte Verbindung scheitert |
+| `geheim.py` | Maskiert Zugangsdaten in allem, was protokolliert oder verschickt wird |
 | `dienst.py` | Bedienung: einrichten, Status, Protokoll (wird zur EXE gebaut) |
 | `windienst.py` | meldet den Gateway als Windows-Dienst an |
 | `pfade.py` | findet `.env`, Zustand und Protokoll neben dem Programm |
