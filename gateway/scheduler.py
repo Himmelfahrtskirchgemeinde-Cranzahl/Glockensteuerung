@@ -42,6 +42,7 @@ from heartbeat import Heartbeat, mask_serial
 from notify import EmailNotifier
 import outbox
 import pfade
+import protokoll
 import sperre
 from voco_mqtt import Voco, decode_name
 
@@ -238,9 +239,9 @@ def protokoll_einrichten(ausfuehrlich: bool = False) -> str:
     """Protokoll auf die Konsole UND in eine Datei.
 
     Als Systemdienst gibt es kein Fenster: Ohne Datei bliebe im Fehlerfall
-    nichts uebrig ausser der Frage, warum nichts laeutet. Die Datei wird bei
-    1 MB umgebrochen und drei Staende werden aufgehoben - das reicht fuer
-    mehrere Wochen und laeuft nie voll.
+    nichts uebrig ausser der Frage, warum nichts laeutet. Jeder abgeschlossene
+    Monat wandert in den Unterordner 'protokolle' (siehe protokoll.py); die
+    laufende Datei bleibt dadurch klein, ohne dass Aelteres verloren geht.
     """
     wurzel = logging.getLogger()
     wurzel.setLevel(logging.DEBUG if ausfuehrlich else logging.INFO)
@@ -253,8 +254,7 @@ def protokoll_einrichten(ausfuehrlich: bool = False) -> str:
 
     datei = pfade.protokolldatei()
     try:
-        in_datei = logging.handlers.RotatingFileHandler(
-            datei, maxBytes=1_000_000, backupCount=3, encoding="utf-8")
+        in_datei = protokoll.MonatsProtokoll(datei, pfade.protokollordner())
         in_datei.setFormatter(form)
         wurzel.addHandler(geheim.schuetzen(in_datei))
     except Exception as e:                      # z. B. kein Schreibrecht

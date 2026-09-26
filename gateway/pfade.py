@@ -20,6 +20,8 @@ import sys
 ENV_DATEI = ".env"
 ZUSTAND_DATEI = "state.json"
 PROTOKOLL_DATEI = "gateway.log"
+# Unterordner fuer die abgeschlossenen Monate - siehe protokoll.py.
+PROTOKOLL_ORDNER = "protokolle"
 # Kurzlebige Marke: Sie sagt dem Dienst, dass das Anhalten gewollt ist - jemand
 # hat im Menue "anhalten" oder "neu starten" gewaehlt. Ohne sie gilt jedes
 # Anhalten als unerwartet und wird gemeldet. Genau darauf kommt es an: Haelt
@@ -122,6 +124,11 @@ def protokolldatei() -> str:
     """Laufendes Protokoll. Ohne das sieht niemand, warum der Dienst schweigt:
     Als Systemdienst gibt es kein Fenster, in dem etwas stehen koennte."""
     return os.path.join(arbeitsordner(), PROTOKOLL_DATEI)
+
+
+def protokollordner() -> str:
+    """Dorthin wandern die abgeschlossenen Monate des Protokolls."""
+    return os.path.join(arbeitsordner(), PROTOKOLL_ORDNER)
 
 
 def version() -> str:

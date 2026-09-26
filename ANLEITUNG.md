@@ -309,6 +309,12 @@ Was dann von selbst passiert:
 - Windows startet ihn nach einem Absturz **selbst neu**.
 - Verbindungen, die abreißen, baut er **eigenständig wieder auf**.
 - Er schreibt mit, was passiert – `gateway.log` neben der Programmdatei.
+  Am Monatsersten wandert der abgeschlossene Monat in den Unterordner
+  **`protokolle`**, als `gateway-log-09_2026.log`. Die laufende Datei
+  bleibt so klein, und nichts geht verloren: Was im Dezember geschah,
+  steht im Februar noch da. Aufgeräumt wird dort nichts – ein Monat
+  belegt rund ein Megabyte. Wer Platz braucht, löscht alte Dateien
+  einfach von Hand.
 
 ### 3.4 Prüfen, ohne dass etwas läutet
 

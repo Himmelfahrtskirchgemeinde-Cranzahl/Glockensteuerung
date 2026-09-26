@@ -108,7 +108,9 @@ Das war alles. Der Dienst steht danach in `services.msc` als
 - startet beim Hochfahren des Rechners, **ohne dass sich jemand anmeldet**,
 - wird von Windows nach einem Absturz selbst neu gestartet,
 - baut Verbindungen, die abreißen, eigenständig wieder auf,
-- schreibt mit, was passiert (`gateway.log` neben der EXE, umlaufend).
+- schreibt mit, was passiert (`gateway.log` neben der EXE). Jeder
+  abgeschlossene Monat wandert nach `protokolle/gateway-log-MM_JJJJ.log`;
+  die laufende Datei bleibt dadurch klein, Aelteres bleibt vollstaendig.
 
 ### Auf eine neue Version wechseln
 
@@ -299,6 +301,7 @@ WantedBy=multi-user.target
 | `geheim.py` | Maskiert Zugangsdaten in allem, was protokolliert oder verschickt wird |
 | `dienst.py` | Bedienung: einrichten, Status, Protokoll (wird zur EXE gebaut) |
 | `windienst.py` | meldet den Gateway als Windows-Dienst an |
+| `protokoll.py` | legt das Protokoll monatsweise ab (`protokolle/`) |
 | `pfade.py` | findet `.env`, Zustand und Protokoll neben dem Programm |
 | `einrichtung.py` | Einstellungsmenü: fragt ab, prüft und schreibt die `.env` |
 | `sperre.py` | verhindert, dass zwei Gateways gleichzeitig läuten |
