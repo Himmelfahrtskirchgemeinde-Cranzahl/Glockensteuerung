@@ -121,6 +121,15 @@ nicht lesen und meldet, dass die Extension noch nie geöffnet wurde.
 - Frontend: **Vue 3** (`<script setup>`) + TypeScript + Vite. Die Oberfläche
   steckt in einer einzigen `App.vue`; das Design kommt aus `app.css`
   (eigene `.gs-`-Klassen, kein CSS-Framework).
+- **Hell und dunkel**: `utils/thema.ts` erkennt das Thema von ChurchTools und
+  setzt `data-thema="hell|dunkel"` am `<html>`; `app.css` hängt daran eine
+  zweite Farbbelegung derselben Variablen – Aufbau und Abstände bleiben
+  gleich. Erkannt wird an der **gemessenen Farbe der Fläche**, auf der das
+  Modul liegt (im iframe: die Umgebung des Rahmens), ersatzweise an üblichen
+  Kennzeichen wie `data-theme` und zuletzt an der Einstellung des Rechners.
+  Ein `MutationObserver` zieht nach, wenn ChurchTools umgeschaltet wird.
+  ⚠ `html` und `body` dürfen deshalb **nicht** eingefärbt werden – sonst
+  mäße die Erkennung die eigene Farbe. Die Fläche trägt `.gs`.
 - MQTT: `mqtt` (MQTT.js) über WebSocket — Protokoll siehe
   [`../docs/VOCO-MQTT-Protokoll.md`](../docs/VOCO-MQTT-Protokoll.md).
 - ChurchTools-API: `@churchtools/churchtools-client`.

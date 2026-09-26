@@ -52,6 +52,75 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 }
 .gs * { box-sizing: border-box; }
 
+/* ---- Dunkles Thema ----
+   utils/thema.ts setzt `data-thema="dunkel"` am <html>, sobald ChurchTools
+   dunkel steht. Hier wird NUR die Farbbelegung ausgetauscht - Abstaende,
+   Groessen und Aufbau bleiben gleich. So bleibt es dieselbe Oberflaeche und
+   nicht eine zweite, die man mitpflegen muesste.
+
+   Die Werte sind nicht einfach invertiert: Auf dunklem Grund wirkt eine Farbe
+   kraeftiger, deshalb sind Blau und Gruen heller und die farbigen Flaechen
+   (Tints) deutlich dunkler als ihre hellen Gegenstuecke. */
+:root[data-thema="dunkel"] .gs {
+  --gs-navy: #0b1020;
+  --gs-blue: #74a3ff;
+  --gs-blue-strong: #8fb6ff;
+  --gs-blue-tint: #1b2742;
+  /* Etwas satter als im Hellen: Der Primaerknopf traegt weisse Schrift, und
+     die braucht auf der gruenen Flaeche Halt. Ein helleres Gruen sieht auf
+     dunklem Grund zwar kraeftiger aus, laesst die Beschriftung aber
+     verschwimmen. */
+  --gs-green: #2f9a33;
+  --gs-green-strong: #37ae3a;
+  --gs-page: #14181f;
+  --gs-surface: #1c212b;
+  --gs-surface-2: #242b37;
+  --gs-border: #2e3643;
+  --gs-border-strong: #3d4757;
+  --gs-text: #dde3ec;
+  --gs-head: #f3f6fa;
+  --gs-dim: #a0abbd;
+  --gs-faint: #7f8b9e;
+  --gs-success-bg: #182b1a;
+  --gs-success-fg: #86d383;
+  --gs-danger: #ff8b80;
+  --gs-danger-tint: #35201e;
+  --gs-warning: #e3ab4e;
+  --gs-warning-tint: #33281a;
+}
+
+/* Weisse Schrift steht im Hellen auf kraeftigem Blau oder Rot. Im Dunkeln sind
+   beide Farben hell - dort braucht dieselbe Flaeche dunkle Schrift, sonst ist
+   sie kaum zu lesen. */
+:root[data-thema="dunkel"] .gs-fab,
+:root[data-thema="dunkel"] .gs-badge,
+:root[data-thema="dunkel"] .gs-fab .badge { color: #101725; }
+
+/* Der Hinweiston kehrt sich um: helle Flaeche, dunkle Schrift - damit er sich
+   wie im Hellen vom Untergrund abhebt. */
+:root[data-thema="dunkel"] .gs-toast { color: var(--gs-page); }
+
+/* Das Zeichen im Banner sass auf Weiss. Ein aufgehelltes Feld traegt es im
+   Dunkeln besser als eine weitere fast gleiche Flaechenfarbe. */
+:root[data-thema="dunkel"] .gs-banner .ic { background: rgba(255, 255, 255, .07); }
+
+/* Die Schalter ueber dem Log tragen die Farbe ihrer Art - dieselbe wie das
+   Zeichen im Log. Im Dunkeln uebernehmen sie die Log-Farben direkt; die
+   dunklen Varianten von dort waeren auf dunklem Grund nicht zu erkennen. */
+:root[data-thema="dunkel"] .gs-chip.an.out { border-color: #3f5f9e; color: #93b4f0; }
+:root[data-thema="dunkel"] .gs-chip.an.in { border-color: #1f7e72; color: #5ad1c2; }
+:root[data-thema="dunkel"] .gs-chip.an.sim { border-color: #8a6a1f; color: #f0c26b; }
+:root[data-thema="dunkel"] .gs-chip.an.info { border-color: #58657a; color: #a9b4c6; }
+
+/* Schatten und Abdunklungen: auf dunklem Grund braucht beides mehr Schwarz,
+   sonst verschwindet das Schwebende und das Fenster dahinter bleibt zu laut. */
+:root[data-thema="dunkel"] .gs-fab,
+:root[data-thema="dunkel"] .gs-modal,
+:root[data-thema="dunkel"] .gs-toast { box-shadow: 0 10px 30px rgba(0, 0, 0, .55); }
+:root[data-thema="dunkel"] .gs-backdrop { background: rgba(0, 0, 0, .6); }
+:root[data-thema="dunkel"] .gs-navback { background: rgba(0, 0, 0, .55); }
+:root[data-thema="dunkel"] .gs-subnav { box-shadow: 0 8px 40px rgba(0, 0, 0, .5); }
+
 /* ---- Kopfleiste (voll breit, fix oben) ---- */
 .gs-mhead { display: flex; align-items: center; gap: 12px; padding: 0 22px; height: 58px; flex: none; background: var(--gs-surface); border-bottom: 1px solid var(--gs-border); position: sticky; top: 0; z-index: 20; }
 .gs-burger { display: none; background: none; border: none; padding: 8px; margin-left: -4px; border-radius: 9px; color: var(--gs-text); cursor: pointer; }
@@ -101,7 +170,7 @@ html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 .gs-subfoot .heart { color: var(--gs-faint); }
 /* Hinweis auf eine neuere Fassung – sichtbar, aber nicht so laut wie eine Störung. */
 .gs-update { display: inline-flex; align-items: center; gap: 5px; margin: 5px 0 7px; padding: 4px 9px; border-radius: 999px; background: var(--gs-blue-tint); color: var(--gs-blue); border: 1px solid color-mix(in srgb, var(--gs-blue) 22%, var(--gs-border)); font-size: 11.5px; font-weight: 700; text-decoration: none; }
-.gs-update:hover { background: color-mix(in srgb, var(--gs-blue) 14%, #fff); }
+.gs-update:hover { background: color-mix(in srgb, var(--gs-blue) 14%, var(--gs-surface)); }
 .gs-update svg { flex: none; }
 
 /* Versionsnummer ist anklickbar (oeffnet den Changelog) – sie soll aber weiter
@@ -151,15 +220,15 @@ button.ver:focus-visible { outline: 2px solid var(--gs-blue); outline-offset: 2p
 .gs-primary:hover { background: var(--gs-green-strong); }
 .gs-ring { background: var(--gs-green); color: #fff; }
 .gs-ring:hover { background: var(--gs-green-strong); }
-.gs-ghost, .gs-sim-btn { background: #fff; border-color: var(--gs-border-strong); color: var(--gs-text); }
+.gs-ghost, .gs-sim-btn { background: var(--gs-surface); border-color: var(--gs-border-strong); color: var(--gs-text); }
 .gs-ghost:hover, .gs-sim-btn:hover { background: var(--gs-surface-2); }
 .gs-sim-btn { color: var(--gs-blue); }
-.gs-stop { background: #fff; border-color: color-mix(in srgb, var(--gs-danger) 40%, var(--gs-border)); color: var(--gs-danger); }
+.gs-stop { background: var(--gs-surface); border-color: color-mix(in srgb, var(--gs-danger) 40%, var(--gs-border)); color: var(--gs-danger); }
 .gs-stop:hover { background: var(--gs-danger-tint); }
 
 /* ---- Simulations-Banner ---- */
 .gs-banner { display: flex; align-items: center; gap: 14px; border-radius: var(--gs-radius); padding: 14px 16px; margin-bottom: 16px; border: 1px solid; }
-.gs-banner .ic { width: 40px; height: 40px; border-radius: 10px; flex: none; display: grid; place-items: center; background: #fff; }
+.gs-banner .ic { width: 40px; height: 40px; border-radius: 10px; flex: none; display: grid; place-items: center; background: var(--gs-surface); }
 .gs-banner.sim-on { background: var(--gs-blue-tint); border-color: color-mix(in srgb, var(--gs-blue) 25%, var(--gs-border)); }
 .gs-banner.sim-on .ic { color: var(--gs-blue); }
 .gs-banner.sim-off { background: var(--gs-surface-2); border-color: var(--gs-border-strong); }
@@ -193,7 +262,7 @@ button.ver:focus-visible { outline: 2px solid var(--gs-blue); outline-offset: 2p
 .gs-fields { display: grid; grid-template-columns: 160px 1fr; gap: 11px 14px; align-items: center; }
 .gs-fields label { color: var(--gs-dim); font-size: 14px; }
 .gs input[type="text"], .gs input[type="password"], .gs input[type="number"], .gs input[type="email"], .gs select, .gs textarea {
-  font: inherit; font-size: 14px; color: var(--gs-text); background: #fff;
+  font: inherit; font-size: 14px; color: var(--gs-text); background: var(--gs-surface);
   border: 1px solid var(--gs-border-strong); border-radius: var(--gs-radius-sm); padding: 8px 11px; width: 100%;
 }
 .gs input:focus, .gs select:focus, .gs textarea:focus { outline: none; border-color: var(--gs-blue); box-shadow: 0 0 0 3px var(--gs-blue-tint); }
