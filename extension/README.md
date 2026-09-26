@@ -130,6 +130,12 @@ nicht lesen und meldet, dass die Extension noch nie geöffnet wurde.
   Ein `MutationObserver` zieht nach, wenn ChurchTools umgeschaltet wird.
   ⚠ `html` und `body` dürfen deshalb **nicht** eingefärbt werden – sonst
   mäße die Erkennung die eigene Farbe. Die Fläche trägt `.gs`.
+- **Kontraste**: Jede Schrift erreicht in **beiden** Themen mindestens
+  **4,5:1** gegen ihre Fläche (WCAG-Stufe AA); gemessen wird gegen die erste
+  gefüllte Fläche darüber, nicht gegen die nächstbeste Farbe. Die gedämpften
+  Töne (`--gs-dim`, `--gs-faint`) und die farbigen Flächen sind deshalb
+  dunkler, als sie auf den ersten Blick sein müssten. Wer sie aufhellt, nimmt
+  das zurück.
 - MQTT: `mqtt` (MQTT.js) über WebSocket — Protokoll siehe
   [`../docs/VOCO-MQTT-Protokoll.md`](../docs/VOCO-MQTT-Protokoll.md).
 - ChurchTools-API: `@churchtools/churchtools-client`.
