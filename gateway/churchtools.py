@@ -118,9 +118,14 @@ class ChurchTools:
         # wird - weder hier noch bei ChurchTools.
         self.s.headers["Authorization"] = f"Login {self._token}"
         if self._traegt():
-            log.warning("Die Anmeldung traegt nicht ueber den ersten Aufruf hinaus - "
-                        "es kommt kein gueltiges Sitzungs-Cookie an. Der Dienst weist "
-                        "sich deshalb bei jeder Anfrage im Kopf der Anfrage aus.")
+            # Bewusst nur eine Feststellung: Dieser Weg ist gleichwertig, das
+            # Token bleibt dabei aus jeder Adresse heraus, und es gibt nichts
+            # zu tun. Als Warnung stuende die Zeile bei jedem Start im
+            # Ereignis-Log der Gemeinde - und Warnungen, die immer kommen,
+            # liest bald niemand mehr.
+            log.info("Diese ChurchTools-Instanz gibt kein Sitzungs-Cookie mit. "
+                     "Der Dienst weist sich deshalb bei jeder Anfrage im Kopf "
+                     "der Anfrage aus.")
             return
         # Letzter Weg: in der Adresse. Aeltere Faelle koennen den Kopf nicht.
         self.s.headers.pop("Authorization", None)
