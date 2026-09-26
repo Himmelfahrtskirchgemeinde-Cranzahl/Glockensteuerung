@@ -231,8 +231,20 @@ Der Gateway meldet sich mit einem **Login-Token** an ChurchTools an
 (am besten ein eigener, technischer Benutzer):
 
 - In ChurchTools: **Persönliche Einstellungen → Sicherheit/Berechtigungen →
-  Login-Token** anzeigen/erzeugen. Der Benutzer braucht Leserechte auf die
-  betreffenden Kalender/Veranstaltungen und das Modul.
+  Login-Token** anzeigen/erzeugen.
+- **Rechte nicht vergessen – und zwar unter „Glockensteuerung“ in der
+  Rechteverwaltung.** Ein frisch angelegter technischer Benutzer hat keine,
+  und dann sieht der Dienst das Modul zwar, aber keine einzige Kategorie
+  darin. Gebraucht werden:
+
+  | Untermenü | sehen | bearbeiten | wofür |
+  |---|---|---|---|
+  | **Steuerung** | ✓ | ✓ | Gerät lesen; das **Lebenszeichen schreiben** – ohne das Bearbeiten-Recht meldet die Erweiterung dauerhaft „Automatik nicht erreichbar“ |
+  | **Ereignis-Log** | ✓ | ✓ | seine Meldungen ins Log schreiben |
+  | **Automatik-Regeln** | ✓ | – | die Regeln lesen |
+  | **E-Mail-Versand** | ✓ | – | nur wenn Störungsmails gewünscht sind – dort liegt der Postausgang |
+
+  Dazu **Leserechte auf die Kalender**, aus denen geläutet werden soll.
 
 ### 3.3 Windows: einrichten in fünf Minuten
 
@@ -602,6 +614,7 @@ Angehängt werden nur technische Angaben (Instanz-Host, Version, letzte Ereignis
 |---|---|
 | „Gerät offline" in der Extension | Seriennummer/Passwort falsch, oder VOCO gerade nicht mit dem HEW-Broker verbunden (Internet am Gerät prüfen). |
 | „Automatik nicht erreichbar" in der Extension | Der Gateway meldet sich nicht mehr. Unter Windows: `Glockensteuerung-Gateway.exe --status` – dort steht, ob der Dienst läuft und was zuletzt im Protokoll stand. |
+| Im Protokoll steht „Kategorie 'steuerung' im Modul nicht gefunden“ | Das Modul ist da, aber der technische Benutzer darf die Kategorien nicht sehen. Die Meldung nennt, welche für ihn sichtbar sind – steht dort *keine*, fehlen ihm die Rechte ganz. Zu vergeben in der Rechteverwaltung unter „Glockensteuerung“; welche genau, steht in Teil 3.2. |
 | Im Protokoll steht „Custom-Module 'glockensteuerung' nicht gefunden“ | Der Dienst spricht mit einer ChurchTools-Instanz, in der die Extension nicht liegt – oder sie wurde dort noch nie von einer berechtigten Person geöffnet. Die Meldung nennt alles dazu: die Adresse, als wer der Dienst dort angemeldet ist und welche Module er vorgefunden hat. Steht bei „angemeldet als“ *niemand erkennbar*, gilt das Login-Token für diese Instanz nicht – ChurchTools weist ein fremdes Token nicht ab, es antwortet nur ohne angemeldete Person. Wird dagegen eine Person genannt und es steht trotzdem „dort vorhanden: keine“, trug die Anmeldung früher nicht bis zur nächsten Anfrage; seit 26.10.5 merkt der Dienst das und legt das Token jeder Anfrage bei. Menüpunkt 3 zeigt die Adresse unter „Instanz“. Stimmt sie nicht, unter Menüpunkt 2 den Zugang umstellen und den Dienst neu starten (Menüpunkt 6) – die Zugangsdaten werden nur beim Start gelesen. |
 | Der Dienst lief, tat aber nichts | Bis Version 26.7 beendete er sich stillschweigend, sobald die ChurchTools-Sitzung ablief oder beim Hochfahren noch kein Netz da war. Ab 26.8 meldet er sich selbst neu an und versucht es weiter – die neue Fassung installieren. |
 | Es läutet doppelt | Es läuft noch ein zweiter Gateway, meist ein alter Eintrag in der Aufgabenplanung. `--status` nennt solche Einträge; `--installieren` schaltet sie ab. Seit 26.10 zieht sich ein zweiter Gateway von selbst zurück und schreibt den Grund ins Protokoll – auch dann, wenn der eine als Dienst und der andere unter einem Benutzerkonto läuft. Der **Testlauf** (Menüpunkt 4) ist davon ausgenommen: Er löst nichts aus und darf deshalb neben dem laufenden Dienst starten. |
