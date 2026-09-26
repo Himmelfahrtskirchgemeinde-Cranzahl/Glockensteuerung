@@ -28,16 +28,64 @@ SPERRDATEI = "gateway.lock"
 _halter = None          # haelt Mutex bzw. Datei offen, solange der Dienst laeuft
 
 
+# Jeder darf den Mutex oeffnen. Ohne das legt der Dienst (als System) ein
+# Objekt an, das ein angemeldeter Benutzer nicht einmal ansehen darf - sein
+# CreateMutexW scheitert dann mit "Zugriff verweigert" statt mit "gibt es
+# schon". Genau der Fall, den die Sperre erkennen soll, blieb so unerkannt.
+_SDDL_JEDER = "D:(A;;GA;;;WD)"
+ERROR_ACCESS_DENIED = 5
+ERROR_FILE_NOT_FOUND = 2
+ERROR_ALREADY_EXISTS = 183
+SYNCHRONIZE = 0x00100000
+
+
+def _sicherheit(ctypes, wintypes):
+    """SECURITY_ATTRIBUTES, die jedem den Zugriff erlauben - oder None."""
+    try:
+        advapi = ctypes.WinDLL("advapi32", use_last_error=True)
+        sd = ctypes.c_void_p()
+        ok = advapi.ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            ctypes.c_wchar_p(_SDDL_JEDER), 1, ctypes.byref(sd), None)
+        if not ok:
+            return None
+
+        class SA(ctypes.Structure):
+            _fields_ = [("nLength", wintypes.DWORD),
+                        ("lpSecurityDescriptor", ctypes.c_void_p),
+                        ("bInheritHandle", wintypes.BOOL)]
+
+        return SA(ctypes.sizeof(SA), sd, False)
+    except Exception:
+        return None                      # dann eben mit den Standardrechten
+
+
+def _laeuft_schon(ctypes, kernel32) -> bool:
+    """Gibt es den Mutex, obwohl wir ihn nicht anlegen durften?
+
+    Auf ein Objekt, das es nicht gibt, antwortet Windows mit "nicht gefunden".
+    Kommt dagegen wieder "Zugriff verweigert", ist es da - und dann laeuft ein
+    Gateway unter einem anderen Konto.
+    """
+    kernel32.OpenMutexW.restype = ctypes.c_void_p
+    handle = kernel32.OpenMutexW(SYNCHRONIZE, False, MUTEX_NAME)
+    if handle:
+        kernel32.CloseHandle(ctypes.c_void_p(handle))
+        return True
+    return ctypes.get_last_error() != ERROR_FILE_NOT_FOUND
+
+
 def _windows_sperren() -> bool:
     import ctypes
     from ctypes import wintypes
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel32.CreateMutexW.restype = wintypes.HANDLE
     kernel32.CreateMutexW.argtypes = [wintypes.LPCVOID, wintypes.BOOL, wintypes.LPCWSTR]
-    handle = kernel32.CreateMutexW(None, True, MUTEX_NAME)
+    sa = _sicherheit(ctypes, wintypes)
+    handle = kernel32.CreateMutexW(ctypes.byref(sa) if sa else None, True, MUTEX_NAME)
     fehler = ctypes.get_last_error()
-    ERROR_ALREADY_EXISTS = 183
     if not handle:
+        if fehler == ERROR_ACCESS_DENIED and _laeuft_schon(ctypes, kernel32):
+            return False
         # Ohne Mutex lieber weiterlaufen als gar nicht laeuten.
         log.warning("Mehrfachstart-Sperre nicht moeglich (Fehler %s).", fehler)
         return True
