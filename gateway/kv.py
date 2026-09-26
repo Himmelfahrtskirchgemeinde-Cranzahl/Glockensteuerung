@@ -49,13 +49,15 @@ class KV:
                 vorhanden = ", ".join(
                     str(m.get("shorty")) for m in module if m.get("shorty")
                 ) or "keine"
+                wer = getattr(self.ct, "benutzer", "") or "niemand erkennbar"
                 raise RuntimeError(
                     f"Custom-Module '{self.ext_key}' nicht gefunden auf "
                     f"{getattr(self.ct, 'base', '(unbekannte Adresse)')} "
-                    f"(dort vorhanden: {vorhanden}). Entweder zeigt CT_BASE_URL auf "
-                    "eine andere Instanz als die mit der Extension, oder die "
-                    "Extension wurde dort noch nie von einer berechtigten Person "
-                    "geoeffnet."
+                    f"(angemeldet als: {wer}; dort vorhanden: {vorhanden}). "
+                    "Moegliche Gruende: CT_BASE_URL zeigt auf eine andere Instanz "
+                    "als die mit der Extension; das Login-Token gilt dort nicht; "
+                    "oder die Extension wurde dort noch nie von einer berechtigten "
+                    "Person geoeffnet."
                 )
         if self._kategorie_id is None:
             for c in self.ct.get(f"/custommodules/{self._modul_id}/customdatacategories"):

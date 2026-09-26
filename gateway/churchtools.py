@@ -46,10 +46,34 @@ class ChurchTools:
         self.anmelden()
 
     def anmelden(self) -> None:
-        """Sitzung per Login-Token (neu) aufbauen - setzt das Cookie."""
+        """Sitzung per Login-Token (neu) aufbauen - setzt das Cookie.
+
+        Haelt fest, WER dabei herauskommt. Das ist keine Spielerei: Auf ein
+        Token, das zu dieser Instanz nicht passt, antwortet ChurchTools nicht
+        mit 401, sondern mit einer Sitzung ohne angemeldete Person - HTTP 200.
+        Der Dienst lief dann weiter, sah aber nichts und meldete nur, das
+        Custom-Module sei "nicht gefunden". Mit dem Namen im Protokoll ist in
+        einem Blick klar, ob das Token greift.
+        """
         r = self.s.get(f"{self.api}/whoami", params={"login_token": self._token},
                        timeout=self.timeout)
         r.raise_for_status()
+        wer = self._unwrap(r)
+        self.benutzer = ""
+        if isinstance(wer, dict):
+            name = " ".join(x for x in (wer.get("firstName"), wer.get("lastName")) if x)
+            kennung = wer.get("id")
+            self.benutzer = (f"{name} (ID {kennung})" if name else
+                             (f"ID {kennung}" if kennung else ""))
+        if self.benutzer:
+            log.info("Bei ChurchTools angemeldet als %s.", self.benutzer)
+        else:
+            # Kein Abbruch: Vielleicht liefert eine kuenftige Fassung die
+            # Angaben anders. Gesagt werden muss es trotzdem - ohne diesen
+            # Hinweis sucht man den Fehler bei den Rechten statt beim Token.
+            log.warning("Bei ChurchTools angemeldet, aber ohne erkennbare Person - "
+                        "das Login-Token gilt fuer %s vermutlich nicht. Der Dienst "
+                        "sieht dann weder Modul noch Regeln.", self.base)
 
     def _anfrage(self, methode: str, path: str, *, params=None, json=None):
         letzter: Exception | None = None
