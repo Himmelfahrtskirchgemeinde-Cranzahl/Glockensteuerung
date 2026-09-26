@@ -60,12 +60,28 @@ class KV:
                     "Person geoeffnet."
                 )
         if self._kategorie_id is None:
-            for c in self.ct.get(f"/custommodules/{self._modul_id}/customdatacategories"):
+            kategorien = list(self.ct.get(
+                f"/custommodules/{self._modul_id}/customdatacategories") or [])
+            for c in kategorien:
                 if c.get("shorty") == self.kategorie:
                     self._kategorie_id = c.get("id")
                     break
             if self._kategorie_id is None:
-                raise RuntimeError(f"Kategorie '{self.kategorie}' im Modul nicht gefunden.")
+                # ChurchTools liefert nur die Kategorien, die der angemeldete
+                # Benutzer sehen darf. Eine leere Liste heisst deshalb fast
+                # immer: Dem technischen Benutzer fehlen die Rechte auf das
+                # Modul - nicht, dass die Kategorie fehlt. Ohne diesen Hinweis
+                # sucht man sie in der Extension, wo sie laengst steht.
+                sichtbar = ", ".join(
+                    str(c.get("shorty")) for c in kategorien if c.get("shorty")
+                ) or "keine"
+                wer = getattr(self.ct, "benutzer", "") or "unbekannt"
+                raise RuntimeError(
+                    f"Kategorie '{self.kategorie}' im Modul nicht gefunden "
+                    f"(angemeldet als: {wer}; sichtbar sind: {sichtbar}). "
+                    "Sichtbar ist nur, worauf dieser Benutzer Rechte hat - in "
+                    "der Rechteverwaltung unter 'Glockensteuerung' pruefen."
+                )
         return (f"/custommodules/{self._modul_id}"
                 f"/customdatacategories/{self._kategorie_id}/customdatavalues")
 
