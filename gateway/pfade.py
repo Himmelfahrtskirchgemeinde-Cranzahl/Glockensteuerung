@@ -22,6 +22,10 @@ ZUSTAND_DATEI = "state.json"
 PROTOKOLL_DATEI = "gateway.log"
 # Unterordner fuer die abgeschlossenen Monate - siehe protokoll.py.
 PROTOKOLL_ORDNER = "protokolle"
+# Zuletzt gelesener Zugang zum Postausgang - siehe mailzugang.py. Ohne ihn
+# bliebe die Stoerungsmail gerade dann aus, wenn ChurchTools nicht erreichbar
+# ist.
+MAILZUGANG_DATEI = "mailzugang.json"
 # Kurzlebige Marke: Sie sagt dem Dienst, dass das Anhalten gewollt ist - jemand
 # hat im Menue "anhalten" oder "neu starten" gewaehlt. Ohne sie gilt jedes
 # Anhalten als unerwartet und wird gemeldet. Genau darauf kommt es an: Haelt
@@ -129,6 +133,11 @@ def protokolldatei() -> str:
 def protokollordner() -> str:
     """Dorthin wandern die abgeschlossenen Monate des Protokolls."""
     return os.path.join(arbeitsordner(), PROTOKOLL_ORDNER)
+
+
+def mailzugangsdatei() -> str:
+    """Gemerkter Zugang zum Postausgang (enthaelt das Passwort)."""
+    return os.path.join(arbeitsordner(), MAILZUGANG_DATEI)
 
 
 def version() -> str:

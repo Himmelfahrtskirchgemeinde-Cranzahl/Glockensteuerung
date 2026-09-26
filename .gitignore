@@ -38,5 +38,12 @@ gateway/zwischenzertifikat.pem
 gateway/gateway.log
 # Sperrdatei des laufenden Dienstes (siehe gateway/sperre.py)
 gateway/gateway.lock
+# Abgelegte Monate des Protokolls (siehe gateway/protokoll.py). Darin stehen
+# Namen von Personen - das gehoert nicht in ein oeffentliches Repository.
+gateway/protokolle/
+# Gemerkter Zugang zum Postausgang (siehe gateway/mailzugang.py). ENTHAELT DAS
+# PASSWORT - darf unter keinen Umstaenden committet werden.
+mailzugang.json
+gateway/mailzugang.json
 gateway/state.json
 gateway/version.py

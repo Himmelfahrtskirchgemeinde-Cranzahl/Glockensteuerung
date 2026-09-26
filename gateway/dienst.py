@@ -688,6 +688,15 @@ def _archiv_umfang() -> str:
     return f"  ({len(dateien)} abgelegte Datei(en))" if dateien else "  (noch leer)"
 
 
+def _mailzugang() -> str:
+    """Gemerkter Zugang zum Postausgang - fuer den Fall ohne ChurchTools."""
+    try:
+        import mailzugang
+        return mailzugang.beschreibung()
+    except Exception:
+        return "(nicht pruefbar)"
+
+
 def _instanz() -> str:
     """Adresse der ChurchTools-Instanz aus der .env - ohne Zugangsdaten."""
     try:
@@ -709,6 +718,9 @@ def status() -> int:
     print(f"Instanz:       {_instanz() or '(keine Adresse eingetragen)'}")
     print(f"Protokoll:     {pfade.protokolldatei()}")
     print(f"Archiv:        {pfade.protokollordner()}{_archiv_umfang()}")
+    # Ob eine Stoerungsmail auch dann rausgeht, wenn ChurchTools beim Start
+    # nicht erreichbar ist - genau dann, wenn sie am noetigsten ist.
+    print(f"Postausgang:   {_mailzugang()}")
     if ist_windows():
         print(f"Dienst:        {windienst.zustand()}")
         # Die wichtigere Frage als "laeuft er gerade": Faengt er nach einem

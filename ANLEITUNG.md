@@ -624,10 +624,38 @@ Da mehrere Leute testen, sammeln wir Rückmeldungen und Fehler **zentral**.
 
 ### Im Gateway (automatische Fehler-Mails)
 Der Gateway läuft dauerhaft; er mailt bei Fehlern an `EMAIL_TO`
-(Standard `josua.hess@icloud.com`). Dazu in der `gateway/.env` die SMTP-Daten
-eines Postausgangs eintragen (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, …; siehe
-`gateway/.env.example`). Ohne SMTP bleibt es still (nur Log). Eine **Spam-Sperre**
+(Standard `josua.hess@icloud.com`). Die Zugangsdaten des Postausgangs werden
+üblicherweise in der Erweiterung gepflegt (Untermenü „E-Mail-Versand"); ersatzweise
+gehen sie in die `gateway/.env` (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, …; siehe
+`gateway/.env.example`). Ohne Postausgang bleibt es still (nur Log). Eine **Spam-Sperre**
 sendet dieselbe Fehlerart höchstens einmal pro Stunde.
+
+**Wenn die Automatik gar nicht läuft.** Dieser Fall fällt sonst niemandem auf:
+Erreicht der Dienst ChurchTools nicht, kommt dort auch kein Lebenszeichen an –
+und die Erweiterung, die einen Ausfall sonst meldet, bekommt selbst nichts mit.
+Genau so stand die Automatik im September 2026 **32 Stunden** still, ohne dass
+jemand etwas ahnte.
+
+Deshalb meldet sich der Dienst jetzt selbst:
+
+| Wann | Was |
+|---|---|
+| nach **10 Minuten** ohne gelungenen Anlauf | eine als **dringend** gekennzeichnete Mail: seit wann, woran es liegt, welche ChurchTools-Adresse, welcher Rechner |
+| alle **12 Stunden**, solange es nicht läuft | dieselbe Meldung noch einmal – eine einzige Mail geht im Posteingang unter |
+| sobald es wieder läuft | eine **Entwarnung** mit der Dauer der Störung |
+
+Die ersten zehn Minuten bleiben absichtlich still: Nach einem Neustart des
+Rechners ist das Netz oft noch nicht da, und eine Mail wäre dann jedes Mal ein
+Fehlalarm.
+
+> Damit das gehen kann, merkt sich der Dienst die Zugangsdaten des Postausgangs
+> auf dem Rechner – sie liegen ja sonst in ChurchTools, an das er gerade nicht
+> herankommt. In der Datei steht das **Passwort des Postausgangs**; unter
+> Windows ist sie an das Konto des Dienstes gebunden und für andere angemeldete
+> Benutzer nicht lesbar. Wo sie liegt, sagt Menüpunkt **3** in der Zeile
+> `Postausgang:`. Wer das nicht möchte, löscht die Datei – dann bleibt die
+> Meldung im Anlauffall aus, und im Protokoll steht, dass niemand
+> benachrichtigt werden konnte.
 
 ### Datenschutz
 Berichte enthalten **keine** Passwörter/Token; die Seriennummer wird **maskiert**.
@@ -643,6 +671,7 @@ Angehängt werden nur technische Angaben (Instanz-Host, Version, letzte Ereignis
 | „Automatik nicht erreichbar" in der Extension | Der Gateway meldet sich nicht mehr. Unter Windows: `Glockensteuerung-Gateway.exe --status` – dort steht, ob der Dienst läuft und was zuletzt im Protokoll stand. |
 | Im Protokoll steht „Kategorie 'steuerung' im Modul nicht gefunden“ | Das Modul ist da, aber der technische Benutzer darf die Kategorien nicht sehen. Die Meldung nennt, welche für ihn sichtbar sind – steht dort *keine*, fehlen ihm die Rechte ganz. Zu vergeben in der Rechteverwaltung unter „Glockensteuerung“; welche genau, steht in Teil 3.2. |
 | Im Protokoll steht „Custom-Module 'glockensteuerung' nicht gefunden“ | Der Dienst spricht mit einer ChurchTools-Instanz, in der die Extension nicht liegt – oder sie wurde dort noch nie von einer berechtigten Person geöffnet. Die Meldung nennt alles dazu: die Adresse, als wer der Dienst dort angemeldet ist und welche Module er vorgefunden hat. Steht bei „angemeldet als“ *niemand erkennbar*, gilt das Login-Token für diese Instanz nicht – ChurchTools weist ein fremdes Token nicht ab, es antwortet nur ohne angemeldete Person. Wird dagegen eine Person genannt und es steht trotzdem „dort vorhanden: keine“, trug die Anmeldung früher nicht bis zur nächsten Anfrage; seit 26.10.5 merkt der Dienst das und legt das Token jeder Anfrage bei. Menüpunkt 3 zeigt die Adresse unter „Instanz“. Stimmt sie nicht, unter Menüpunkt 2 den Zugang umstellen und den Dienst neu starten (Menüpunkt 6) – die Zugangsdaten werden nur beim Start gelesen. |
+| Die Automatik stand lange still, ohne dass es jemand merkte | Erreicht der Dienst ChurchTools nicht, kommt dort kein Lebenszeichen an – und die Erweiterung, die einen Ausfall sonst meldet, bekommt selbst nichts mit. Neuere Fassungen melden sich deshalb nach **10 Minuten** ohne gelungenen Anlauf selbst per Mail und erinnert alle 12 Stunden daran. Kommt keine Mail an, steht im Protokoll, woran es lag – meist ist gar kein Postausgang bekannt (siehe Teil „Im Gateway"). |
 | Der Dienst lief, tat aber nichts | Bis Version 26.7 beendete er sich stillschweigend, sobald die ChurchTools-Sitzung ablief oder beim Hochfahren noch kein Netz da war. Ab 26.8 meldet er sich selbst neu an und versucht es weiter – die neue Fassung installieren. |
 | Es läutet doppelt | Es läuft noch ein zweiter Gateway, meist ein alter Eintrag in der Aufgabenplanung. `--status` nennt solche Einträge; `--installieren` schaltet sie ab. Seit 26.10 zieht sich ein zweiter Gateway von selbst zurück und schreibt den Grund ins Protokoll – auch dann, wenn der eine als Dienst und der andere unter einem Benutzerkonto läuft. Der **Testlauf** (Menüpunkt 4) ist davon ausgenommen: Er löst nichts aus und darf deshalb neben dem laufenden Dienst starten. |
 | Zeitweise wird gar nicht geläutet | Der Rechner geht schlafen – währenddessen läuft der Dienst nicht. `--status` weist darauf hin; abschalten beim Einrichten oder in den Energieoptionen („Energiesparmodus: Niemals"). |
