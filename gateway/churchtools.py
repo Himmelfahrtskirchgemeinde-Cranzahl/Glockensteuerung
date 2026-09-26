@@ -43,6 +43,10 @@ class ChurchTools:
         self._token = login_token
         self.s = requests.Session()
         self.s.headers["Accept"] = "application/json"
+        self.benutzer = ""
+        # Traegt die Sitzung nicht, wird das Token jeder Anfrage beigelegt.
+        # Siehe anmelden().
+        self._token_mitsenden = False
         self.anmelden()
 
     def anmelden(self) -> None:
@@ -58,15 +62,10 @@ class ChurchTools:
         r = self.s.get(f"{self.api}/whoami", params={"login_token": self._token},
                        timeout=self.timeout)
         r.raise_for_status()
-        wer = self._unwrap(r)
-        self.benutzer = ""
-        if isinstance(wer, dict):
-            name = " ".join(x for x in (wer.get("firstName"), wer.get("lastName")) if x)
-            kennung = wer.get("id")
-            self.benutzer = (f"{name} (ID {kennung})" if name else
-                             (f"ID {kennung}" if kennung else ""))
+        self.benutzer = self._person(self._unwrap(r))
         if self.benutzer:
             log.info("Bei ChurchTools angemeldet als %s.", self.benutzer)
+            self._sitzung_pruefen()
         else:
             # Kein Abbruch: Vielleicht liefert eine kuenftige Fassung die
             # Angaben anders. Gesagt werden muss es trotzdem - ohne diesen
@@ -75,7 +74,59 @@ class ChurchTools:
                         "das Login-Token gilt fuer %s vermutlich nicht. Der Dienst "
                         "sieht dann weder Modul noch Regeln.", self.base)
 
+    @staticmethod
+    def _person(daten) -> str:
+        """'Vorname Nachname (ID n)' aus einer whoami-Antwort - oder leer.
+
+        Wer nicht angemeldet ist, bekommt von ChurchTools keine Absage,
+        sondern einen Platzhalter ohne Namen und mit einer Kennung von 0 oder
+        -1. Der gilt hier als "niemand" - sonst haette der Dienst sich selbst
+        bestaetigt, angemeldet zu sein.
+        """
+        if not isinstance(daten, dict):
+            return ""
+        name = " ".join(x for x in (daten.get("firstName"), daten.get("lastName")) if x)
+        try:
+            kennung = int(daten.get("id"))
+        except (TypeError, ValueError):
+            kennung = 0
+        if kennung <= 0:
+            return ""
+        return f"{name} (ID {kennung})" if name else f"ID {kennung}"
+
+    def _sitzung_pruefen(self) -> None:
+        """Traegt die Anmeldung ueber den ersten Aufruf hinaus?
+
+        Die Anmeldung setzt ein Sitzungs-Cookie, und jede weitere Anfrage lebt
+        davon. Kommt das Cookie nicht an - etwa weil die Adresse weiterleitet
+        und es bei der Zieladresse landet -, ist der Dienst ab dem zweiten
+        Aufruf wieder anonym. ChurchTools weist ihn dann nicht ab, sondern
+        antwortet mit leeren Listen: keine Module, keine Regeln, kein
+        Lebenszeichen. Von aussen sah das aus wie fehlende Rechte.
+
+        Deshalb hier ein zweiter whoami-Aufruf, diesmal OHNE Token. Erkennt er
+        dieselbe Person, traegt die Sitzung. Sonst legt der Dienst das Token
+        jeder Anfrage bei - der Weg, den ChurchTools fuer Server dieser Art
+        ohnehin vorsieht.
+        """
+        self._token_mitsenden = False
+        try:
+            probe = self._person(self._unwrap(
+                self.s.get(f"{self.api}/whoami", timeout=self.timeout)))
+        except Exception as e:
+            probe = ""
+            log.debug("Sitzungspruefung nicht moeglich: %s", e)
+        if probe:
+            return
+        self._token_mitsenden = True
+        log.warning("Die Anmeldung traegt nicht ueber den ersten Aufruf hinaus - "
+                    "es kommt kein gueltiges Sitzungs-Cookie an. Der Dienst legt "
+                    "das Login-Token deshalb jeder Anfrage bei.")
+
     def _anfrage(self, methode: str, path: str, *, params=None, json=None):
+        if self._token_mitsenden:
+            params = dict(params or {})
+            params.setdefault("login_token", self._token)
         letzter: Exception | None = None
         neu_angemeldet = False
         for versuch in range(VERSUCHE):
