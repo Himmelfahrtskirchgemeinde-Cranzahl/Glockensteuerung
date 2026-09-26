@@ -678,6 +678,16 @@ def anhalten() -> int:
     return rc
 
 
+def _archiv_umfang() -> str:
+    """'(3 abgelegte Monate)' - oder nichts, solange keiner abgelegt wurde."""
+    try:
+        dateien = [n for n in os.listdir(pfade.protokollordner())
+                   if n.startswith("gateway-log-")]
+    except OSError:
+        return "  (noch leer)"
+    return f"  ({len(dateien)} abgelegte Datei(en))" if dateien else "  (noch leer)"
+
+
 def _instanz() -> str:
     """Adresse der ChurchTools-Instanz aus der .env - ohne Zugangsdaten."""
     try:
@@ -698,6 +708,7 @@ def status() -> int:
     # ungenannt.
     print(f"Instanz:       {_instanz() or '(keine Adresse eingetragen)'}")
     print(f"Protokoll:     {pfade.protokolldatei()}")
+    print(f"Archiv:        {pfade.protokollordner()}{_archiv_umfang()}")
     if ist_windows():
         print(f"Dienst:        {windienst.zustand()}")
         # Die wichtigere Frage als "laeuft er gerade": Faengt er nach einem
