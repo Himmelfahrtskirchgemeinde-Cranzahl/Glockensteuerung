@@ -207,6 +207,27 @@ worden". Der gewöhnliche Betrieb bleibt unauffällig.
 **Herunterladen** speichert genau das, was die Suche gerade übrig lässt. Ohne
 Filter ist es der ganze gespeicherte Bestand.
 
+### 2.5 Hell oder dunkel
+
+Die Erweiterung folgt dem **Thema von ChurchTools**: Steht ChurchTools auf
+dunkel, wird auch die Erweiterung dunkel – und umgekehrt. Einzustellen ist
+dafür nichts, und das Umschalten wirkt sofort, ohne die Seite neu zu laden.
+
+> Früher blieb die Erweiterung immer hell. ChurchTools färbte seine Schrift
+> dann weiß, und die stand auf den weißen Karten der Erweiterung – einzelne
+> Zeilen waren dadurch gar nicht zu lesen.
+
+Erkannt wird das Thema an der **Farbe der Fläche**, auf der die Erweiterung
+liegt – nicht an einem Namen im Seitenaufbau, der sich mit der nächsten
+ChurchTools-Fassung ändern könnte. Passt es doch einmal nicht, steht im
+Ereignis-Log gleich nach dem Öffnen eine Zeile wie
+
+```
+Thema: dunkel - erkannt an: Flaeche von <div> (Helligkeit 0.02)
+```
+
+Die sagt, wofür die Erweiterung sich entschieden hat und warum.
+
 ---
 
 ## Teil 3 – Automatik-Gateway einrichten

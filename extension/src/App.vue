@@ -11,6 +11,7 @@ import { fetchLatest, isStale, isNewer, parseChangelog, DOWNLOAD_URL, RELEASES_U
 import type { UpdateCheck } from './update';
 import type { Rights } from './perms';
 import { fitInfo } from './utils/fit-height';
+import { themaInfo } from './utils/thema';
 import { ohneDoppelte, zuZeilen, filtern, schwere, leererFilter, filterAktiv, gatewayArt } from './logbuch';
 import type { LogDir, Zeile, LogFilter } from './logbuch';
 
@@ -643,6 +644,10 @@ async function boot() {
         // Seitenleiste doch mitscrollen – dann sieht man sofort, woran es liegt.
         const fit = fitInfo();
         pushLog(`Layout: ${fit.mode} – ${fit.detail} → Höhe ${fit.height}px`, 'info', true);
+        // Welches Thema erkannt wurde und woran. Steht im Log, falls die
+        // Erweiterung hell bleibt, obwohl ChurchTools dunkel steht.
+        const thema = themaInfo();
+        pushLog(`Thema: ${thema.thema} – erkannt an: ${thema.quelle}`, 'info', true);
         loading.value = false;
     } catch (e) {
         loading.value = false;
@@ -1253,8 +1258,8 @@ async function loadNextRingings() {
                 „Herunterladen“ speichert genau diese Auswahl.
               </div>
               <div class="gs-log">
-                <span v-if="alleLogZeilen.length === 0" style="color:#7c8b99">(noch keine Ereignisse – „Aktualisieren" drücken oder Gerät verbinden)</span>
-                <span v-else-if="gefilterteZeilen.length === 0" style="color:#7c8b99">(keine Zeile passt – Suche ändern oder „Zurücksetzen“)</span>
+                <span v-if="alleLogZeilen.length === 0" style="color:var(--gs-faint)">(noch keine Ereignisse – „Aktualisieren" drücken oder Gerät verbinden)</span>
+                <span v-else-if="gefilterteZeilen.length === 0" style="color:var(--gs-faint)">(keine Zeile passt – Suche ändern oder „Zurücksetzen“)</span>
                 <div v-if="!canEdit('log') && alleLogZeilen.length" class="gs-loghint">Nur mitlesen: Zeilen dieser Sitzung werden nicht dauerhaft gespeichert.</div>
                 <div v-for="(e, i) in gefilterteZeilen" :key="i" :class="schwere(e)"><span class="ts">{{ zeitstempel(e.ts) }}</span> <span :class="e.dir">{{ logIcon(e.dir) }}</span> {{ e.line }}<span v-if="e.wer" class="wer"> – {{ e.wer }}</span></div>
               </div>
