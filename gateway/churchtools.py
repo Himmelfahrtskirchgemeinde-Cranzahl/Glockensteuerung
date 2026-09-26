@@ -110,18 +110,33 @@ class ChurchTools:
         ohnehin vorsieht.
         """
         self._token_mitsenden = False
-        try:
-            probe = self._person(self._unwrap(
-                self.s.get(f"{self.api}/whoami", timeout=self.timeout)))
-        except Exception as e:
-            probe = ""
-            log.debug("Sitzungspruefung nicht moeglich: %s", e)
-        if probe:
+        self.s.headers.pop("Authorization", None)
+        if self._traegt():
             return
+        # Zweiter Weg, und der bessere: das Token im Kopf der Anfrage statt in
+        # der Adresse. So steht es in keiner Adresse, die irgendwo mitgeschrieben
+        # wird - weder hier noch bei ChurchTools.
+        self.s.headers["Authorization"] = f"Login {self._token}"
+        if self._traegt():
+            log.warning("Die Anmeldung traegt nicht ueber den ersten Aufruf hinaus - "
+                        "es kommt kein gueltiges Sitzungs-Cookie an. Der Dienst weist "
+                        "sich deshalb bei jeder Anfrage im Kopf der Anfrage aus.")
+            return
+        # Letzter Weg: in der Adresse. Aeltere Faelle koennen den Kopf nicht.
+        self.s.headers.pop("Authorization", None)
         self._token_mitsenden = True
         log.warning("Die Anmeldung traegt nicht ueber den ersten Aufruf hinaus - "
                     "es kommt kein gueltiges Sitzungs-Cookie an. Der Dienst legt "
                     "das Login-Token deshalb jeder Anfrage bei.")
+
+    def _traegt(self) -> bool:
+        """Erkennt ChurchTools den Dienst bei einem Aufruf ohne Token wieder?"""
+        try:
+            return bool(self._person(self._unwrap(
+                self.s.get(f"{self.api}/whoami", timeout=self.timeout))))
+        except Exception as e:
+            log.debug("Sitzungspruefung nicht moeglich: %s", e)
+            return False
 
     def _anfrage(self, methode: str, path: str, *, params=None, json=None):
         if self._token_mitsenden:
