@@ -223,10 +223,26 @@ def load_dotenv(path: str | None = None) -> str | None:
     pfad = path or pfade.env_datei()
     if not pfad or not os.path.exists(pfad):
         return None
+    uebergangen: list[str] = []
     with open(pfad, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
-                os.environ.setdefault(k.strip(), v.strip())
+                k, v = k.strip(), v.strip()
+                # Die Umgebung behaelt Vorrang - so laesst sich der Dienst fuer
+                # einen Versuch ueberstimmen, ohne die Datei anzufassen.
+                # Stillschweigend darf das aber nicht geschehen: Eine alte
+                # Systemvariable liess den Dienst mit einer anderen Instanz
+                # sprechen als der, die im Menue und in der .env stand - und
+                # die Suche ging dann bei Rechten und Token los.
+                if k in os.environ and os.environ[k] != v:
+                    uebergangen.append(k)
+                os.environ.setdefault(k, v)
+    if uebergangen:
+        # Nur die Namen, nie die Werte: Hier stehen Token und Passwoerter.
+        log.warning("Diese Angaben stehen in der Umgebung und ueberstimmen die "
+                    ".env: %s. Der Dienst benutzt also NICHT, was in der Datei "
+                    "steht. Zum Aufraeumen die Systemvariablen entfernen.",
+                    ", ".join(sorted(set(uebergangen))))
     return pfad
