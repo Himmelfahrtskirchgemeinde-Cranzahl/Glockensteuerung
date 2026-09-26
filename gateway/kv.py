@@ -35,15 +35,27 @@ class KV:
     # --- IDs ---------------------------------------------------------------
     def _basis(self) -> str:
         if self._modul_id is None:
-            for m in self.ct.get("/custommodules"):
+            module = list(self.ct.get("/custommodules") or [])
+            for m in module:
                 if m.get("shorty") == self.ext_key:
                     self._modul_id = m.get("id")
                     break
             if self._modul_id is None:
+                # Wonach gesucht wurde, WO gesucht wurde und was dort steht: Die
+                # fruehere Meldung nannte nur eine moegliche Ursache ("Extension
+                # noch nie geoeffnet"). Zeigt CT_BASE_URL auf die falsche
+                # Instanz, schickte sie damit in die Irre - dort ist das Modul ja
+                # laengst angelegt, nur eben woanders.
+                vorhanden = ", ".join(
+                    str(m.get("shorty")) for m in module if m.get("shorty")
+                ) or "keine"
                 raise RuntimeError(
-                    f"Custom-Module '{self.ext_key}' nicht gefunden - die Extension "
-                    "muss einmal von einer berechtigten Person geoeffnet worden "
-                    "sein, damit es angelegt wird."
+                    f"Custom-Module '{self.ext_key}' nicht gefunden auf "
+                    f"{getattr(self.ct, 'base', '(unbekannte Adresse)')} "
+                    f"(dort vorhanden: {vorhanden}). Entweder zeigt CT_BASE_URL auf "
+                    "eine andere Instanz als die mit der Extension, oder die "
+                    "Extension wurde dort noch nie von einer berechtigten Person "
+                    "geoeffnet."
                 )
         if self._kategorie_id is None:
             for c in self.ct.get(f"/custommodules/{self._modul_id}/customdatacategories"):
