@@ -29,6 +29,7 @@ import json
 import logging
 import logging.handlers
 import os
+import platform
 import sys
 import threading
 import time
@@ -87,6 +88,16 @@ WIEDERANLAUF_MAX_S = 300
 # Ab wann ein Lauf als "hat getragen" gilt und die Wartezeit wieder von vorn
 # beginnt.
 GELUNGEN_AB_S = 600
+# Ab wann ein misslungener Anlauf gemeldet wird. Nicht beim ersten Fehlversuch:
+# Nach einem Neustart des Rechners ist das Netz oft noch nicht da, und eine Mail
+# "Automatik steht" waere dann jedes Mal ein Fehlalarm. Zehn Minuten sind lang
+# genug, dass es kein Aussetzer mehr ist, und kurz genug, dass noch etwas zu
+# retten ist.
+ANLAUF_MELDUNG_S = 600
+# Danach erinnern, solange es nicht laeuft. Eine einzige Mail geht sonst im
+# Posteingang unter - beim Ausfall im September 2026 stand die Automatik 32
+# Stunden.
+ANLAUF_ERINNERUNG_S = 12 * 3600
 # Selbstaktualisierung: so oft wird nachgesehen, ob es etwas Neues gibt.
 UPDATE_PRUEFUNG_S = 6 * 3600
 # So viel Ruhe muss um eine Ausloesung herum sein, damit getauscht wird. Ein
@@ -618,6 +629,60 @@ def pause_melden(warte_s: float, grund: str) -> None:
         pass
 
 
+def anlauf_melden(notifier: EmailNotifier, fehler: Exception,
+                  seit: float | None, zuletzt: float | None) -> float | None:
+    """Mailt, wenn der Dienst laengere Zeit nicht hochkommt.
+
+    Der Fall, der hier gemeldet wird, faellt sonst NIEMANDEM auf: Erreicht der
+    Dienst ChurchTools nicht, kommt dort auch kein Lebenszeichen an - und die
+    Erweiterung, die einen Ausfall sonst meldet, bekommt selbst nichts mit.
+    Genau so blieb im September 2026 ein Ausfall 32 Stunden unbemerkt.
+
+    Das Protokoll auf dem Rechner der Gemeinde hatte alles festgehalten. Nur
+    sieht dort niemand nach, solange er nichts ahnt.
+    """
+    if seit is None:
+        return zuletzt
+    jetzt = time.time()
+    if jetzt - seit < ANLAUF_MELDUNG_S:
+        return zuletzt                      # noch im Rahmen - erst mal weiter
+    if zuletzt is not None and jetzt - zuletzt < ANLAUF_ERINNERUNG_S:
+        return zuletzt                      # schon gemeldet, Erinnerung spaeter
+    dauer = int((jetzt - seit) / 60)
+    if not notifier.enabled:
+        log.warning("Der Dienst kommt seit %d Minuten nicht hoch, und es ist "
+                    "kein Postausgang bekannt - es kann niemand benachrichtigt "
+                    "werden.", dauer)
+        return zuletzt
+    if not notifier.send_errors:
+        return zuletzt                      # Stoerungsmails sind abbestellt
+    ziel = os.environ.get("CT_BASE_URL", "").strip() or "(keine Adresse eingetragen)"
+    notifier.notify(
+        "Die Automatik laeuft nicht",
+        f"Der Gateway-Dienst kommt seit {dauer} Minuten nicht hoch. Bis dahin\n"
+        f"wird NICHT automatisch gelaeutet.\n\n"
+        f"Letzte Stoerung: {fehler}\n"
+        f"ChurchTools:     {ziel}\n"
+        f"Rechner:         {platform.node()}\n"
+        f"Protokoll:       {pfade.protokolldatei()}\n\n"
+        f"Der Dienst versucht es weiter. Diese Meldung wiederholt sich alle "
+        f"{ANLAUF_ERINNERUNG_S // 3600} Stunden, solange es nicht laeuft.",
+        dedup_key="anlauf", dringend=True)
+    return jetzt
+
+
+def entwarnung(notifier: EmailNotifier, seit: float | None) -> None:
+    """Nach einer gemeldeten Stoerung: sagen, dass es wieder laeuft."""
+    dauer = int((time.time() - seit) / 60) if seit else 0
+    log.info("Der Dienst laeuft wieder (Stoerung dauerte rund %d Minuten).", dauer)
+    if notifier.enabled and notifier.send_errors:
+        notifier.notify("Die Automatik laeuft wieder",
+                        f"Der Gateway-Dienst ist wieder angelaufen. Die Stoerung "
+                        f"dauerte rund {dauer} Minuten; in dieser Zeit wurde nicht "
+                        f"automatisch gelaeutet.",
+                        dedup_key="anlauf-entwarnung", dringend=True)
+
+
 def dienstschleife(dry: bool, notifier: EmailNotifier) -> None:
     """Haelt den Dienst am Leben, was auch passiert.
 
@@ -629,6 +694,9 @@ def dienstschleife(dry: bool, notifier: EmailNotifier) -> None:
     """
     warte = WIEDERANLAUF_MIN_S
     erster_start = True
+    # Seit wann kommt der Dienst nicht mehr hoch, und wann wurde das gemeldet?
+    seit: float | None = None
+    zuletzt_gemeldet: float | None = None
     while not STOPP.is_set():
         begonnen = time.time()
         try:
@@ -641,9 +709,15 @@ def dienstschleife(dry: bool, notifier: EmailNotifier) -> None:
             gelaufen = time.time() - begonnen
             if gelaufen > GELUNGEN_AB_S:
                 warte = WIEDERANLAUF_MIN_S   # lief lange - war offenbar nur ein Aussetzer
+                if zuletzt_gemeldet is not None:
+                    entwarnung(notifier, seit)
+                seit, zuletzt_gemeldet = None, None
+            elif seit is None:
+                seit = begonnen
             log.warning("Dienst unterbrochen: %s", e)
             log.info("Neuer Versuch in %d Sekunden.", warte)
             pause_melden(warte, str(e))
+            zuletzt_gemeldet = anlauf_melden(notifier, e, seit, zuletzt_gemeldet)
             try:
                 if STOPP.wait(warte):
                     break

@@ -13,6 +13,11 @@ die .env:
 
 Ist kein SMTP_HOST gesetzt, bleibt der Notifier still (kein Absturz) und
 protokolliert einmalig einen Hinweis.
+
+Beim Start ist die Extension noch nicht gelesen - der Notifier kennt dann nur
+die .env. Damit eine Stoerungsmail auch dann rausgeht, wenn ChurchTools GAR
+NICHT erreichbar ist (und die Zugangsdaten dort also unerreichbar sind), wird
+zusaetzlich der zuletzt gelesene Zugang herangezogen; siehe mailzugang.py.
 """
 from __future__ import annotations
 import logging
@@ -22,6 +27,7 @@ import time
 from email.message import EmailMessage
 from email.utils import formatdate
 
+import mailzugang
 import tls
 
 log = logging.getLogger("voco-gateway")
@@ -43,6 +49,16 @@ class EmailNotifier:
         self._warned = False
         # Stoerungsmeldungen ueberhaupt verschicken? Aus der Extension steuerbar.
         self.send_errors = True
+        # Die .env hat hier Vorrang: Wer sie ausfuellt, hat das ausdruecklich so
+        # gewollt. Steht dort nichts, greift der zuletzt aus der Extension
+        # gelesene Zugang - sonst bliebe die Meldung "Dienst kommt nicht hoch"
+        # genau dann aus, wenn sie gebraucht wird.
+        if not self.host:
+            gemerkt = mailzugang.holen()
+            if gemerkt:
+                self._setzen(gemerkt)
+                log.info("Postausgang aus dem gemerkten Zugang - ChurchTools "
+                         "ist noch nicht gelesen.")
 
     @property
     def enabled(self) -> bool:
@@ -57,6 +73,13 @@ class EmailNotifier:
         """
         if cfg is None or not getattr(cfg, "host", ""):
             return
+        self._setzen(cfg)
+        # Fuer den naechsten Start ablegen. Erst hier, nicht schon beim Lesen:
+        # Gemerkt wird nur, was der Dienst auch wirklich benutzt.
+        mailzugang.merken(cfg)
+
+    def _setzen(self, cfg) -> None:
+        """Zugangsdaten uebernehmen - aus der Extension oder vom Merkzettel."""
         self.host = cfg.host
         self.port = cfg.port or 587
         self.user = cfg.user

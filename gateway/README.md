@@ -311,6 +311,41 @@ WantedBy=multi-user.target
 | `ereignisse.py` | hält Verbindungen und Ausfälle im Ereignis-Log fest |
 | `outbox.py` | arbeitet den Postausgang der Extension ab |
 | `notify.py` | verschickt Fehlermeldungen per E-Mail |
+| `mailzugang.py` | merkt den Postausgang, damit auch ohne ChurchTools gemeldet werden kann |
+
+## Wenn der Dienst gar nicht hochkommt
+
+Dieser Fall fällt sonst **niemandem** auf: Erreicht der Dienst ChurchTools
+nicht, kommt dort auch kein Lebenszeichen an – und die Erweiterung, die einen
+Ausfall sonst meldet, bekommt selbst nichts mit. Im September 2026 stand die
+Automatik so 32 Stunden still.
+
+Deshalb meldet sich der Dienst hier selbst:
+
+- Nach **10 Minuten** ohne gelungenen Anlauf geht eine als dringend
+  gekennzeichnete Mail raus (`ANLAUF_MELDUNG_S` in `scheduler.py`). Nicht
+  früher – nach einem Neustart des Rechners ist das Netz oft noch nicht da,
+  und eine Mail wäre dann jedes Mal ein Fehlalarm.
+- Sie wiederholt sich alle **12 Stunden**, solange es nicht läuft
+  (`ANLAUF_ERINNERUNG_S`). Eine einzige Mail geht im Posteingang unter.
+- Läuft der Dienst wieder, kommt eine **Entwarnung** mit der Dauer der Störung.
+
+Damit das überhaupt gehen kann, braucht der Dienst die Zugangsdaten des
+Postausgangs, **ohne** ChurchTools zu fragen – die liegen dort ja. `mailzugang.py`
+legt deshalb den zuletzt gelesenen Zugang neben dem Programm ab
+(`mailzugang.json`) und zieht ihn beim Start heran, solange ChurchTools noch
+nicht geantwortet hat. Die `.env` hat weiterhin Vorrang; sobald ChurchTools
+antwortet, gilt wieder, was dort steht.
+
+> ⚠ In der Datei steht das **Passwort des Postausgangs**. Unter Windows wird
+> sie mit DPAPI an das Konto des Dienstes gebunden – ein anderer angemeldeter
+> Benutzer kann sie nicht lesen. Wer am selben Rechner Administrator ist, kann
+> sich allerdings als Systemkonto ausgeben; dagegen schützt das nicht.
+> Ausserhalb von Windows gibt es DPAPI nicht: Dort bekommt die Datei die Rechte
+> 0600 und der Inhalt bleibt lesbar. Sie steht in `.gitignore`.
+
+Wo die Datei liegt und wie sie geschützt ist, sagt `--status` (Menüpunkt 3) in
+der Zeile `Postausgang:`. Wer sie loswerden will, löscht sie.
 
 ## Wenn die Verbindung am Zertifikat scheitert
 
