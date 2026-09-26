@@ -678,10 +678,25 @@ def anhalten() -> int:
     return rc
 
 
+def _instanz() -> str:
+    """Adresse der ChurchTools-Instanz aus der .env - ohne Zugangsdaten."""
+    try:
+        import config
+        config.load_dotenv()
+        return os.environ.get("CT_BASE_URL", "").strip()
+    except Exception:
+        return ""
+
+
 def status() -> int:
     print(f"Glockensteuerung-Gateway {pfade.version()}")
     print(f"Programm:      {programmdatei()}")
     print(f"Konfiguration: {pfade.env_datei() or 'KEINE .env gefunden'}")
+    # Mit WELCHER ChurchTools-Instanz der Dienst spricht - die haeufigste
+    # Ursache fuer "kein Lebenszeichen" ist, dass hier eine andere steht als
+    # die, in der die Extension liegt. Das Token bleibt selbstverstaendlich
+    # ungenannt.
+    print(f"Instanz:       {_instanz() or '(keine Adresse eingetragen)'}")
     print(f"Protokoll:     {pfade.protokolldatei()}")
     if ist_windows():
         print(f"Dienst:        {windienst.zustand()}")

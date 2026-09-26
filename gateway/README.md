@@ -121,6 +121,12 @@ Beim Einrichten meldet das Programm, was es vorgefunden hat, und dass nichts
 davon überschrieben wird. Zeigt der Dienst noch auf eine andere Programmdatei,
 sagt `--status` das ausdrücklich – sonst liefe unbemerkt die alte Fassung weiter.
 
+`--status` nennt außerdem unter „Instanz“ die Adresse der ChurchTools-Instanz
+aus der `.env` (ohne Token). Das ist der schnellste Weg zur häufigsten Ursache für
+ein ausbleibendes Lebenszeichen: Der Dienst spricht mit einer anderen Instanz als
+der, in der die Extension liegt. Dieselbe Angabe steht in der Fehlermeldung im
+Protokoll, zusammen damit, welche Module dort tatsächlich vorhanden sind.
+
 Weitere Schalter derselben Datei:
 
 ```text
