@@ -173,30 +173,24 @@ const gatewayPillTitel = computed(() => {
 /** Fassung des Gateway-Dienstes, wie sie im Lebenszeichen steht. */
 const gatewayVersion = computed(() => gatewayStatus.value?.version || '');
 /**
- * Laufen Erweiterung und Dienst auseinander?
+ * Was an der Fassung des Dienstes in der Fußzeile steht.
  *
- * Beide bekommen beim Bauen DIESELBE Nummer. Weichen sie ab, wurde eine Seite
- * nicht mitaktualisiert - meist der Dienst auf dem Rechner der Gemeinde, denn
- * die Erweiterung tauscht man in ChurchTools aus, den Dienst aber am Rechner.
- * Im Entwicklungsbetrieb heisst die Erweiterung „dev"; dann sagt der Vergleich
- * nichts.
+ * Bewusst OHNE Vergleich mit der Erweiterung: Die beiden Nummern stimmen im
+ * Normalbetrieb nicht überein, und das ist richtig so. Der Dienst holt sich
+ * neue Fassungen selbst, aber nur, wenn der Changelog einen Gateway-Abschnitt
+ * hat (siehe gateway/aktualisierung.py) – eine Fassung, die nur die
+ * Erweiterung betrifft, lässt ihn absichtlich stehen. Umgekehrt kann er der
+ * Erweiterung voraus sein, weil er sich allein aktualisiert und sie von Hand
+ * hochgeladen wird. Eine Warnung bei Abweichung wäre also Dauerlärm.
  */
-const versionenUneinig = computed(() => {
-    const g = gatewayVersion.value;
-    return !!g && APP_VERSION !== 'dev' && APP_VERSION !== '0.0.0' && g !== APP_VERSION;
-});
-/** Was an der Fassung des Dienstes in der Fußzeile steht. */
 const gatewayVersionTitel = computed(() => {
     if (!gatewayVersion.value) {
-        return 'Die Fassung des Dienstes steht im Lebenszeichen. Solange keines eingegangen '
-            + 'ist, lässt sie sich nicht sagen.';
+        return 'Die Fassung des Dienstes steht in seinem Lebenszeichen. Solange keines '
+            + 'eingegangen ist, lässt sie sich nicht sagen.';
     }
-    if (versionenUneinig.value) {
-        return `Der Dienst läuft mit Fassung ${gatewayVersion.value}, diese Erweiterung mit `
-            + `${APP_VERSION}. Beide gehören zusammen – vermutlich wurde der Dienst auf dem `
-            + 'Rechner noch nicht aktualisiert (Menüpunkt 5 am Rechner).';
-    }
-    return `Der Gateway-Dienst läuft mit derselben Fassung wie diese Erweiterung (${APP_VERSION}).`;
+    return `Der Gateway-Dienst auf dem Rechner läuft mit Fassung ${gatewayVersion.value}. `
+        + 'Sie muss nicht mit der der Erweiterung übereinstimmen: Der Dienst aktualisiert '
+        + 'sich selbst, aber nur bei Änderungen, die ihn betreffen.';
 });
 
 /** Erklärt, seit wann der Dienst fehlt. */
@@ -1188,12 +1182,9 @@ async function loadNextRingings() {
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
               Version {{ updateCheck!.latest }} verfügbar
             </a>
-            <!-- Fassung des Gateway-Dienstes. Sie steht im Lebenszeichen; ohne
-                 Lebenszeichen lässt sie sich nicht sagen. Weicht sie von der
-                 Erweiterung ab, fällt das hier auf – beide gehören zusammen. -->
-            <div v-if="gatewayBekannt" class="gwver" :class="{ uneinig: versionenUneinig }"
-                 :title="gatewayVersionTitel">
-              <svg v-if="versionenUneinig" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+            <!-- Fassung des Gateway-Dienstes aus seinem Lebenszeichen. Sie darf
+                 von der der Erweiterung abweichen (siehe gatewayVersionTitel). -->
+            <div v-if="gatewayBekannt" class="gwver" :title="gatewayVersionTitel">
               Dienst <b>{{ gatewayVersion ? 'v' + gatewayVersion : '(unbekannt)' }}</b>
             </div>
             <div>Entwickelt mit <span class="heart">♥</span> von JosuaDev</div>

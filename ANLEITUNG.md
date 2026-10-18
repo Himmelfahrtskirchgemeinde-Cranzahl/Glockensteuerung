@@ -467,11 +467,11 @@ untereinander: oben die der **Erweiterung**, darunter die des **Dienstes**
 („Dienst v26.10.8"). Die Angabe kommt aus dem Lebenszeichen – solange keines
 eingegangen ist, steht dort „(unbekannt)".
 
-> Beide Nummern werden **gemeinsam** vergeben. Weichen sie voneinander ab,
-> wird die Zeile **gelb** und nennt beim Darüberfahren den Grund: Dann wurde
-> eine Seite nicht mitaktualisiert – meist der Dienst auf dem Rechner, denn die
-> Erweiterung tauscht man in ChurchTools aus, den Dienst aber am Rechner
-> (Menüpunkt 5, siehe 3.6).
+> **Die beiden Nummern müssen nicht übereinstimmen**, und eine Abweichung ist
+> kein Fehler. Der Dienst holt sich neue Fassungen selbst, aber nur, wenn die
+> Änderung **ihn** betrifft – eine Fassung, die allein die Erweiterung ändert,
+> lässt ihn absichtlich stehen. Umgekehrt kann er der Erweiterung voraus sein,
+> weil er sich allein aktualisiert und sie von Hand hochgeladen wird.
 
 > **Wie schnell fällt ein Ausfall auf?** Der Dienst hinterlegt alle **40
 > Sekunden** ein Lebenszeichen. Bleibt es **2 Minuten** aus, schaltet die
@@ -741,7 +741,6 @@ Angehängt werden nur technische Angaben (Instanz-Host, Version, letzte Ereignis
 | Die Automatik stand lange still, ohne dass es jemand merkte | Erreicht der Dienst ChurchTools nicht, kommt dort kein Lebenszeichen an – und die Erweiterung, die einen Ausfall sonst meldet, bekommt selbst nichts mit. Neuere Fassungen melden sich deshalb nach **10 Minuten** ohne gelungenen Anlauf selbst per Mail und erinnert alle 12 Stunden daran. Kommt keine Mail an, steht im Protokoll, woran es lag – meist ist gar kein Postausgang bekannt (siehe Teil „Im Gateway"). |
 | Es läutet bei einem Termin, obwohl `+AUS…` im Titel steht | Das Kürzel gibt es nicht. Ein Kalenderzusatz wirkt nur, wenn er `+AUSA` heißt oder genau dem **Kürzel** einer Regel entspricht (siehe 2.4). Die Vorschau unter „Steuerung" zeigt dann eine rote Warnung mit dem unbekannten Kürzel, und dieselbe Meldung steht im Ereignis-Log. |
 | Ein Termin fehlt in der Vorschau | Steht er durchgestrichen mit „entfällt" da, ist er absichtlich ausgenommen (`+AUS…` im Titel). Fehlt er ganz, passt der **Titel** nicht exakt zur Regel. |
-| Unten links steht die Fassung des Dienstes **gelb** | Dienst und Erweiterung laufen mit verschiedenen Fassungen. Beide gehören zusammen; meist fehlt dem Dienst die Aktualisierung – am Rechner Menüpunkt **5** (siehe 3.6). |
 | Der Dienst lief, tat aber nichts | Bis Version 26.7 beendete er sich stillschweigend, sobald die ChurchTools-Sitzung ablief oder beim Hochfahren noch kein Netz da war. Ab 26.8 meldet er sich selbst neu an und versucht es weiter – die neue Fassung installieren. |
 | Es läutet doppelt | Es läuft noch ein zweiter Gateway, meist ein alter Eintrag in der Aufgabenplanung. `--status` nennt solche Einträge; `--installieren` schaltet sie ab. Seit 26.10 zieht sich ein zweiter Gateway von selbst zurück und schreibt den Grund ins Protokoll – auch dann, wenn der eine als Dienst und der andere unter einem Benutzerkonto läuft. Der **Testlauf** (Menüpunkt 4) ist davon ausgenommen: Er löst nichts aus und darf deshalb neben dem laufenden Dienst starten. |
 | Zeitweise wird gar nicht geläutet | Der Rechner geht schlafen – währenddessen läuft der Dienst nicht. `--status` weist darauf hin; abschalten beim Einrichten oder in den Energieoptionen („Energiesparmodus: Niemals"). |

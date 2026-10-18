@@ -67,9 +67,12 @@ der Gateway erwartet (`VOCO_EXT_KEY`).
 - **Status:** Gerät online?, läuft die Automatik?, Liste der startbaren
   Sofort-PGS, Vorschau der nächsten Läutungen.
 - **Fassung des Gateway-Dienstes** (aus seinem Lebenszeichen) unten in der
-  Seitenleiste, unter der Fassung der Erweiterung. Beide werden gemeinsam
-  vergeben; weichen sie ab, wird die Zeile gelb – dann wurde eine Seite nicht
-  mitaktualisiert. Die Nummer steht auch in jedem Fehlerbericht.
+  Seitenleiste, unter der Fassung der Erweiterung. Die beiden Nummern dürfen
+  abweichen: Der Dienst aktualisiert sich selbst, aber nur bei Änderungen, die
+  ihn betreffen (`betrifft_gateway` in `gateway/aktualisierung.py`). Deshalb
+  wird eine Abweichung bewusst **nicht** hervorgehoben. Die Nummer steht auch
+  in jedem Fehlerbericht – dort beantwortet sie die erste Rückfrage bei jeder
+  Meldung.
 - **Manuell auslösen/stoppen** (mit Sicherheitsabfrage – löst echtes Läuten aus).
 - **Gerät konfigurieren:** Seriennummer, Geräte-Passwort, Broker-URL.
 - **Automatik-Regeln:** je Regel Kalender und/oder Termin-Titel (exakter
