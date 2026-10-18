@@ -170,6 +170,29 @@ const gatewayPillTitel = computed(() => {
     if (s?.simulation) teile.push('Der Dienst läuft in Simulation – er löst nichts aus.');
     return teile.join(' ');
 });
+/** Fassung des Gateway-Dienstes, wie sie im Lebenszeichen steht. */
+const gatewayVersion = computed(() => gatewayStatus.value?.version || '');
+/**
+ * Was an der Fassung des Dienstes in der Fußzeile steht.
+ *
+ * Bewusst OHNE Vergleich mit der Erweiterung: Die beiden Nummern stimmen im
+ * Normalbetrieb nicht überein, und das ist richtig so. Der Dienst holt sich
+ * neue Fassungen selbst, aber nur, wenn der Changelog einen Gateway-Abschnitt
+ * hat (siehe gateway/aktualisierung.py) – eine Fassung, die nur die
+ * Erweiterung betrifft, lässt ihn absichtlich stehen. Umgekehrt kann er der
+ * Erweiterung voraus sein, weil er sich allein aktualisiert und sie von Hand
+ * hochgeladen wird. Eine Warnung bei Abweichung wäre also Dauerlärm.
+ */
+const gatewayVersionTitel = computed(() => {
+    if (!gatewayVersion.value) {
+        return 'Die Fassung des Dienstes steht in seinem Lebenszeichen. Solange keines '
+            + 'eingegangen ist, lässt sie sich nicht sagen.';
+    }
+    return `Der Gateway-Dienst auf dem Rechner läuft mit Fassung ${gatewayVersion.value}. `
+        + 'Sie muss nicht mit der der Erweiterung übereinstimmen: Der Dienst aktualisiert '
+        + 'sich selbst, aber nur bei Änderungen, die ihn betreffen.';
+});
+
 /** Erklärt, seit wann der Dienst fehlt. */
 const gatewayDownText = computed(() => {
     const age = gatewayAgeMin.value;
@@ -283,6 +306,7 @@ function ctx(): ReportContext {
     try { instance = new URL(baseUrl).host; } catch { instance = String(baseUrl); }
     return {
         version: APP_VERSION,
+        gatewayVersion: gatewayVersion.value,
         instance,
         device: maskSerial(device.value.serial),
         online: online.value,
@@ -890,6 +914,7 @@ async function sendFeedback() {
                 body: `${felder.message}\n\n— — —\n`
                     + `Von: ${felder.name || '(ohne Namen)'} <${felder.email || 'keine Adresse'}>\n`
                     + `Instanz: ${c.instance}\nGerät: ${c.device}\nVersion: ${c.version}\n`
+                    + `Dienst: ${c.gatewayVersion || '(kein Lebenszeichen)'}\n`
                     + `Gerät online: ${c.online}\n\nLetzte Ereignisse:\n${c.logTail.join('\n')}`,
                 at: new Date().toISOString(),
             });
@@ -1157,6 +1182,11 @@ async function loadNextRingings() {
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
               Version {{ updateCheck!.latest }} verfügbar
             </a>
+            <!-- Fassung des Gateway-Dienstes aus seinem Lebenszeichen. Sie darf
+                 von der der Erweiterung abweichen (siehe gatewayVersionTitel). -->
+            <div v-if="gatewayBekannt" class="gwver" :title="gatewayVersionTitel">
+              Dienst <b>{{ gatewayVersion ? 'v' + gatewayVersion : '(unbekannt)' }}</b>
+            </div>
             <div>Entwickelt mit <span class="heart">♥</span> von JosuaDev</div>
           </div>
         </nav>

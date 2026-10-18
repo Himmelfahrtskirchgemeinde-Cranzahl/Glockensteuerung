@@ -20,6 +20,13 @@ export const APP_VERSION: string = typeof __APP_VERSION__ !== 'undefined' ? __AP
 
 export interface ReportContext {
     version: string;
+    /**
+     * Fassung des Gateway-Dienstes (aus seinem Lebenszeichen), leer solange
+     * keines eingegangen ist. Gehoert in jeden Bericht: Laeuft der Dienst mit
+     * einer aelteren Fassung als die Erweiterung, erklaert das die meisten
+     * Meldungen schon von selbst.
+     */
+    gatewayVersion?: string;
     instance: string;      // Host der ChurchTools-Instanz
     device: string;        // maskierte Seriennummer (kein Geheimnis)
     online: boolean | null;
@@ -95,6 +102,7 @@ export async function submitFeedback(
         `${f.message}\n\n` +
         `— — —\nVon: ${f.name || '(anonym)'} <${f.email || ''}>\n` +
         `Instanz: ${ctx.instance}\nGerät: ${ctx.device}\nVersion: ${ctx.version}\n` +
+        `Dienst: ${ctx.gatewayVersion || '(kein Lebenszeichen)'}\n` +
         `Online: ${ctx.online}\n\nLetzte Ereignisse:\n${ctx.logTail.join('\n')}`;
     const mailto = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     return { sent: false, mailto };

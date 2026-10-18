@@ -462,6 +462,17 @@ Ausfall – dann kommt die übliche Meldung samt E-Mail.
 
 Die bisherige Programmdatei bleibt als `.alt` liegen, bis die neue läuft.
 
+**Welche Fassung läuft gerade?** Unten links in der Erweiterung stehen beide
+untereinander: oben die der **Erweiterung**, darunter die des **Dienstes**
+(„Dienst v26.10.8"). Die Angabe kommt aus dem Lebenszeichen – solange keines
+eingegangen ist, steht dort „(unbekannt)".
+
+> **Die beiden Nummern müssen nicht übereinstimmen**, und eine Abweichung ist
+> kein Fehler. Der Dienst holt sich neue Fassungen selbst, aber nur, wenn die
+> Änderung **ihn** betrifft – eine Fassung, die allein die Erweiterung ändert,
+> lässt ihn absichtlich stehen. Umgekehrt kann er der Erweiterung voraus sein,
+> weil er sich allein aktualisiert und sie von Hand hochgeladen wird.
+
 > **Wie schnell fällt ein Ausfall auf?** Der Dienst hinterlegt alle **40
 > Sekunden** ein Lebenszeichen. Bleibt es **2 Minuten** aus, schaltet die
 > Erweiterung auf „Automatik steht", schreibt es ins Ereignis-Log und schickt
