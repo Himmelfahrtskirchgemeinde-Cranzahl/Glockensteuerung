@@ -13,6 +13,7 @@ import type { Rights } from './perms';
 import { fitInfo } from './utils/fit-height';
 import { themaInfo } from './utils/thema';
 import { ohneDoppelte, zuZeilen, filtern, schwere, leererFilter, filterAktiv, gatewayArt } from './logbuch';
+import { markerLesen, regelAusgenommen, unbekannteKuerzel, kuerzelPruefen } from './marker';
 import type { LogDir, Zeile, LogFilter } from './logbuch';
 
 const isDev = import.meta.env.MODE === 'development';
@@ -68,7 +69,7 @@ const calendars = ref<{ id: number; name: string }[]>([]);
 /** Zugang zum Postausgang. Nur für „Erweiterung verwalten" sichtbar. */
 const email = ref<EmailConfig>(newEmailConfig());
 const emailGeladen = ref(false);
-const nextRingings = ref<Array<{ when: Date; program: string; source: string }>>([]);
+const nextRingings = ref<Array<{ when: Date; program: string; source: string; entfaellt?: string }>>([]);
 /** Letztes Lebenszeichen des Gateway-Dienstes (schreibt er alle 40 Sekunden). */
 const gatewayStatus = ref<GatewayStatus | null>(null);
 /**
@@ -183,6 +184,8 @@ const gatewayDownText = computed(() => {
 });
 /** Erklärt, WARUM die Vorschau leer ist (Ladefehler, keine Treffer, Schreibweise). */
 const ringingHint = ref('');
+/** Warnung, wenn im Kalender ein Kuerzel steht, das es nicht gibt. */
+const markerHint = ref('');
 const logLines = ref<Zeile[]>([]);
 /**
  * Ereignisse, die der Gateway-Dienst festgehalten hat.
@@ -832,8 +835,23 @@ async function saveDevice() {
 
 function addRule() { rules.value.push(newRule()); }
 function delRule(i: number) { rules.value.splice(i, 1); }
+/** Was an diesem Kuerzel nicht stimmt - leerer Text heisst: alles gut. */
+function kuerzelFehler(rule: MappingRule): string {
+    return kuerzelPruefen(rule.kuerzel || '',
+        rules.value.filter((r) => r.id !== rule.id).map((r) => r.kuerzel));
+}
+
 async function saveRules() {
+    // Ein doppeltes oder reserviertes Kuerzel wuerde stillschweigend die
+    // falsche Regel abschalten. Lieber gar nicht speichern.
+    const schlecht = rules.value.find((r) => kuerzelFehler(r));
+    if (schlecht) {
+        saveMsg.value = `Kürzel „${schlecht.kuerzel}" geht nicht: ${kuerzelFehler(schlecht)}`;
+        return;
+    }
     try {
+        // Leeres Feld heisst „kein Kuerzel" - nicht der leere Text.
+        for (const r of rules.value) r.kuerzel = (r.kuerzel || '').trim() || null;
         await store.saveRules(rules.value);
         saveMsg.value = '✓ gespeichert';
         loadNextRingings();
@@ -961,6 +979,7 @@ const fmtTime = (d: Date) => d.toLocaleTimeString('de-DE', { hour: '2-digit', mi
 async function loadNextRingings() {
     nextRingings.value = [];
     ringingHint.value = '';
+    markerHint.value = '';
     const active = rules.value.filter((r) => r.active && r.pgsName);
     if (!active.length) return;
 
@@ -990,15 +1009,19 @@ async function loadNextRingings() {
         return;
     }
 
-    const out: Array<{ when: Date; program: string; source: string }> = [];
+    const out: Array<{ when: Date; program: string; source: string; entfaellt?: string }> = [];
     const seenTitles = new Set<string>();
     let appointments = 0;
 
-    const add = (r: MappingRule, start: Date, source: string) => {
+    const add = (r: MappingRule, start: Date, source: string, entfaellt?: string) => {
         const when = new Date(start.getTime() - (r.leadMinutes || 0) * 60000);
         if (when.getTime() < Date.now()) return;
-        out.push({ when, program: r.pgsName, source });
+        out.push({ when, program: r.pgsName, source, entfaellt });
     };
+    // Kuerzel, die im Kalender stehen, aber zu keiner Regel gehoeren. Das ist
+    // der gefaehrliche Fall: Wer sich vertippt, glaubt, es laeute nicht.
+    const unbekannt = new Set<string>();
+    const alleKuerzel = rules.value.map((r) => r.kuerzel);
 
     for (const it of items) {
         const base = it?.appointment?.base ?? it?.base ?? it;
@@ -1011,19 +1034,37 @@ async function loadNextRingings() {
         const start = new Date(startStr);
         const calendarId: number | undefined = base?.calendar?.id;
         const calName: string = base?.calendar?.name ?? '';
-        const title: string = String(base?.title ?? base?.caption ?? '').trim();
+        // Marker aus dem Titel schneiden, BEVOR verglichen wird - sonst
+        // passte „Gottesdienst +AUSA" nicht mehr auf die Regel „Gottesdienst".
+        const befund = markerLesen(String(base?.title ?? base?.caption ?? ''));
+        const title = befund.titel;
         if (title) seenTitles.add(title);
+        for (const k of unbekannteKuerzel(befund, alleKuerzel)) unbekannt.add(k);
 
         for (const r of active) {
             if (r.calendarId && r.calendarId !== calendarId) continue;
             // Exakt vergleichen: „Festgottesdienst" ist NICHT „Gottesdienst".
             if (r.title && title.toLowerCase() !== r.title.trim().toLowerCase()) continue;
-            add(r, start, `${title || '(ohne Titel)'} · Beginn ${fmtTime(start)} · Kalender „${calName}"`);
+            const quelle = `${title || '(ohne Titel)'} · Beginn ${fmtTime(start)} · Kalender „${calName}"`;
+            // Ausgenommene Laeutungen bleiben SICHTBAR, nur durchgestrichen.
+            // Fehlten sie einfach, suchte man beim naechsten Mal vergeblich,
+            // warum der Gottesdienst nicht in der Liste steht.
+            const grund = regelAusgenommen(befund, r.kuerzel)
+                ? (befund.allesAus ? '+AUSA im Titel' : `+AUS${(r.kuerzel || '').toUpperCase()} im Titel`)
+                : undefined;
+            add(r, start, quelle, grund);
         }
     }
 
     out.sort((a, b) => a.when.getTime() - b.when.getTime());
     nextRingings.value = out.slice(0, 12);
+
+    if (unbekannt.size) {
+        markerHint.value = `Im Kalender steht +AUS${[...unbekannt].join(', +AUS')} – `
+            + 'dieses Kürzel hat keine Regel. Dort läutet es also trotzdem. '
+            + 'Kürzel unter „Automatik-Regeln" prüfen.';
+        pushLog('Vorschau – ' + markerHint.value, 'gw');
+    }
 
     // Leere Liste nie unerklärt lassen – sonst sucht man den Fehler im Nichts.
     if (!out.length) {
@@ -1194,6 +1235,9 @@ async function loadNextRingings() {
               <div class="gs-head"><h2>Nächste automatische Läutungen</h2><span class="gs-spacer"></span>
                 <button class="gs-btn gs-ghost sm" @click="loadNextRingings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg><span class="btxt">Aktualisieren</span></button></div>
               <div class="gs-body">
+                <p v-if="markerHint" class="gs-banner gw-down" style="margin-bottom:14px">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+                  <span>{{ markerHint }}</span></p>
                 <p v-if="nextRingings.length === 0 && !ringingHint" class="gs-empty">(keine anstehenden Läutungen aus den Regeln in den nächsten 30 Tagen)</p>
                 <p v-else-if="ringingHint" class="gs-readonly" style="margin-bottom:0">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
@@ -1202,15 +1246,16 @@ async function loadNextRingings() {
                   <table>
                     <thead><tr><th>Wann</th><th>Programm</th><th>Ausgelöst durch</th></tr></thead>
                     <tbody>
-                      <tr v-for="(n, i) in nextRingings" :key="i">
+                      <tr v-for="(n, i) in nextRingings" :key="i" :class="{ 'gs-entfaellt': n.entfaellt }">
                         <td><b>{{ fmtDay(n.when) }} · {{ fmtTime(n.when) }}</b></td>
                         <td><span class="gs-label">{{ decodeName(n.program) }}</span></td>
-                        <td class="gs-muted">{{ n.source }}</td>
+                        <td class="gs-muted">{{ n.source }}
+                          <span v-if="n.entfaellt" class="gs-pill warn" style="margin-left:6px">entfällt – {{ n.entfaellt }}</span></td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
-                <p class="gs-note" style="color:var(--gs-dim)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><span>Vorschau aus ChurchTools (Zeit = Beginn − Vorlauf). Regeln <b>mit</b> Termin-Titel greifen nur bei Terminen, deren Titel <b>exakt</b> übereinstimmt – „Gottesdienst" trifft also nicht auch „Festgottesdienst". Regeln <b>ohne</b> Titel greifen bei allen Terminen des Kalenders. Das tatsächliche Auslösen übernimmt der Gateway-Dienst.</span></p>
+                <p class="gs-note" style="color:var(--gs-dim)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><span>Vorschau aus ChurchTools (Zeit = Beginn − Vorlauf). Regeln <b>mit</b> Termin-Titel greifen nur bei Terminen, deren Titel <b>exakt</b> übereinstimmt – „Gottesdienst" trifft also nicht auch „Festgottesdienst". Regeln <b>ohne</b> Titel greifen bei allen Terminen des Kalenders. Einzelne Termine lassen sich im Kalendertitel abschalten: <b>+AUSA</b> schaltet alles ab, <b>+AUS</b> mit dem Kürzel einer Regel nur diese. Das tatsächliche Auslösen übernimmt der Gateway-Dienst.</span></p>
               </div>
             </section>
 
@@ -1273,6 +1318,9 @@ async function loadNextRingings() {
               <button v-else class="gs-btn gs-ghost sm" @click="addRule"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Regel hinzufügen</button></div>
             <div class="gs-body">
               <p style="color:var(--gs-dim);font-size:13.5px;margin:0 0 14px">Vom Gateway-Dienst für automatisches Läuten genutzt (Termin → Programm). Der <b>Termin-Titel</b> muss <b>exakt</b> so lauten wie im Kalender – leer lassen heißt „jeder Termin des Kalenders".</p>
+              <p class="gs-readonly" style="margin-bottom:14px">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+                <span>Einen <b>einzelnen Termin</b> ausnehmen, ohne hier etwas zu ändern: im Kalendertitel <b>+AUSA</b> anhängen – dann läutet für diesen Termin nichts. Soll nur <b>eine</b> Regel ausfallen, bekommt sie unten ein <b>Kürzel</b>; im Kalender steht dann z. B. <b>+AUSVL</b>.</span></p>
               <p v-if="!canEdit('regeln')" class="gs-readonly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Zum Ändern brauchst du das Recht „Daten in Kategorie bearbeiten" für „Automatik-Regeln". Ein Admin vergibt es in der Rechteverwaltung unter „Glockensteuerung".</p>
               <p v-if="rules.length === 0" class="gs-empty">(noch keine Regeln)</p>
               <div v-for="(rule, i) in rules" :key="rule.id" class="gs-rule">
@@ -1298,6 +1346,13 @@ async function loadNextRingings() {
                   <option v-if="rule.pgsName && !allCatalogNames.includes(rule.pgsName)" :value="rule.pgsName">{{ decodeName(rule.pgsName) }} (aktuell)</option>
                 </select>
                 <label>Vorlauf (Min.)</label><input type="number" min="0" v-model.number="rule.leadMinutes" :disabled="!canEdit('regeln')">
+                <label>Kürzel</label>
+                <div>
+                  <input type="text" v-model="rule.kuerzel" placeholder="(keines) z. B. VL" maxlength="12"
+                         style="width:auto;min-width:120px" :disabled="!canEdit('regeln')">
+                  <span v-if="kuerzelFehler(rule)" class="gs-pill warn" style="margin-left:8px">{{ kuerzelFehler(rule) }}</span>
+                  <span v-else-if="rule.kuerzel" class="gs-muted" style="margin-left:8px;font-size:12.5px">im Kalendertitel: <b>+AUS{{ (rule.kuerzel || '').toUpperCase() }}</b></span>
+                </div>
                 <label>Aktiv</label><label class="gs-switch"><input type="checkbox" v-model="rule.active" :disabled="!canEdit('regeln')"></label>
                 <template v-if="canEdit('regeln')"><div></div><button class="gs-btn gs-stop sm" style="justify-self:start" @click="delRule(i)">Löschen</button></template>
               </div>

@@ -42,6 +42,11 @@ class Rule:
     pgs_name: str
     lead_minutes: int
     active: bool
+    # Optionales Kuerzel, mit dem sich diese Regel im Kalendertitel einzeln
+    # abschalten laesst: steht dort "+AUSVL", faellt die Regel mit dem Kuerzel
+    # "VL" bei diesem Termin aus. Ohne Kuerzel geht nur "+AUSA" (alles aus).
+    # Siehe marker.py.
+    kuerzel: str = ""
 
 
 @dataclass
@@ -97,6 +102,7 @@ def _to_rule(r: dict) -> Rule:
         pgs_name=r.get("pgsName", ""),
         lead_minutes=int(r.get("leadMinutes", 0) or 0),
         active=bool(r.get("active", True)),
+        kuerzel=str(r.get("kuerzel") or "").strip(),
     )
 
 

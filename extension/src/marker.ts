@@ -1,0 +1,93 @@
+/**
+ * Marker im Kalendertitel: einzelne Laeutungen abschalten, ohne eine Regel
+ * anzufassen.
+ *
+ * Im Titel eines Termins steht hinter einem Pluszeichen, was NICHT laeuten
+ * soll:
+ *
+ *   Gottesdienst +AUSA      alles aus - fuer diesen Termin laeutet nichts
+ *   Gottesdienst +AUSVL     nur die Regel mit dem Kuerzel "VL" faellt aus
+ *   Gottesdienst +AUSVL +AUSNL   mehrere auf einmal
+ *
+ * Gross- und Kleinschreibung ist egal, ein Doppelpunkt darf dazwischen stehen
+ * (`+AUS:VL`). `+AUS` ohne Zusatz gilt wie `+AUSA`.
+ *
+ * WICHTIG: Der Marker wird aus dem Titel GESCHNITTEN, bevor er mit dem Titel
+ * einer Regel verglichen wird. Sonst passte „Gottesdienst +AUSA" nicht mehr
+ * auf die Regel „Gottesdienst" - der Marker haette dort zwar zufaellig die
+ * richtige Wirkung, bei einer Regel ohne Titelfilter aber gar keine.
+ *
+ * Dieselbe Grammatik steht im Gateway in `gateway/marker.py`. Weichen die
+ * beiden voneinander ab, zeigt die Vorschau etwas anderes an, als wirklich
+ * laeutet - die Stellen gehoeren zusammen geaendert.
+ */
+
+/** Dieses Kuerzel steht fuer „alles" und darf keiner Regel gehoeren. */
+export const ALLE = 'A';
+
+/** Woraus ein Kuerzel bestehen darf. */
+export const KUERZEL_ZEICHEN = /^[A-Za-z0-9ÄÖÜäöüß_-]+$/;
+
+// Das Pluszeichen ist der Indikator, "AUS" das Steuerwort. Beides zusammen
+// kommt in einem Termin-Titel sonst nicht vor - anders als ein "+" allein.
+const MUSTER = /\+AUS(?::?([A-Za-zÄÖÜäöüß0-9_-]+))?/gi;
+
+export interface MarkerBefund {
+    /** Titel ohne die Marker - damit wird gegen die Regel verglichen. */
+    titel: string;
+    /** Stand `+AUSA` (oder `+AUS`) darin? */
+    allesAus: boolean;
+    /** Genannte Kuerzel, in Grossbuchstaben, ohne das reservierte "A". */
+    kuerzel: string[];
+    /** Stand ueberhaupt ein Marker im Titel? */
+    gefunden: boolean;
+}
+
+/** Titel zerlegen: was bleibt, und was soll ausfallen? */
+export function markerLesen(roh: string | null | undefined): MarkerBefund {
+    const text = (roh ?? '').toString();
+    const befund: MarkerBefund = { titel: text.trim(), allesAus: false, kuerzel: [], gefunden: false };
+    if (!text.includes('+')) return befund;   // haeufigster Fall, ohne Regex
+
+    const gesehen = new Set<string>();
+    let rest = text.replace(MUSTER, (_treffer, gruppe?: string) => {
+        befund.gefunden = true;
+        const k = (gruppe ?? '').toUpperCase();
+        if (!k || k === ALLE) befund.allesAus = true;
+        else if (!gesehen.has(k)) { gesehen.add(k); befund.kuerzel.push(k); }
+        return ' ';
+    });
+    // Mehrfache Leerzeichen entstehen durch das Herausschneiden.
+    rest = rest.replace(/\s{2,}/g, ' ').trim();
+    befund.titel = rest;
+    return befund;
+}
+
+/** Faellt die Regel mit diesem Kuerzel bei diesem Termin aus? */
+export function regelAusgenommen(befund: MarkerBefund, kuerzel: string | null | undefined): boolean {
+    if (befund.allesAus) return true;
+    const k = (kuerzel ?? '').trim().toUpperCase();
+    return k !== '' && befund.kuerzel.includes(k);
+}
+
+/**
+ * Kuerzel, die im Titel stehen, aber zu keiner Regel gehoeren.
+ *
+ * Das ist der gefaehrliche Fall: Wer sich vertippt, glaubt, es laeute nicht -
+ * und es laeutet doch. Deshalb muss er auffallen.
+ */
+export function unbekannteKuerzel(befund: MarkerBefund, bekannte: Array<string | null | undefined>): string[] {
+    const liste = new Set(bekannte.map((k) => (k ?? '').trim().toUpperCase()).filter(Boolean));
+    return befund.kuerzel.filter((k) => !liste.has(k));
+}
+
+/** Taugt der Text als Kuerzel einer Regel? Leer heisst „keines vergeben". */
+export function kuerzelPruefen(roh: string, andere: Array<string | null | undefined>): string {
+    const k = (roh ?? '').trim();
+    if (!k) return '';
+    if (!KUERZEL_ZEICHEN.test(k)) return 'Nur Buchstaben, Ziffern, - und _.';
+    if (k.toUpperCase() === ALLE) return '„A" ist für +AUSA reserviert.';
+    const belegt = andere.map((x) => (x ?? '').trim().toUpperCase()).filter(Boolean);
+    if (belegt.includes(k.toUpperCase())) return 'Dieses Kürzel hat schon eine andere Regel.';
+    return '';
+}

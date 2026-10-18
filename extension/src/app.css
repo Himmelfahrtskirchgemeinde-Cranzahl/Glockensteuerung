@@ -330,6 +330,11 @@ button.ver:focus-visible { outline: 2px solid var(--gs-blue); outline-offset: 2p
 .gs td b { color: var(--gs-head); }
 .gs-label { display: inline-block; padding: 3px 9px; border-radius: 7px; font-size: 12px; font-weight: 600; background: var(--gs-blue-tint); color: var(--gs-blue); }
 .gs-muted { color: var(--gs-dim); }
+/* Laeutung, die wegen eines Markers im Kalendertitel ausfaellt. Sie bleibt
+   sichtbar - fehlte sie einfach, suchte man vergeblich, warum der
+   Gottesdienst nicht in der Liste steht. */
+.gs-entfaellt td b { text-decoration: line-through; }
+.gs-entfaellt .gs-label { opacity: .55; }
 
 /* ---- Regel-Karten ---- */
 .gs-rule { border: 1px solid var(--gs-border); border-radius: var(--gs-radius-sm); padding: 12px; margin-bottom: 10px; display: grid; grid-template-columns: 160px 1fr; gap: 9px 12px; align-items: center; }

@@ -39,6 +39,7 @@ from churchtools import ChurchTools
 from config import EXT_KEY, GatewayConfig, Rule, load_dotenv, load_from_churchtools
 from ereignisse import Ereignisse, LogWaechter, Zustandswaechter
 import geheim
+import marker
 from heartbeat import Heartbeat, mask_serial
 from notify import EmailNotifier
 import outbox
@@ -161,7 +162,8 @@ def quiet_now() -> bool:
         return False
 
 
-def rule_matches(rule: Rule, occ: dict) -> bool:
+def rule_matches(rule: Rule, occ: dict, befund: "marker.Befund | None" = None,
+                 marker_beachten: bool = True) -> bool:
     """Passt die Regel auf dieses Termin-Vorkommen?
 
     Deckungsgleich mit der Vorschau in der Extension (App.vue,
@@ -169,17 +171,29 @@ def rule_matches(rule: Rule, occ: dict) -> bool:
       - Regel OHNE Titel → jeder Termin der gewaehlten Kalender.
       - Regel MIT Titel  → nur Termine, deren Titel EXAKT uebereinstimmt.
         „Gottesdienst" trifft also NICHT auch „Festgottesdienst".
+      - Marker im Titel („+AUSA", „+AUS<Kuerzel>") nehmen diesen einen Termin
+        aus – siehe marker.py.
+
+    `befund` ist das Ergebnis von marker.lesen() fuer den Titel dieses Termins.
+    Fehlt es, wird es hier berechnet; build_schedule reicht es durch, weil es
+    je Termin nur einmal gebraucht wird.
     """
     if not rule.active:
         return False
     if rule.calendar_id is not None and occ.get("calendarId") != rule.calendar_id:
         return False
+    if befund is None:
+        befund = marker.lesen(occ.get("title"))
+    # Erst der Marker: Er entscheidet unabhaengig davon, ob die Regel einen
+    # Titel verlangt. Sonst bliebe er bei Regeln ohne Titelfilter wirkungslos.
+    if marker_beachten and marker.ausgenommen(befund, rule.kuerzel):
+        return False
     if rule.title:
-        if (occ.get("title") or "").strip().lower() != rule.title.strip().lower():
+        # Verglichen wird der Titel OHNE Marker - sonst passte
+        # „Gottesdienst +AUSVL" nicht mehr auf die Regel „Gottesdienst".
+        if befund.titel.strip().lower() != rule.title.strip().lower():
             return False
     return True
-
-
 def build_schedule(ct: ChurchTools, cfg: GatewayConfig) -> list[dict]:
     """Liefert Liste geplanter Ausloesungen: {ts, key, pgs_name, title}."""
     today = dt.date.today()
@@ -207,13 +221,25 @@ def build_schedule(ct: ChurchTools, cfg: GatewayConfig) -> list[dict]:
     now_ts = time.time()
     horizon_ts = now_ts + HORIZON_HOURS * 3600
     plan = []
+    # Kuerzel ALLER Regeln, auch der abgeschalteten: Wer "+AUSVL" schreibt,
+    # meint die Regel - ob sie gerade aktiv ist, aendert nichts daran, dass das
+    # Kuerzel bekannt ist.
+    alle_kuerzel = [r.kuerzel for r in cfg.rules]
+    unbekannt: set[str] = set()
+    ausgenommen = 0
     for occ in occs:
         start = occ.get("start")
         if not start:
             continue
         start_ts = start.timestamp()
+        befund = marker.lesen(occ.get("title"))
+        unbekannt.update(marker.unbekannte(befund, alle_kuerzel))
         for rule in active:
-            if not rule_matches(rule, occ):
+            if not rule_matches(rule, occ, befund):
+                # Nur am Marker gescheitert? Das ist gewollt und gehoert
+                # gezaehlt - nicht gescheitert wie ein unpassender Titel.
+                if befund.gefunden and rule_matches(rule, occ, befund, marker_beachten=False):
+                    ausgenommen += 1
                 continue
             fire_ts = start_ts - rule.lead_minutes * 60
             if fire_ts < now_ts - FIRE_WINDOW_S or fire_ts > horizon_ts:
@@ -222,18 +248,41 @@ def build_schedule(ct: ChurchTools, cfg: GatewayConfig) -> list[dict]:
                 "ts": fire_ts,
                 "key": f"{rule.id}:{occ['kind']}:{occ['id']}:{int(start_ts)}",
                 "pgs_name": rule.pgs_name,
-                "title": occ.get("title", ""),
+                # Ohne Marker: In „Ausgeloest fuer ..." gehoert der Anlass,
+                # nicht die Steueranweisung.
+                "title": befund.titel,
             })
     plan.sort(key=lambda p: p["ts"])
+
+    if ausgenommen and plan:
+        # Bei LEEREM Plan sagt es die Diagnose weiter unten - sonst stuende es
+        # zweimal da.
+        log.info("%d Laeutung(en) durch einen Marker im Kalendertitel "
+                 "ausgenommen.", ausgenommen)
+    if unbekannt:
+        # Der gefaehrliche Fall: Wer sich vertippt, glaubt, es laeute nicht -
+        # und es laeutet doch. WARNING, damit es auch im Ereignis-Log der
+        # Gemeinde steht (siehe LogWaechter).
+        log.warning("Im Kalender steht +AUS%s, aber kein Laeuteprogramm hat "
+                    "dieses Kuerzel - dort wird trotzdem gelaeutet. Kuerzel in "
+                    "den Automatik-Regeln pruefen.",
+                    ", +AUS".join(sorted(unbekannt)))
 
     # Leerer Plan darf nie unerklaert bleiben – sonst sucht man den Fehler im
     # Nichts. Dieselbe Diagnose zeigt die Extension unter der leeren Vorschau.
     if not plan:
         gesucht = sorted({r.title.strip() for r in active if r.title})
-        vorhanden = sorted({o["title"] for o in occs if o.get("title")})[:12]
+        # Titel OHNE Marker zeigen: Sonst sieht es aus, als stimme die
+        # Schreibweise nicht - dabei ist der Termin absichtlich ausgenommen.
+        vorhanden = sorted({marker.lesen(o["title"]).titel
+                            for o in occs if o.get("title")})[:12]
         if not occs:
             log.warning("Keine Ausloesung geplant: im Zeitraum liegen keine Termine "
                         "in den Kalendern %s.", sorted(cal_ids) or "(keine)")
+        elif ausgenommen:
+            # Nicht als Stoerung melden: Genau das war ja gewollt.
+            log.info("Keine Ausloesung geplant: %d Laeutung(en) sind durch einen "
+                     "Marker im Kalendertitel ausgenommen.", ausgenommen)
         elif gesucht:
             log.warning("Keine Ausloesung geplant: %d Termin(e) gefunden, aber kein Titel "
                         "passt exakt. Gesucht: %s – vorhanden: %s",
