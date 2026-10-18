@@ -186,16 +186,21 @@ genügt ein Zusatz **im Titel des Kalendertermins**.
 
 | Im Kalendertitel | Wirkung |
 |---|---|
-| `Gottesdienst +AUSA` | Für diesen Termin läutet **gar nichts**. |
+| `Gottesdienst +AUSA` | Für diesen Termin läutet **gar nichts**. Auch `+AUS` oder `+AA` genügen. |
 | `Gottesdienst +AUSVL` | Nur die Regel mit dem Kürzel `VL` fällt aus – alles andere läutet. |
 | `Gottesdienst +AUSVL +AUSNL` | Mehrere auf einmal. |
 
-**Kurzform:** Statt `AUS` genügt ein `A` – `+AVL` wirkt wie `+AUSVL`, und `+A`
+**Kurzform:** Statt `AUS` genügt ein `A` – `+AVL` wirkt wie `+AUSVL`, und `+AA`
 wie `+AUSA`.
 
 Groß- und Kleinschreibung ist egal (`+ausa` geht auch), ein Doppelpunkt darf
 dazwischen stehen (`+AUS:VL`), und der Zusatz darf vorn, hinten oder mittendrin
-stehen. `+AUS` ohne Zusatz gilt wie `+AUSA`.
+stehen.
+
+> **`+A` allein tut nichts.** Für „alles aus" gibt es `+AUS`, `+AUSA` und
+> `+AA`. Ein einzelnes `A` hinter einem Plus kann dagegen auch zufällig in
+> einem Titel stehen – und ein zufälliges Zeichen soll nicht das ganze
+> Geläut abstellen.
 
 > **Warum die Kurzform ein bekanntes Kürzel braucht.** `+AVL` wirkt nur, wenn
 > es die Regel mit dem Kürzel `VL` wirklich gibt. Sonst würde jedes Wort hinter

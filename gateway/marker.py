@@ -8,9 +8,14 @@ Im Titel eines Termins steht hinter einem Pluszeichen, was NICHT laeuten soll:
     Gottesdienst +AUSVL          nur die Regel mit dem Kuerzel "VL" faellt aus
     Gottesdienst +AUSVL +AUSNL   mehrere auf einmal
 
-Kurzform: statt "AUS" genuegt ein "A" - "+AVL" wirkt wie "+AUSVL", "+A" wie
-"+AUSA". Gross- und Kleinschreibung ist egal, ein Doppelpunkt darf dazwischen
-stehen (`+AUS:VL`), und `+AUS` ohne Zusatz gilt wie `+AUSA`.
+Kurzform: statt "AUS" genuegt ein "A" - "+AVL" wirkt wie "+AUSVL", "+AA" wie
+"+AUSA". Gross- und Kleinschreibung ist egal, und ein Doppelpunkt darf
+dazwischen stehen (`+AUS:VL`).
+
+"+AUS" allein steht fuer alle - das Wort ist eindeutig genug. Die Kurzform "+A"
+dagegen NICHT: Ein einzelnes "A" hinter einem Plus kann auch zufaellig in einem
+Titel stehen, und ein zufaelliges Zeichen soll nicht das ganze Gelaeut
+abstellen. Fuer alle also "+AUS", "+AUSA" oder "+AA".
 
 Die Kurzform greift NUR mit einem Kuerzel, das es wirklich gibt. Sonst risse
 sie Loecher in gewoehnliche Titel: Aus "Konzert +Anmeldung erforderlich" wuerde
@@ -77,10 +82,13 @@ def lesen(roh: str | None, bekannte=()) -> Befund:
     def ersetzen(treffer: re.Match) -> str:
         wort = (treffer.group(1) or "").upper()
         k = (treffer.group(2) or "").upper()
+        if not k and wort == ALLE:
+            # "+A" allein ist kein Befehl - siehe Kopf dieser Datei.
+            return treffer.group(0)      # kein Marker: Text unangetastet
         # Kurzform nur bei einem Kuerzel, das es gibt - sonst bliebe von
         # "+Anmeldung" ein Loch im Titel zurueck.
-        if wort == ALLE and k and k != ALLE and k not in bekannt:
-            return treffer.group(0)      # kein Marker: Text unangetastet
+        if wort == ALLE and k != ALLE and k not in bekannt:
+            return treffer.group(0)
         befund.gefunden = True
         if not k or k == ALLE:
             befund.alles_aus = True

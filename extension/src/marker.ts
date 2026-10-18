@@ -9,9 +9,14 @@
  *   Gottesdienst +AUSVL     nur die Regel mit dem Kuerzel "VL" faellt aus
  *   Gottesdienst +AUSVL +AUSNL   mehrere auf einmal
  *
- * Kurzform: statt "AUS" genuegt ein "A" - "+AVL" wirkt wie "+AUSVL", "+A" wie
- * "+AUSA". Gross- und Kleinschreibung ist egal, ein Doppelpunkt darf dazwischen
- * stehen (`+AUS:VL`), und `+AUS` ohne Zusatz gilt wie `+AUSA`.
+ * Kurzform: statt "AUS" genuegt ein "A" - "+AVL" wirkt wie "+AUSVL", "+AA" wie
+ * "+AUSA". Gross- und Kleinschreibung ist egal, und ein Doppelpunkt darf
+ * dazwischen stehen (`+AUS:VL`).
+ *
+ * "+AUS" allein steht fuer alle - das Wort ist eindeutig genug. Die Kurzform
+ * "+A" dagegen NICHT: Ein einzelnes "A" hinter einem Plus kann auch zufaellig
+ * in einem Titel stehen, und ein zufaelliges Zeichen soll nicht das ganze
+ * Gelaeut abstellen. Fuer alle also "+AUS", "+AUSA" oder "+AA".
  *
  * Die Kurzform greift NUR mit einem Kuerzel, das es wirklich gibt. Sonst risse
  * sie Loecher in gewoehnliche Titel: Aus "Konzert +Anmeldung erforderlich"
@@ -69,9 +74,11 @@ export function markerLesen(roh: string | null | undefined,
     let rest = text.replace(MUSTER, (treffer, wortRoh?: string, gruppe?: string) => {
         const wort = (wortRoh ?? '').toUpperCase();
         const k = (gruppe ?? '').toUpperCase();
+        // "+A" allein ist kein Befehl - siehe Kopf dieser Datei.
+        if (!k && wort === ALLE) return treffer;   // kein Marker: Text unangetastet
         // Kurzform nur bei einem Kuerzel, das es gibt - sonst bliebe von
         // "+Anmeldung" ein Loch im Titel zurueck.
-        if (wort === ALLE && k && k !== ALLE && !bekannt.has(k)) return treffer;
+        if (wort === ALLE && k !== ALLE && !bekannt.has(k)) return treffer;
         befund.gefunden = true;
         if (!k || k === ALLE) befund.allesAus = true;
         else if (!gesehen.has(k)) { gesehen.add(k); befund.kuerzel.push(k); }
