@@ -190,9 +190,23 @@ genügt ein Zusatz **im Titel des Kalendertermins**.
 | `Gottesdienst +AUSVL` | Nur die Regel mit dem Kürzel `VL` fällt aus – alles andere läutet. |
 | `Gottesdienst +AUSVL +AUSNL` | Mehrere auf einmal. |
 
+**Kurzform:** Statt `AUS` genügt ein `A` – `+AVL` wirkt wie `+AUSVL`, und `+A`
+wie `+AUSA`.
+
 Groß- und Kleinschreibung ist egal (`+ausa` geht auch), ein Doppelpunkt darf
 dazwischen stehen (`+AUS:VL`), und der Zusatz darf vorn, hinten oder mittendrin
 stehen. `+AUS` ohne Zusatz gilt wie `+AUSA`.
+
+> **Warum die Kurzform ein bekanntes Kürzel braucht.** `+AVL` wirkt nur, wenn
+> es die Regel mit dem Kürzel `VL` wirklich gibt. Sonst würde jedes Wort hinter
+> einem Plus zum Befehl: Aus „Konzert +Anmeldung erforderlich" würde
+> „Konzert erforderlich". Die lange Form `+AUS…` ist eindeutig genug und wirkt
+> immer – auch mit einem Kürzel, das es nicht gibt (siehe „Vertippt?" unten).
+>
+> Umgekehrt heißt das: Ein Titel, der zufällig mit `+Aus…` beginnt
+> („Gemeindefest +Ausflug"), wird als Befehl gelesen. Geläutet wird trotzdem
+> – es erscheint nur die Warnung über das unbekannte Kürzel. Wer das vermeiden
+> will, setzt ein Leerzeichen: „Gemeindefest + Ausflug".
 
 **Das Kürzel** vergibt man bei der Regel selbst (Feld **Kürzel**, siehe 2.3) –
 kurz und einprägsam, etwa `VL` für Vorläuten. Der Buchstabe **A** ist für

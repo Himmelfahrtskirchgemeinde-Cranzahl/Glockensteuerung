@@ -8,8 +8,15 @@ Im Titel eines Termins steht hinter einem Pluszeichen, was NICHT laeuten soll:
     Gottesdienst +AUSVL          nur die Regel mit dem Kuerzel "VL" faellt aus
     Gottesdienst +AUSVL +AUSNL   mehrere auf einmal
 
-Gross- und Kleinschreibung ist egal, ein Doppelpunkt darf dazwischen stehen
-(`+AUS:VL`). `+AUS` ohne Zusatz gilt wie `+AUSA`.
+Kurzform: statt "AUS" genuegt ein "A" - "+AVL" wirkt wie "+AUSVL", "+A" wie
+"+AUSA". Gross- und Kleinschreibung ist egal, ein Doppelpunkt darf dazwischen
+stehen (`+AUS:VL`), und `+AUS` ohne Zusatz gilt wie `+AUSA`.
+
+Die Kurzform greift NUR mit einem Kuerzel, das es wirklich gibt. Sonst risse
+sie Loecher in gewoehnliche Titel: Aus "Konzert +Anmeldung erforderlich" wuerde
+"Konzert erforderlich", und "nmeldung" galte als Kuerzel. "+AUS" ist dagegen
+eindeutig genug, um immer zu wirken - auch mit einem Kuerzel, das es nicht gibt
+(das ist ein Tippfehler, und der soll auffallen).
 
 WICHTIG: Der Marker wird aus dem Titel GESCHNITTEN, bevor er mit dem Titel
 einer Regel verglichen wird. Sonst passte "Gottesdienst +AUSA" nicht mehr auf
@@ -30,10 +37,12 @@ ALLE = "A"
 # Woraus ein Kuerzel bestehen darf.
 KUERZEL_ZEICHEN = re.compile(r"^[A-Za-z0-9ÄÖÜäöüß_-]+$")
 
-# Das Pluszeichen ist der Indikator, "AUS" das Steuerwort. Beides zusammen
-# kommt in einem Termin-Titel sonst nicht vor - anders als ein "+" allein.
+# Das Pluszeichen ist der Indikator, "AUS" (oder kurz "A") das Steuerwort.
+# Beides zusammen kommt in einem Termin-Titel sonst nicht vor - anders als ein
+# "+" allein. Die Reihenfolge in der Alternative ist wichtig: "AUS" wird zuerst
+# versucht, sonst laese sich "+AUSVL" auch als "A" + Kuerzel "USVL".
 _MUSTER = re.compile(
-    r"\+AUS(?::?([A-Za-zÄÖÜäöüß0-9_-]+))?",
+    r"\+(AUS|A)(?::?([A-Za-zÄÖÜäöüß0-9_-]+))?",
     re.IGNORECASE,
 )
 
@@ -50,18 +59,29 @@ class Befund:
     gefunden: bool = False      # stand ueberhaupt ein Marker im Titel?
 
 
-def lesen(roh: str | None) -> Befund:
-    """Titel zerlegen: was bleibt, und was soll ausfallen?"""
+def lesen(roh: str | None, bekannte=()) -> Befund:
+    """Titel zerlegen: was bleibt, und was soll ausfallen?
+
+    `bekannte` sind die Kuerzel aller Regeln. Sie entscheiden allein ueber die
+    Kurzform "+A<Kuerzel>"; ohne sie wirkt nur das eindeutige "+AUS...".
+    """
     text = (roh or "").strip()
     befund = Befund(titel=text)
     if "+" not in text:
         return befund                    # haeufigster Fall, ohne Regex
 
+    bekannt = {(k or "").strip().upper() for k in bekannte}
+    bekannt.discard("")
     gesehen: set[str] = set()
 
     def ersetzen(treffer: re.Match) -> str:
+        wort = (treffer.group(1) or "").upper()
+        k = (treffer.group(2) or "").upper()
+        # Kurzform nur bei einem Kuerzel, das es gibt - sonst bliebe von
+        # "+Anmeldung" ein Loch im Titel zurueck.
+        if wort == ALLE and k and k != ALLE and k not in bekannt:
+            return treffer.group(0)      # kein Marker: Text unangetastet
         befund.gefunden = True
-        k = (treffer.group(1) or "").upper()
         if not k or k == ALLE:
             befund.alles_aus = True
         elif k not in gesehen:
