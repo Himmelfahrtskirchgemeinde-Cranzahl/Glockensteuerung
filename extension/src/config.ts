@@ -60,6 +60,13 @@ export interface MappingRule {
     pgsName: string;        // Anzeigename des Sofort-PGS, der ausgeloest wird
     leadMinutes: number;    // Vorlauf: X Minuten vor Terminbeginn ausloesen
     active: boolean;
+    /**
+     * Optionales Kuerzel, mit dem sich diese Regel im Kalendertitel einzeln
+     * abschalten laesst: steht dort `+AUSVL`, faellt die Regel mit dem Kuerzel
+     * „VL" bei diesem Termin aus. Ohne Kuerzel geht nur `+AUSA` (alles aus).
+     * Siehe marker.ts.
+     */
+    kuerzel?: string | null;
 }
 
 /**
@@ -600,6 +607,7 @@ export function newRule(): MappingRule {
         pgsName: '',
         leadMinutes: 15,
         active: true,
+        kuerzel: null,
     };
 }
 
@@ -613,6 +621,8 @@ export function newRule(): MappingRule {
 function migrateRules(rules: MappingRule[] | null | undefined): MappingRule[] {
     return (rules ?? []).map((r) => {
         const { category, ...rest } = r;
-        return { ...rest, title: r.title ?? category ?? null };
+        // Regeln aus aelteren Fassungen haben noch kein Kuerzel. Sie bleiben
+        // ohne - abschalten laesst sich damit nur ueber `+AUSA`.
+        return { ...rest, title: r.title ?? category ?? null, kuerzel: r.kuerzel ?? null };
     });
 }

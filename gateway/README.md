@@ -307,6 +307,7 @@ WantedBy=multi-user.target
 | `sperre.py` | verhindert, dass zwei Gateways gleichzeitig läuten |
 | `aktualisierung.py` | holt neue Fassungen und tauscht die Programmdatei |
 | `kv.py` | gemeinsamer Zugriff auf den Speicher der Extension |
+| `marker.py` | liest `+AUSA` / `+AUS<Kürzel>` aus dem Kalendertitel |
 | `heartbeat.py` | Lebenszeichen alle 40 Sekunden nach ChurchTools |
 | `ereignisse.py` | hält Verbindungen und Ausfälle im Ereignis-Log fest |
 | `outbox.py` | arbeitet den Postausgang der Extension ab |

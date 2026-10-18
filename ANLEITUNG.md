@@ -159,6 +159,7 @@ Unter **„Automatik-Regeln"** je Anlass eine Regel:
 | **Termin-Titel** | optional: nur Termine mit **exakt** diesem Titel (z. B. „Gottesdienst") |
 | **Läuteprogramm** | Name des Sofort-PGS, der ausgelöst wird |
 | **Vorlauf (Min.)** | wie viele Minuten **vor** Terminbeginn geläutet wird |
+| **Kürzel** | optional, z. B. `VL` – damit lässt sich **diese** Regel bei einem einzelnen Termin im Kalender abschalten (siehe 2.4) |
 | **Aktiv** | Regel ein/aus |
 
 Kalender **und** Termin-Titel lassen sich kombinieren (beides gesetzt = beide
@@ -176,7 +177,43 @@ trifft deshalb **nur** Termine, die genau so heißen, und **nicht** zusätzlich
 > Regeln übernehmen den alten Eintrag automatisch als Termin-Titel; bitte
 > einmal prüfen, ob er mit dem Titel im Kalender übereinstimmt.
 
-### 2.4 Ereignis-Log: was aufgehoben wird
+### 2.4 Einen einzelnen Termin ausnehmen (`+AUSA`)
+
+Manchmal soll bei **einem** Termin nicht geläutet werden – eine Trauerfeier im
+Anschluss, eine Absprache mit der Nachbargemeinde, ein Gottesdienst in der
+Kapelle statt in der Kirche. Dafür muss niemand eine Regel anfassen: Es
+genügt ein Zusatz **im Titel des Kalendertermins**.
+
+| Im Kalendertitel | Wirkung |
+|---|---|
+| `Gottesdienst +AUSA` | Für diesen Termin läutet **gar nichts**. |
+| `Gottesdienst +AUSVL` | Nur die Regel mit dem Kürzel `VL` fällt aus – alles andere läutet. |
+| `Gottesdienst +AUSVL +AUSNL` | Mehrere auf einmal. |
+
+Groß- und Kleinschreibung ist egal (`+ausa` geht auch), ein Doppelpunkt darf
+dazwischen stehen (`+AUS:VL`), und der Zusatz darf vorn, hinten oder mittendrin
+stehen. `+AUS` ohne Zusatz gilt wie `+AUSA`.
+
+**Das Kürzel** vergibt man bei der Regel selbst (Feld **Kürzel**, siehe 2.3) –
+kurz und einprägsam, etwa `VL` für Vorläuten. Der Buchstabe **A** ist für
+`+AUSA` reserviert und lässt sich nicht vergeben. Hat eine Regel kein Kürzel,
+lässt sie sich nur über `+AUSA` zusammen mit allen anderen abschalten.
+
+> **Der Titel bleibt gültig.** Der Zusatz wird herausgerechnet, bevor der Titel
+> mit der Regel verglichen wird – „Gottesdienst +AUSVL" gilt also weiterhin als
+> „Gottesdienst". Auch in den Meldungen im Ereignis-Log steht der Anlass ohne
+> den Zusatz.
+
+**Kontrolle.** Unter **„Steuerung"** zeigt die Vorschau „Nächste Läutungen" die
+ausgenommenen Termine weiter an – durchgestrichen und mit dem Vermerk
+„entfällt". So sieht man auf einen Blick, dass der Zusatz angekommen ist, und
+sucht nicht vergeblich nach einem fehlenden Eintrag.
+
+> **Vertippt?** Steht im Kalender ein Kürzel, das es nicht gibt (`+AUSXZ`),
+> **läutet es trotzdem**. Damit das nicht unbemerkt bleibt, erscheint in der
+> Vorschau eine rote Warnung, und der Gateway schreibt es ins Ereignis-Log.
+
+### 2.5 Ereignis-Log: was aufgehoben wird
 
 Unter **„Ereignis-Log"** steht, was passiert ist – wer geläutet hat, was die
 Anlage geantwortet hat, wann die Automatik weg war. Das Log lebt **nicht** nur
@@ -207,7 +244,7 @@ worden". Der gewöhnliche Betrieb bleibt unauffällig.
 **Herunterladen** speichert genau das, was die Suche gerade übrig lässt. Ohne
 Filter ist es der ganze gespeicherte Bestand.
 
-### 2.5 Hell oder dunkel
+### 2.6 Hell oder dunkel
 
 Die Erweiterung folgt dem **Thema von ChurchTools**: Steht ChurchTools auf
 dunkel, wird auch die Erweiterung dunkel – und umgekehrt. Einzustellen ist
@@ -672,6 +709,8 @@ Angehängt werden nur technische Angaben (Instanz-Host, Version, letzte Ereignis
 | Im Protokoll steht „Kategorie 'steuerung' im Modul nicht gefunden“ | Das Modul ist da, aber der technische Benutzer darf die Kategorien nicht sehen. Die Meldung nennt, welche für ihn sichtbar sind – steht dort *keine*, fehlen ihm die Rechte ganz. Zu vergeben in der Rechteverwaltung unter „Glockensteuerung“; welche genau, steht in Teil 3.2. |
 | Im Protokoll steht „Custom-Module 'glockensteuerung' nicht gefunden“ | Der Dienst spricht mit einer ChurchTools-Instanz, in der die Extension nicht liegt – oder sie wurde dort noch nie von einer berechtigten Person geöffnet. Die Meldung nennt alles dazu: die Adresse, als wer der Dienst dort angemeldet ist und welche Module er vorgefunden hat. Steht bei „angemeldet als“ *niemand erkennbar*, gilt das Login-Token für diese Instanz nicht – ChurchTools weist ein fremdes Token nicht ab, es antwortet nur ohne angemeldete Person. Wird dagegen eine Person genannt und es steht trotzdem „dort vorhanden: keine“, trug die Anmeldung früher nicht bis zur nächsten Anfrage; seit 26.10.5 merkt der Dienst das und legt das Token jeder Anfrage bei. Menüpunkt 3 zeigt die Adresse unter „Instanz“. Stimmt sie nicht, unter Menüpunkt 2 den Zugang umstellen und den Dienst neu starten (Menüpunkt 6) – die Zugangsdaten werden nur beim Start gelesen. |
 | Die Automatik stand lange still, ohne dass es jemand merkte | Erreicht der Dienst ChurchTools nicht, kommt dort kein Lebenszeichen an – und die Erweiterung, die einen Ausfall sonst meldet, bekommt selbst nichts mit. Neuere Fassungen melden sich deshalb nach **10 Minuten** ohne gelungenen Anlauf selbst per Mail und erinnert alle 12 Stunden daran. Kommt keine Mail an, steht im Protokoll, woran es lag – meist ist gar kein Postausgang bekannt (siehe Teil „Im Gateway"). |
+| Es läutet bei einem Termin, obwohl `+AUS…` im Titel steht | Das Kürzel gibt es nicht. Ein Kalenderzusatz wirkt nur, wenn er `+AUSA` heißt oder genau dem **Kürzel** einer Regel entspricht (siehe 2.4). Die Vorschau unter „Steuerung" zeigt dann eine rote Warnung mit dem unbekannten Kürzel, und dieselbe Meldung steht im Ereignis-Log. |
+| Ein Termin fehlt in der Vorschau | Steht er durchgestrichen mit „entfällt" da, ist er absichtlich ausgenommen (`+AUS…` im Titel). Fehlt er ganz, passt der **Titel** nicht exakt zur Regel. |
 | Der Dienst lief, tat aber nichts | Bis Version 26.7 beendete er sich stillschweigend, sobald die ChurchTools-Sitzung ablief oder beim Hochfahren noch kein Netz da war. Ab 26.8 meldet er sich selbst neu an und versucht es weiter – die neue Fassung installieren. |
 | Es läutet doppelt | Es läuft noch ein zweiter Gateway, meist ein alter Eintrag in der Aufgabenplanung. `--status` nennt solche Einträge; `--installieren` schaltet sie ab. Seit 26.10 zieht sich ein zweiter Gateway von selbst zurück und schreibt den Grund ins Protokoll – auch dann, wenn der eine als Dienst und der andere unter einem Benutzerkonto läuft. Der **Testlauf** (Menüpunkt 4) ist davon ausgenommen: Er löst nichts aus und darf deshalb neben dem laufenden Dienst starten. |
 | Zeitweise wird gar nicht geläutet | Der Rechner geht schlafen – währenddessen läuft der Dienst nicht. `--status` weist darauf hin; abschalten beim Einrichten oder in den Energieoptionen („Energiesparmodus: Niemals"). |
