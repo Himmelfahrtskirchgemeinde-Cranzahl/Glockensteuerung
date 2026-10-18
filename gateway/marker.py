@@ -12,9 +12,10 @@ Kurzform: statt "AUS" genuegt ein "A" - "+AVL" wirkt wie "+AUSVL", "+AA" wie
 "+AUSA". Gross- und Kleinschreibung ist egal, und ein Doppelpunkt darf
 dazwischen stehen (`+AUS:VL`).
 
-Ein Kuerzel gehoert IMMER dazu - entweder das einer Regel oder "A" fuer alle.
-"+AUS" oder "+A" allein bewirkt nichts: Dort fehlt die Angabe, was abgeschaltet
-werden soll, und ein halber Befehl soll nicht das ganze Gelaeut abstellen.
+"+AUS" allein steht fuer alle - das Wort ist eindeutig genug. Die Kurzform "+A"
+dagegen NICHT: Ein einzelnes "A" hinter einem Plus kann auch zufaellig in einem
+Titel stehen, und ein zufaelliges Zeichen soll nicht das ganze Gelaeut
+abstellen. Fuer alle also "+AUS", "+AUSA" oder "+AA".
 
 Die Kurzform greift NUR mit einem Kuerzel, das es wirklich gibt. Sonst risse
 sie Loecher in gewoehnliche Titel: Aus "Konzert +Anmeldung erforderlich" wuerde
@@ -61,9 +62,6 @@ class Befund:
     alles_aus: bool = False     # stand "+AUSA" (oder "+AUS") darin?
     kuerzel: list[str] = field(default_factory=list)   # genannte Kuerzel, gross
     gefunden: bool = False      # stand ueberhaupt ein Marker im Titel?
-    # Stand "+AUS" ohne Kuerzel da? Das bewirkt nichts und ist fast immer ein
-    # vergessenes "A".
-    ohne_kuerzel: bool = False
 
 
 def lesen(roh: str | None, bekannte=()) -> Befund:
@@ -84,19 +82,15 @@ def lesen(roh: str | None, bekannte=()) -> Befund:
     def ersetzen(treffer: re.Match) -> str:
         wort = (treffer.group(1) or "").upper()
         k = (treffer.group(2) or "").upper()
-        if not k:
-            # Ohne Kuerzel fehlt die Angabe, was abgeschaltet werden soll.
-            # Bei der langen Form ist die Absicht aber erkennbar - das gehoert
-            # gemeldet, sonst laeutet es und niemand weiss, warum.
-            if wort != ALLE:
-                befund.ohne_kuerzel = True
+        if not k and wort == ALLE:
+            # "+A" allein ist kein Befehl - siehe Kopf dieser Datei.
             return treffer.group(0)      # kein Marker: Text unangetastet
         # Kurzform nur bei einem Kuerzel, das es gibt - sonst bliebe von
         # "+Anmeldung" ein Loch im Titel zurueck.
         if wort == ALLE and k != ALLE and k not in bekannt:
             return treffer.group(0)
         befund.gefunden = True
-        if k == ALLE:
+        if not k or k == ALLE:
             befund.alles_aus = True
         elif k not in gesehen:
             gesehen.add(k)

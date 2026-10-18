@@ -1021,7 +1021,6 @@ async function loadNextRingings() {
     // Kuerzel, die im Kalender stehen, aber zu keiner Regel gehoeren. Das ist
     // der gefaehrliche Fall: Wer sich vertippt, glaubt, es laeute nicht.
     const unbekannt = new Set<string>();
-    let ohneKuerzel = false;
     const alleKuerzel = rules.value.map((r) => r.kuerzel);
 
     for (const it of items) {
@@ -1041,7 +1040,6 @@ async function loadNextRingings() {
         const title = befund.titel;
         if (title) seenTitles.add(title);
         for (const k of unbekannteKuerzel(befund, alleKuerzel)) unbekannt.add(k);
-        if (befund.ohneKuerzel) ohneKuerzel = true;
 
         for (const r of active) {
             if (r.calendarId && r.calendarId !== calendarId) continue;
@@ -1065,10 +1063,6 @@ async function loadNextRingings() {
         markerHint.value = `Im Kalender steht +AUS${[...unbekannt].join(', +AUS')} – `
             + 'dieses Kürzel hat keine Regel. Dort läutet es also trotzdem. '
             + 'Kürzel unter „Automatik-Regeln" prüfen.';
-        pushLog('Vorschau – ' + markerHint.value, 'gw');
-    } else if (ohneKuerzel) {
-        markerHint.value = 'Im Kalender steht „+AUS" ohne Kürzel – das bewirkt nichts. '
-            + 'Gemeint war vermutlich „+AUSA" (alles) oder „+AUS" mit dem Kürzel einer Regel.';
         pushLog('Vorschau – ' + markerHint.value, 'gw');
     }
 
@@ -1261,7 +1255,7 @@ async function loadNextRingings() {
                     </tbody>
                   </table>
                 </div>
-                <p class="gs-note" style="color:var(--gs-dim)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><span>Vorschau aus ChurchTools (Zeit = Beginn − Vorlauf). Regeln <b>mit</b> Termin-Titel greifen nur bei Terminen, deren Titel <b>exakt</b> übereinstimmt – „Gottesdienst" trifft also nicht auch „Festgottesdienst". Regeln <b>ohne</b> Titel greifen bei allen Terminen des Kalenders. Einzelne Termine lassen sich im Kalendertitel abschalten: <b>+AUSA</b> (kurz <b>+AA</b>) schaltet alles ab, <b>+AUS</b> bzw. <b>+A</b> mit dem Kürzel einer Regel nur diese. Ein Kürzel gehört immer dazu. Das tatsächliche Auslösen übernimmt der Gateway-Dienst.</span></p>
+                <p class="gs-note" style="color:var(--gs-dim)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><span>Vorschau aus ChurchTools (Zeit = Beginn − Vorlauf). Regeln <b>mit</b> Termin-Titel greifen nur bei Terminen, deren Titel <b>exakt</b> übereinstimmt – „Gottesdienst" trifft also nicht auch „Festgottesdienst". Regeln <b>ohne</b> Titel greifen bei allen Terminen des Kalenders. Einzelne Termine lassen sich im Kalendertitel abschalten: <b>+AUS</b>, <b>+AUSA</b> oder <b>+AA</b> schaltet alles ab, <b>+AUS</b> bzw. <b>+A</b> mit dem Kürzel einer Regel nur diese. Das tatsächliche Auslösen übernimmt der Gateway-Dienst.</span></p>
               </div>
             </section>
 
