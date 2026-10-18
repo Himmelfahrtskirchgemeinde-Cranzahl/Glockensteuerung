@@ -229,6 +229,7 @@ def build_schedule(ct: ChurchTools, cfg: GatewayConfig) -> list[dict]:
     # Kuerzel bekannt ist.
     alle_kuerzel = [r.kuerzel for r in cfg.rules]
     unbekannt: set[str] = set()
+    ohne_kuerzel = False
     ausgenommen = 0
     for occ in occs:
         start = occ.get("start")
@@ -237,6 +238,7 @@ def build_schedule(ct: ChurchTools, cfg: GatewayConfig) -> list[dict]:
         start_ts = start.timestamp()
         befund = marker.lesen(occ.get("title"), alle_kuerzel)
         unbekannt.update(marker.unbekannte(befund, alle_kuerzel))
+        ohne_kuerzel = ohne_kuerzel or befund.ohne_kuerzel
         for rule in active:
             if not rule_matches(rule, occ, befund):
                 # Nur am Marker gescheitert? Das ist gewollt und gehoert
@@ -262,6 +264,12 @@ def build_schedule(ct: ChurchTools, cfg: GatewayConfig) -> list[dict]:
         # zweimal da.
         log.info("%d Laeutung(en) durch einen Marker im Kalendertitel "
                  "ausgenommen.", ausgenommen)
+    if ohne_kuerzel:
+        # Dasselbe stille Risiko wie beim Tippfehler: Es sieht aus wie ein
+        # Befehl, bewirkt aber nichts.
+        log.warning("Im Kalender steht \"+AUS\" ohne Kuerzel - das bewirkt "
+                    "nichts. Gemeint war vermutlich \"+AUSA\" (alles) oder "
+                    "\"+AUS\" mit dem Kuerzel einer Regel.")
     if unbekannt:
         # Der gefaehrliche Fall: Wer sich vertippt, glaubt, es laeute nicht -
         # und es laeutet doch. WARNING, damit es auch im Ereignis-Log der

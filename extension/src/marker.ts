@@ -9,9 +9,14 @@
  *   Gottesdienst +AUSVL     nur die Regel mit dem Kuerzel "VL" faellt aus
  *   Gottesdienst +AUSVL +AUSNL   mehrere auf einmal
  *
- * Kurzform: statt "AUS" genuegt ein "A" - "+AVL" wirkt wie "+AUSVL", "+A" wie
- * "+AUSA". Gross- und Kleinschreibung ist egal, ein Doppelpunkt darf dazwischen
- * stehen (`+AUS:VL`), und `+AUS` ohne Zusatz gilt wie `+AUSA`.
+ * Kurzform: statt "AUS" genuegt ein "A" - "+AVL" wirkt wie "+AUSVL", "+AA" wie
+ * "+AUSA". Gross- und Kleinschreibung ist egal, und ein Doppelpunkt darf
+ * dazwischen stehen (`+AUS:VL`).
+ *
+ * Ein Kuerzel gehoert IMMER dazu - entweder das einer Regel oder "A" fuer alle.
+ * "+AUS" oder "+A" allein bewirkt nichts: Dort fehlt die Angabe, was
+ * abgeschaltet werden soll, und ein halber Befehl soll nicht das ganze Gelaeut
+ * abstellen.
  *
  * Die Kurzform greift NUR mit einem Kuerzel, das es wirklich gibt. Sonst risse
  * sie Loecher in gewoehnliche Titel: Aus "Konzert +Anmeldung erforderlich"
@@ -50,6 +55,11 @@ export interface MarkerBefund {
     kuerzel: string[];
     /** Stand ueberhaupt ein Marker im Titel? */
     gefunden: boolean;
+    /**
+     * Stand `+AUS` ohne Kuerzel da? Das bewirkt nichts und ist fast immer ein
+     * vergessenes „A".
+     */
+    ohneKuerzel: boolean;
 }
 
 /**
@@ -61,7 +71,7 @@ export interface MarkerBefund {
 export function markerLesen(roh: string | null | undefined,
                             bekannte: Array<string | null | undefined> = []): MarkerBefund {
     const text = (roh ?? '').toString();
-    const befund: MarkerBefund = { titel: text.trim(), allesAus: false, kuerzel: [], gefunden: false };
+    const befund: MarkerBefund = { titel: text.trim(), allesAus: false, kuerzel: [], gefunden: false, ohneKuerzel: false };
     if (!text.includes('+')) return befund;   // haeufigster Fall, ohne Regex
 
     const bekannt = new Set(bekannte.map((k) => (k ?? '').trim().toUpperCase()).filter(Boolean));
@@ -69,11 +79,18 @@ export function markerLesen(roh: string | null | undefined,
     let rest = text.replace(MUSTER, (treffer, wortRoh?: string, gruppe?: string) => {
         const wort = (wortRoh ?? '').toUpperCase();
         const k = (gruppe ?? '').toUpperCase();
+        if (!k) {
+            // Ohne Kuerzel fehlt die Angabe, was abgeschaltet werden soll. Bei
+            // der langen Form ist die Absicht aber erkennbar - das gehoert
+            // gemeldet, sonst laeutet es und niemand weiss, warum.
+            if (wort !== ALLE) befund.ohneKuerzel = true;
+            return treffer;              // kein Marker: Text unangetastet
+        }
         // Kurzform nur bei einem Kuerzel, das es gibt - sonst bliebe von
         // "+Anmeldung" ein Loch im Titel zurueck.
-        if (wort === ALLE && k && k !== ALLE && !bekannt.has(k)) return treffer;
+        if (wort === ALLE && k !== ALLE && !bekannt.has(k)) return treffer;
         befund.gefunden = true;
-        if (!k || k === ALLE) befund.allesAus = true;
+        if (k === ALLE) befund.allesAus = true;
         else if (!gesehen.has(k)) { gesehen.add(k); befund.kuerzel.push(k); }
         return ' ';
     });

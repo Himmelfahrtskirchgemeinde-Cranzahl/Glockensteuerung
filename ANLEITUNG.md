@@ -190,12 +190,18 @@ genügt ein Zusatz **im Titel des Kalendertermins**.
 | `Gottesdienst +AUSVL` | Nur die Regel mit dem Kürzel `VL` fällt aus – alles andere läutet. |
 | `Gottesdienst +AUSVL +AUSNL` | Mehrere auf einmal. |
 
-**Kurzform:** Statt `AUS` genügt ein `A` – `+AVL` wirkt wie `+AUSVL`, und `+A`
+**Kurzform:** Statt `AUS` genügt ein `A` – `+AVL` wirkt wie `+AUSVL`, und `+AA`
 wie `+AUSA`.
 
 Groß- und Kleinschreibung ist egal (`+ausa` geht auch), ein Doppelpunkt darf
 dazwischen stehen (`+AUS:VL`), und der Zusatz darf vorn, hinten oder mittendrin
-stehen. `+AUS` ohne Zusatz gilt wie `+AUSA`.
+stehen.
+
+> **Ein Kürzel gehört immer dazu** – entweder das einer Regel oder `A` für
+> alle. **`+AUS` oder `+A` allein bewirkt nichts**: Dort fehlt die Angabe, was
+> abgeschaltet werden soll, und ein halber Befehl soll nicht das ganze Geläut
+> abstellen. Steht `+AUS` ohne Kürzel im Kalender, erscheint dafür eine
+> Warnung – damit niemand glaubt, er hätte abgeschaltet.
 
 > **Warum die Kurzform ein bekanntes Kürzel braucht.** `+AVL` wirkt nur, wenn
 > es die Regel mit dem Kürzel `VL` wirklich gibt. Sonst würde jedes Wort hinter
