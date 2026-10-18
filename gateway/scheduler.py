@@ -183,7 +183,10 @@ def rule_matches(rule: Rule, occ: dict, befund: "marker.Befund | None" = None,
     if rule.calendar_id is not None and occ.get("calendarId") != rule.calendar_id:
         return False
     if befund is None:
-        befund = marker.lesen(occ.get("title"))
+        # Fuer die Einzelpruefung ist genau ein Kuerzel bekannt: das dieser
+        # Regel. Mehr braucht es hier nicht - build_schedule reicht ohnehin
+        # einen Befund durch, der alle kennt.
+        befund = marker.lesen(occ.get("title"), [rule.kuerzel])
     # Erst der Marker: Er entscheidet unabhaengig davon, ob die Regel einen
     # Titel verlangt. Sonst bliebe er bei Regeln ohne Titelfilter wirkungslos.
     if marker_beachten and marker.ausgenommen(befund, rule.kuerzel):
@@ -232,7 +235,7 @@ def build_schedule(ct: ChurchTools, cfg: GatewayConfig) -> list[dict]:
         if not start:
             continue
         start_ts = start.timestamp()
-        befund = marker.lesen(occ.get("title"))
+        befund = marker.lesen(occ.get("title"), alle_kuerzel)
         unbekannt.update(marker.unbekannte(befund, alle_kuerzel))
         for rule in active:
             if not rule_matches(rule, occ, befund):
@@ -274,7 +277,7 @@ def build_schedule(ct: ChurchTools, cfg: GatewayConfig) -> list[dict]:
         gesucht = sorted({r.title.strip() for r in active if r.title})
         # Titel OHNE Marker zeigen: Sonst sieht es aus, als stimme die
         # Schreibweise nicht - dabei ist der Termin absichtlich ausgenommen.
-        vorhanden = sorted({marker.lesen(o["title"]).titel
+        vorhanden = sorted({marker.lesen(o["title"], alle_kuerzel).titel
                             for o in occs if o.get("title")})[:12]
         if not occs:
             log.warning("Keine Ausloesung geplant: im Zeitraum liegen keine Termine "

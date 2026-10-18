@@ -1036,7 +1036,7 @@ async function loadNextRingings() {
         const calName: string = base?.calendar?.name ?? '';
         // Marker aus dem Titel schneiden, BEVOR verglichen wird - sonst
         // passte „Gottesdienst +AUSA" nicht mehr auf die Regel „Gottesdienst".
-        const befund = markerLesen(String(base?.title ?? base?.caption ?? ''));
+        const befund = markerLesen(String(base?.title ?? base?.caption ?? ''), alleKuerzel);
         const title = befund.titel;
         if (title) seenTitles.add(title);
         for (const k of unbekannteKuerzel(befund, alleKuerzel)) unbekannt.add(k);
@@ -1255,7 +1255,7 @@ async function loadNextRingings() {
                     </tbody>
                   </table>
                 </div>
-                <p class="gs-note" style="color:var(--gs-dim)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><span>Vorschau aus ChurchTools (Zeit = Beginn − Vorlauf). Regeln <b>mit</b> Termin-Titel greifen nur bei Terminen, deren Titel <b>exakt</b> übereinstimmt – „Gottesdienst" trifft also nicht auch „Festgottesdienst". Regeln <b>ohne</b> Titel greifen bei allen Terminen des Kalenders. Einzelne Termine lassen sich im Kalendertitel abschalten: <b>+AUSA</b> schaltet alles ab, <b>+AUS</b> mit dem Kürzel einer Regel nur diese. Das tatsächliche Auslösen übernimmt der Gateway-Dienst.</span></p>
+                <p class="gs-note" style="color:var(--gs-dim)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg><span>Vorschau aus ChurchTools (Zeit = Beginn − Vorlauf). Regeln <b>mit</b> Termin-Titel greifen nur bei Terminen, deren Titel <b>exakt</b> übereinstimmt – „Gottesdienst" trifft also nicht auch „Festgottesdienst". Regeln <b>ohne</b> Titel greifen bei allen Terminen des Kalenders. Einzelne Termine lassen sich im Kalendertitel abschalten: <b>+AUSA</b> (kurz <b>+A</b>) schaltet alles ab, <b>+AUS</b> bzw. <b>+A</b> mit dem Kürzel einer Regel nur diese. Das tatsächliche Auslösen übernimmt der Gateway-Dienst.</span></p>
               </div>
             </section>
 
@@ -1320,7 +1320,7 @@ async function loadNextRingings() {
               <p style="color:var(--gs-dim);font-size:13.5px;margin:0 0 14px">Vom Gateway-Dienst für automatisches Läuten genutzt (Termin → Programm). Der <b>Termin-Titel</b> muss <b>exakt</b> so lauten wie im Kalender – leer lassen heißt „jeder Termin des Kalenders".</p>
               <p class="gs-readonly" style="margin-bottom:14px">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
-                <span>Einen <b>einzelnen Termin</b> ausnehmen, ohne hier etwas zu ändern: im Kalendertitel <b>+AUSA</b> anhängen – dann läutet für diesen Termin nichts. Soll nur <b>eine</b> Regel ausfallen, bekommt sie unten ein <b>Kürzel</b>; im Kalender steht dann z. B. <b>+AUSVL</b>.</span></p>
+                <span>Einen <b>einzelnen Termin</b> ausnehmen, ohne hier etwas zu ändern: im Kalendertitel <b>+AUSA</b> anhängen – dann läutet für diesen Termin nichts. Soll nur <b>eine</b> Regel ausfallen, bekommt sie unten ein <b>Kürzel</b>; im Kalender steht dann z. B. <b>+AUSVL</b> – oder kurz <b>+AVL</b>.</span></p>
               <p v-if="!canEdit('regeln')" class="gs-readonly"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Zum Ändern brauchst du das Recht „Daten in Kategorie bearbeiten" für „Automatik-Regeln". Ein Admin vergibt es in der Rechteverwaltung unter „Glockensteuerung".</p>
               <p v-if="rules.length === 0" class="gs-empty">(noch keine Regeln)</p>
               <div v-for="(rule, i) in rules" :key="rule.id" class="gs-rule">
@@ -1351,7 +1351,7 @@ async function loadNextRingings() {
                   <input type="text" v-model="rule.kuerzel" placeholder="(keines) z. B. VL" maxlength="12"
                          style="width:auto;min-width:120px" :disabled="!canEdit('regeln')">
                   <span v-if="kuerzelFehler(rule)" class="gs-pill warn" style="margin-left:8px">{{ kuerzelFehler(rule) }}</span>
-                  <span v-else-if="rule.kuerzel" class="gs-muted" style="margin-left:8px;font-size:12.5px">im Kalendertitel: <b>+AUS{{ (rule.kuerzel || '').toUpperCase() }}</b></span>
+                  <span v-else-if="rule.kuerzel" class="gs-muted" style="margin-left:8px;font-size:12.5px">im Kalendertitel: <b>+AUS{{ (rule.kuerzel || '').toUpperCase() }}</b> oder kurz <b>+A{{ (rule.kuerzel || '').toUpperCase() }}</b></span>
                 </div>
                 <label>Aktiv</label><label class="gs-switch"><input type="checkbox" v-model="rule.active" :disabled="!canEdit('regeln')"></label>
                 <template v-if="canEdit('regeln')"><div></div><button class="gs-btn gs-stop sm" style="justify-self:start" @click="delRule(i)">Löschen</button></template>

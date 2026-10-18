@@ -73,7 +73,8 @@ der Gateway erwartet (`VOCO_EXT_KEY`).
   (`custommodules`).
 - **Einzelne Termine ausnehmen:** Steht im **Kalendertitel** `+AUSA`, läutet
   für diesen Termin nichts; `+AUS<Kürzel>` schaltet nur die Regel mit diesem
-  Kürzel ab. Der Zusatz wird vor dem Titelvergleich herausgerechnet –
+  Kürzel ab. Kurzform `+A` bzw. `+A<Kürzel>` – die greift aber nur bei einem
+  Kürzel, das es gibt, sonst würde „+Anmeldung" im Titel zum Befehl. Der Zusatz wird vor dem Titelvergleich herausgerechnet –
   „Gottesdienst +AUSVL" gilt also weiter als „Gottesdienst". Die Grammatik
   steht in `src/marker.ts` und **wortgleich** im Gateway in
   `gateway/marker.py`; beide gehören zusammen geändert, sonst zeigt die

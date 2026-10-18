@@ -9,8 +9,15 @@
  *   Gottesdienst +AUSVL     nur die Regel mit dem Kuerzel "VL" faellt aus
  *   Gottesdienst +AUSVL +AUSNL   mehrere auf einmal
  *
- * Gross- und Kleinschreibung ist egal, ein Doppelpunkt darf dazwischen stehen
- * (`+AUS:VL`). `+AUS` ohne Zusatz gilt wie `+AUSA`.
+ * Kurzform: statt "AUS" genuegt ein "A" - "+AVL" wirkt wie "+AUSVL", "+A" wie
+ * "+AUSA". Gross- und Kleinschreibung ist egal, ein Doppelpunkt darf dazwischen
+ * stehen (`+AUS:VL`), und `+AUS` ohne Zusatz gilt wie `+AUSA`.
+ *
+ * Die Kurzform greift NUR mit einem Kuerzel, das es wirklich gibt. Sonst risse
+ * sie Loecher in gewoehnliche Titel: Aus "Konzert +Anmeldung erforderlich"
+ * wuerde "Konzert erforderlich", und "nmeldung" galte als Kuerzel. "+AUS" ist
+ * dagegen eindeutig genug, um immer zu wirken - auch mit einem Kuerzel, das es
+ * nicht gibt (das ist ein Tippfehler, und der soll auffallen).
  *
  * WICHTIG: Der Marker wird aus dem Titel GESCHNITTEN, bevor er mit dem Titel
  * einer Regel verglichen wird. Sonst passte „Gottesdienst +AUSA" nicht mehr
@@ -28,9 +35,11 @@ export const ALLE = 'A';
 /** Woraus ein Kuerzel bestehen darf. */
 export const KUERZEL_ZEICHEN = /^[A-Za-z0-9ÄÖÜäöüß_-]+$/;
 
-// Das Pluszeichen ist der Indikator, "AUS" das Steuerwort. Beides zusammen
-// kommt in einem Termin-Titel sonst nicht vor - anders als ein "+" allein.
-const MUSTER = /\+AUS(?::?([A-Za-zÄÖÜäöüß0-9_-]+))?/gi;
+// Das Pluszeichen ist der Indikator, "AUS" (oder kurz "A") das Steuerwort.
+// Beides zusammen kommt in einem Termin-Titel sonst nicht vor - anders als ein
+// "+" allein. Die Reihenfolge in der Alternative ist wichtig: "AUS" wird zuerst
+// versucht, sonst laese sich "+AUSVL" auch als "A" + Kuerzel "USVL".
+const MUSTER = /\+(AUS|A)(?::?([A-Za-zÄÖÜäöüß0-9_-]+))?/gi;
 
 export interface MarkerBefund {
     /** Titel ohne die Marker - damit wird gegen die Regel verglichen. */
@@ -43,16 +52,27 @@ export interface MarkerBefund {
     gefunden: boolean;
 }
 
-/** Titel zerlegen: was bleibt, und was soll ausfallen? */
-export function markerLesen(roh: string | null | undefined): MarkerBefund {
+/**
+ * Titel zerlegen: was bleibt, und was soll ausfallen?
+ *
+ * `bekannte` sind die Kuerzel aller Regeln. Sie entscheiden allein ueber die
+ * Kurzform `+A<Kuerzel>`; ohne sie wirkt nur das eindeutige `+AUS...`.
+ */
+export function markerLesen(roh: string | null | undefined,
+                            bekannte: Array<string | null | undefined> = []): MarkerBefund {
     const text = (roh ?? '').toString();
     const befund: MarkerBefund = { titel: text.trim(), allesAus: false, kuerzel: [], gefunden: false };
     if (!text.includes('+')) return befund;   // haeufigster Fall, ohne Regex
 
+    const bekannt = new Set(bekannte.map((k) => (k ?? '').trim().toUpperCase()).filter(Boolean));
     const gesehen = new Set<string>();
-    let rest = text.replace(MUSTER, (_treffer, gruppe?: string) => {
-        befund.gefunden = true;
+    let rest = text.replace(MUSTER, (treffer, wortRoh?: string, gruppe?: string) => {
+        const wort = (wortRoh ?? '').toUpperCase();
         const k = (gruppe ?? '').toUpperCase();
+        // Kurzform nur bei einem Kuerzel, das es gibt - sonst bliebe von
+        // "+Anmeldung" ein Loch im Titel zurueck.
+        if (wort === ALLE && k && k !== ALLE && !bekannt.has(k)) return treffer;
+        befund.gefunden = true;
         if (!k || k === ALLE) befund.allesAus = true;
         else if (!gesehen.has(k)) { gesehen.add(k); befund.kuerzel.push(k); }
         return ' ';
