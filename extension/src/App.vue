@@ -170,6 +170,35 @@ const gatewayPillTitel = computed(() => {
     if (s?.simulation) teile.push('Der Dienst läuft in Simulation – er löst nichts aus.');
     return teile.join(' ');
 });
+/** Fassung des Gateway-Dienstes, wie sie im Lebenszeichen steht. */
+const gatewayVersion = computed(() => gatewayStatus.value?.version || '');
+/**
+ * Laufen Erweiterung und Dienst auseinander?
+ *
+ * Beide bekommen beim Bauen DIESELBE Nummer. Weichen sie ab, wurde eine Seite
+ * nicht mitaktualisiert - meist der Dienst auf dem Rechner der Gemeinde, denn
+ * die Erweiterung tauscht man in ChurchTools aus, den Dienst aber am Rechner.
+ * Im Entwicklungsbetrieb heisst die Erweiterung „dev"; dann sagt der Vergleich
+ * nichts.
+ */
+const versionenUneinig = computed(() => {
+    const g = gatewayVersion.value;
+    return !!g && APP_VERSION !== 'dev' && APP_VERSION !== '0.0.0' && g !== APP_VERSION;
+});
+/** Was an der Fassung des Dienstes in der Fußzeile steht. */
+const gatewayVersionTitel = computed(() => {
+    if (!gatewayVersion.value) {
+        return 'Die Fassung des Dienstes steht im Lebenszeichen. Solange keines eingegangen '
+            + 'ist, lässt sie sich nicht sagen.';
+    }
+    if (versionenUneinig.value) {
+        return `Der Dienst läuft mit Fassung ${gatewayVersion.value}, diese Erweiterung mit `
+            + `${APP_VERSION}. Beide gehören zusammen – vermutlich wurde der Dienst auf dem `
+            + 'Rechner noch nicht aktualisiert (Menüpunkt 5 am Rechner).';
+    }
+    return `Der Gateway-Dienst läuft mit derselben Fassung wie diese Erweiterung (${APP_VERSION}).`;
+});
+
 /** Erklärt, seit wann der Dienst fehlt. */
 const gatewayDownText = computed(() => {
     const age = gatewayAgeMin.value;
@@ -283,6 +312,7 @@ function ctx(): ReportContext {
     try { instance = new URL(baseUrl).host; } catch { instance = String(baseUrl); }
     return {
         version: APP_VERSION,
+        gatewayVersion: gatewayVersion.value,
         instance,
         device: maskSerial(device.value.serial),
         online: online.value,
@@ -890,6 +920,7 @@ async function sendFeedback() {
                 body: `${felder.message}\n\n— — —\n`
                     + `Von: ${felder.name || '(ohne Namen)'} <${felder.email || 'keine Adresse'}>\n`
                     + `Instanz: ${c.instance}\nGerät: ${c.device}\nVersion: ${c.version}\n`
+                    + `Dienst: ${c.gatewayVersion || '(kein Lebenszeichen)'}\n`
                     + `Gerät online: ${c.online}\n\nLetzte Ereignisse:\n${c.logTail.join('\n')}`,
                 at: new Date().toISOString(),
             });
@@ -1157,6 +1188,14 @@ async function loadNextRingings() {
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
               Version {{ updateCheck!.latest }} verfügbar
             </a>
+            <!-- Fassung des Gateway-Dienstes. Sie steht im Lebenszeichen; ohne
+                 Lebenszeichen lässt sie sich nicht sagen. Weicht sie von der
+                 Erweiterung ab, fällt das hier auf – beide gehören zusammen. -->
+            <div v-if="gatewayBekannt" class="gwver" :class="{ uneinig: versionenUneinig }"
+                 :title="gatewayVersionTitel">
+              <svg v-if="versionenUneinig" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+              Dienst <b>{{ gatewayVersion ? 'v' + gatewayVersion : '(unbekannt)' }}</b>
+            </div>
             <div>Entwickelt mit <span class="heart">♥</span> von JosuaDev</div>
           </div>
         </nav>
